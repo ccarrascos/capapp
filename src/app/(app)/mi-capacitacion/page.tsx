@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { FileCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import {
@@ -32,7 +34,9 @@ export default async function MiCapacitacionPage() {
   const { data: historial } = persona
     ? await supabase
         .from("inscripciones")
-        .select("id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(cursos(nombre))")
+        .select(
+          "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(cursos(nombre)), certificados(id, numero_certificado)",
+        )
         .eq("persona_run", persona.run)
         .order("fecha_inscripcion", { ascending: false })
     : { data: [] };
@@ -76,12 +80,13 @@ export default async function MiCapacitacionPage() {
                 <TableHead>Aprobación</TableHead>
                 <TableHead>Vigente hasta</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Certificado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(historial ?? []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                     Sin inscripciones registradas.
                   </TableCell>
                 </TableRow>
@@ -95,6 +100,20 @@ export default async function MiCapacitacionPage() {
                   <TableCell className="font-mono text-sm">{h.fecha_aprobacion ?? "—"}</TableCell>
                   <TableCell className="font-mono text-sm">{h.vigencia_hasta ?? "—"}</TableCell>
                   <TableCell className="capitalize">{h.estado.replace(/_/g, " ")}</TableCell>
+                  <TableCell>
+                    {h.certificados ? (
+                      <Link
+                        href={`/certificados/${h.certificados.id}`}
+                        target="_blank"
+                        className="flex items-center gap-1.5 text-primary hover:underline whitespace-nowrap"
+                      >
+                        <FileCheck2 className="size-4" />
+                        Ver certificado
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
