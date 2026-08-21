@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { Camera } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { actualizarPerfil } from "./actions";
+import { actualizarPerfil, subirAvatar } from "./actions";
 
 export function PerfilView({
   nombres,
@@ -16,6 +18,7 @@ export function PerfilView({
   telefono,
   rut,
   roles,
+  avatarUrl,
 }: {
   nombres: string;
   apellidos: string;
@@ -23,6 +26,7 @@ export function PerfilView({
   telefono: string;
   rut: string | null;
   roles: { rol: string; organizacion: string | null }[];
+  avatarUrl: string | null;
 }) {
   return (
     <div className="flex flex-col gap-8 max-w-xl">
@@ -30,6 +34,8 @@ export function PerfilView({
         <p className="text-xs uppercase tracking-wider text-muted-foreground">Cuenta</p>
         <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Mi perfil</h1>
       </div>
+
+      <AvatarUploader nombres={nombres} apellidos={apellidos} avatarUrl={avatarUrl} />
 
       <DatosPersonales nombres={nombres} apellidos={apellidos} email={email} telefono={telefono} rut={rut} />
 
@@ -46,6 +52,72 @@ export function PerfilView({
       </div>
 
       <CambiarContrasena />
+    </div>
+  );
+}
+
+function AvatarUploader({
+  nombres,
+  apellidos,
+  avatarUrl,
+}: {
+  nombres: string;
+  apellidos: string;
+  avatarUrl: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [urlActual, setUrlActual] = useState(avatarUrl);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const iniciales = `${nombres[0] ?? ""}${apellidos[0] ?? ""}`.toUpperCase();
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+
+    const formData = new FormData();
+    formData.set("archivo", archivo);
+
+    startTransition(async () => {
+      const resultado = await subirAvatar(formData);
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setUrlActual(resultado.avatarUrl);
+      toast.success("Foto de perfil actualizada.");
+    });
+
+    e.target.value = "";
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative">
+        <Avatar size="lg" className="size-16">
+          {urlActual && <AvatarImage src={urlActual} alt={`${nombres} ${apellidos}`} />}
+          <AvatarFallback className="text-base">{iniciales}</AvatarFallback>
+        </Avatar>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={pending}
+          title="Cambiar foto"
+          className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background disabled:opacity-50"
+        >
+          <Camera className="size-3.5" />
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={onFileChange}
+        />
+      </div>
+      <div>
+        <p className="text-sm font-medium">Foto de perfil</p>
+        <p className="text-xs text-muted-foreground">JPG, PNG o WEBP. Máximo 3 MB.</p>
+      </div>
     </div>
   );
 }

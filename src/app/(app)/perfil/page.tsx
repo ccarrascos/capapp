@@ -31,6 +31,7 @@ export default async function PerfilPage() {
       email={usuario?.email ?? sesion.email}
       telefono={usuario?.telefono ?? ""}
       rut={usuario?.run && usuario?.dv ? formatearRut(usuario.run, usuario.dv) : null}
+      avatarUrl={sesion.avatarUrl}
       roles={sesion.roles.map((r) => ({
         rol: ROL_LABEL[r.rol] ?? r.rol,
         organizacion: r.organizacionNombre,

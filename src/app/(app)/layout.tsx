@@ -24,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           organizacionActual={sesion.esSuperAdmin ? "Todas las organizaciones" : organizacionActual}
           rolesUsuario={rolesUsuario}
           esSuperAdmin={sesion.esSuperAdmin}
+          avatarUrl={sesion.avatarUrl}
         />
         <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8">{children}</main>
       </div>

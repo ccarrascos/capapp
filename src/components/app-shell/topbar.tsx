@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Menu, LogOut, ChevronDown, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,7 @@ export function Topbar({
   organizacionActual,
   rolesUsuario,
   esSuperAdmin,
+  avatarUrl,
 }: {
   nombres: string;
   apellidos: string;
@@ -46,6 +47,7 @@ export function Topbar({
   organizacionActual: string | null;
   rolesUsuario: RolNombre[];
   esSuperAdmin: boolean;
+  avatarUrl: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -100,6 +102,7 @@ export function Topbar({
           }
         >
           <Avatar className="size-8 rounded-sm">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={`${nombres} ${apellidos}`} className="rounded-sm" />}
             <AvatarFallback className="rounded-sm bg-primary text-primary-foreground text-xs font-semibold">
               {iniciales(nombres, apellidos)}
             </AvatarFallback>

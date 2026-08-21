@@ -29,8 +29,8 @@ export default async function DashboardPage() {
   const esFacilitador = sesion.roles.some((r) => r.rol === "facilitador");
 
   if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} />;
-  if (esFacilitador) return <DashboardFacilitador />;
-  return <DashboardTrabajador />;
+  if (esFacilitador) return <DashboardFacilitador nombres={sesion.nombres} />;
+  return <DashboardTrabajador nombres={sesion.nombres} />;
 }
 
 async function DashboardOrganizacion({ nombres }: { nombres: string }) {
@@ -122,7 +122,7 @@ async function DashboardOrganizacion({ nombres }: { nombres: string }) {
   );
 }
 
-async function DashboardFacilitador() {
+async function DashboardFacilitador({ nombres }: { nombres: string }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -144,9 +144,10 @@ async function DashboardFacilitador() {
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
-      <h1 className="font-heading text-3xl font-bold uppercase tracking-tight">
-        Mis ediciones de curso
-      </h1>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis ediciones de curso</p>
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Hola, {nombres}</h1>
+      </div>
       <div className="border border-border bg-card divide-y divide-border">
         {(ediciones ?? []).length === 0 && (
           <p className="px-5 py-8 text-sm text-muted-foreground">
@@ -171,7 +172,7 @@ async function DashboardFacilitador() {
   );
 }
 
-async function DashboardTrabajador() {
+async function DashboardTrabajador({ nombres }: { nombres: string }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -195,9 +196,10 @@ async function DashboardTrabajador() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <h1 className="font-heading text-3xl font-bold uppercase tracking-tight">
-        Mi capacitación
-      </h1>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Mi capacitación</p>
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Hola, {nombres}</h1>
+      </div>
       <div className="border border-border bg-card p-8 flex flex-col items-center text-center gap-4">
         <SignBadge estado={estado} size="md" className="text-lg" />
         {fila?.vigencia_hasta ? (
