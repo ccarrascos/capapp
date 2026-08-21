@@ -1,0 +1,215 @@
+import Link from "next/link";
+import { getSesion } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { KpiTile } from "@/components/dashboard/kpi-tile";
+import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+const ORG_ROLES = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
+
+export default async function DashboardPage() {
+  const sesion = await getSesion();
+  if (!sesion) return null;
+
+  const esRolOrg = sesion.roles.some((r) => ORG_ROLES.includes(r.rol as (typeof ORG_ROLES)[number]));
+  const esFacilitador = sesion.roles.some((r) => r.rol === "facilitador");
+
+  if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} />;
+  if (esFacilitador) return <DashboardFacilitador />;
+  return <DashboardTrabajador />;
+}
+
+async function DashboardOrganizacion({ nombres }: { nombres: string }) {
+  const supabase = await createClient();
+  const { data: matriz } = await supabase
+    .from("matriz_vigencia_capacitacion")
+    .select("*")
+    .eq("trabajador_activo", true);
+
+  const filas = matriz ?? [];
+  const total = filas.length;
+  const conteo = (estado: EstadoVigencia) => filas.filter((f) => f.estado_vigencia === estado).length;
+  const vigentes = conteo("vigente");
+  const porVencer = conteo("por_vencer");
+  const vencidos = conteo("vencido");
+  const sinCapacitacion = conteo("sin_capacitacion");
+  const cumplimiento = total > 0 ? Math.round((vigentes / total) * 100) : 0;
+
+  const proximos = filas
+    .filter((f) => f.estado_vigencia === "por_vencer" || f.estado_vigencia === "vencido")
+    .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
+    .slice(0, 8);
+
+  return (
+    <div className="flex flex-col gap-8 max-w-6xl">
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+          Panel de cumplimiento
+        </p>
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">
+          Hola, {nombres}
+        </h1>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <KpiTile label="Trabajadores" value={total} accent="steel" />
+        <KpiTile label="Vigentes" value={vigentes} accent="clear" />
+        <KpiTile label="Por vencer (60 días)" value={porVencer} accent="hazard" />
+        <KpiTile label="Vencidos / sin curso" value={vencidos + sinCapacitacion} accent="alert" />
+        <KpiTile label="Cumplimiento" value={cumplimiento} suffix="%" accent="signal" />
+      </div>
+
+      <div className="border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+            Próximos vencimientos
+          </h2>
+          <Button render={<Link href="/trabajadores" />} nativeButton={false} variant="outline" size="sm">
+            Ver matriz completa
+          </Button>
+        </div>
+
+        {proximos.length === 0 ? (
+          <p className="px-5 py-8 text-sm text-muted-foreground">
+            No hay vencimientos próximos ni pendientes. La matriz está al día.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Trabajador</TableHead>
+                <TableHead>RUN</TableHead>
+                <TableHead>Cargo</TableHead>
+                <TableHead>Vence</TableHead>
+                <TableHead>Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {proximos.map((f) => (
+                <TableRow key={f.persona_run}>
+                  <TableCell className="font-medium">
+                    {f.nombres} {f.apellido_paterno}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {f.run}-{f.dv}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{f.cargo ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "—"}</TableCell>
+                  <TableCell>
+                    <SignBadge estado={f.estado_vigencia as EstadoVigencia} size="sm" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+async function DashboardFacilitador() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: facilitador } = await supabase
+    .from("facilitadores")
+    .select("id")
+    .eq("usuario_id", user!.id)
+    .maybeSingle();
+
+  const { data: ediciones } = facilitador
+    ? await supabase
+        .from("ediciones_curso")
+        .select("id, fecha_inicio, fecha_limite, estado, cursos(nombre)")
+        .eq("facilitador_id", facilitador.id)
+        .order("fecha_inicio", { ascending: false })
+        .limit(10)
+    : { data: [] };
+
+  return (
+    <div className="flex flex-col gap-6 max-w-4xl">
+      <h1 className="font-heading text-3xl font-bold uppercase tracking-tight">
+        Mis ediciones de curso
+      </h1>
+      <div className="border border-border bg-card divide-y divide-border">
+        {(ediciones ?? []).length === 0 && (
+          <p className="px-5 py-8 text-sm text-muted-foreground">
+            No tienes ediciones de curso asignadas todavía.
+          </p>
+        )}
+        {(ediciones ?? []).map((e) => (
+          <div key={e.id} className="flex items-center justify-between px-5 py-4">
+            <div>
+              <p className="font-medium">{e.cursos?.nombre ?? "Curso"}</p>
+              <p className="text-sm text-muted-foreground">
+                Inicio {e.fecha_inicio} · Límite {e.fecha_limite}
+              </p>
+            </div>
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+              {e.estado}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function DashboardTrabajador() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: persona } = await supabase
+    .from("personas")
+    .select("run")
+    .eq("usuario_id", user!.id)
+    .maybeSingle();
+
+  const { data: fila } = persona
+    ? await supabase
+        .from("matriz_vigencia_capacitacion")
+        .select("*")
+        .eq("persona_run", persona.run)
+        .maybeSingle()
+    : { data: null };
+
+  const estado = (fila?.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia;
+
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl">
+      <h1 className="font-heading text-3xl font-bold uppercase tracking-tight">
+        Mi capacitación
+      </h1>
+      <div className="border border-border bg-card p-8 flex flex-col items-center text-center gap-4">
+        <SignBadge estado={estado} size="md" className="text-lg" />
+        {fila?.vigencia_hasta ? (
+          <p className="text-sm text-muted-foreground">
+            Vigente hasta <span className="font-mono text-foreground">{fila.vigencia_hasta}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Aún no registras una capacitación aprobada del art. 16 del DS 44.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

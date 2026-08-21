@@ -1,0 +1,169 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import { actualizarPerfil } from "./actions";
+
+export function PerfilView({
+  nombres,
+  apellidos,
+  email,
+  telefono,
+  rut,
+  roles,
+}: {
+  nombres: string;
+  apellidos: string;
+  email: string;
+  telefono: string;
+  rut: string | null;
+  roles: { rol: string; organizacion: string | null }[];
+}) {
+  return (
+    <div className="flex flex-col gap-8 max-w-xl">
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Cuenta</p>
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Mi perfil</h1>
+      </div>
+
+      <DatosPersonales nombres={nombres} apellidos={apellidos} email={email} telefono={telefono} rut={rut} />
+
+      <div>
+        <h2 className="font-heading text-lg font-bold uppercase tracking-wide mb-3">Roles asignados</h2>
+        <div className="flex flex-wrap gap-2">
+          {roles.map((r, i) => (
+            <Badge key={i} variant="secondary" className="rounded-sm">
+              {r.rol}
+              {r.organizacion ? ` · ${r.organizacion}` : ""}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <CambiarContrasena />
+    </div>
+  );
+}
+
+function DatosPersonales({
+  nombres: nombresInicial,
+  apellidos: apellidosInicial,
+  email,
+  telefono: telefonoInicial,
+  rut,
+}: {
+  nombres: string;
+  apellidos: string;
+  email: string;
+  telefono: string;
+  rut: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [form, setForm] = useState({
+    nombres: nombresInicial,
+    apellidos: apellidosInicial,
+    telefono: telefonoInicial,
+  });
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const resultado = await actualizarPerfil({
+        nombres: form.nombres.trim(),
+        apellidos: form.apellidos.trim(),
+        telefono: form.telefono.trim() || null,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Perfil actualizado.");
+    });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <h2 className="font-heading text-lg font-bold uppercase tracking-wide">Datos personales</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="nombres">Nombres</Label>
+          <Input id="nombres" required value={form.nombres} onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="apellidos">Apellidos</Label>
+          <Input id="apellidos" required value={form.apellidos} onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rut">RUT (acceso)</Label>
+          <Input id="rut" value={rut ?? "No asignado"} disabled className="font-mono" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Correo</Label>
+          <Input id="email" value={email} disabled />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="telefono">Teléfono</Label>
+        <Input id="telefono" value={form.telefono} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} />
+      </div>
+      <Button type="submit" disabled={pending} className="w-fit">
+        {pending ? "Guardando…" : "Guardar cambios"}
+      </Button>
+    </form>
+  );
+}
+
+function CambiarContrasena() {
+  const [pending, startTransition] = useTransition();
+  const [password, setPassword] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmacion) {
+      toast.error("Las contraseñas no coinciden.");
+      return;
+    }
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Contraseña actualizada.");
+      setPassword("");
+      setConfirmacion("");
+    });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4 border-t border-border pt-6">
+      <h2 className="font-heading text-lg font-bold uppercase tracking-wide">Cambiar contraseña</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Nueva contraseña</Label>
+          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="confirmacion">Confirmar contraseña</Label>
+          <Input id="confirmacion" type="password" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} />
+        </div>
+      </div>
+      <Button type="submit" disabled={pending} variant="outline" className="w-fit">
+        {pending ? "Actualizando…" : "Actualizar contraseña"}
+      </Button>
+    </form>
+  );
+}
