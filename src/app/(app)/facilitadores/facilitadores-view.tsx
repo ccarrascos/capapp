@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, UserCog2 } from "lucide-react";
+import { Plus, Pencil, UserCog2, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearFacilitador, actualizarFacilitador, buscarPersonaPorRun } from "./actions";
-import { formatearRunInput } from "@/lib/rut";
+import { crearFacilitador, actualizarFacilitador, actualizarEstadoFacilitador, buscarPersonaPorRun } from "./actions";
+import { formatearRunInput, esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 
 type TipoProveedor = Database["public"]["Enums"]["tipo_proveedor"];
@@ -86,9 +86,15 @@ export function FacilitadoresView({
         {facilitadores.map((f) => {
           const puedeEditar = esSuperAdmin || (f.organizacion_id !== null && adminSet.has(f.organizacion_id));
           return (
-            <div key={f.id} className="border border-border bg-card p-5 flex flex-col gap-2 relative">
+            <div
+              key={f.id}
+              className={`border border-border bg-card p-5 flex flex-col gap-2 relative ${!f.activo ? "opacity-60" : ""}`}
+            >
               {puedeEditar && (
-                <EditarFacilitadorDialog facilitador={f} organizaciones={organizaciones} />
+                <div className="absolute top-3 right-3 flex items-center gap-1">
+                  <EditarFacilitadorDialog facilitador={f} organizaciones={organizaciones} />
+                  <ToggleActivoButton facilitador={f} />
+                </div>
               )}
               <span className="flex size-9 items-center justify-center bg-secondary">
                 <UserCog2 className="size-4.5 text-secondary-foreground" />
@@ -112,6 +118,11 @@ export function FacilitadoresView({
                 {f.es_experto_prevencion && (
                   <Badge className="rounded-sm text-[10px] uppercase bg-signal text-signal-foreground">
                     Experto en prevención
+                  </Badge>
+                )}
+                {!f.activo && (
+                  <Badge variant="secondary" className="rounded-sm text-[10px] uppercase bg-alert/10 text-alert">
+                    Inactivo
                   </Badge>
                 )}
               </div>
@@ -161,6 +172,13 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    const run = form.run.replace(/\./g, "").trim();
+    const dv = form.dv.trim().toUpperCase();
+    if (!esRutValido(run, dv)) {
+      toast.error("El RUT ingresado no es válido.");
+      return;
+    }
+
     if (form.tipoProveedor !== "interno" && !form.entidadNombre.trim()) {
       toast.error("Indica el nombre de la entidad externa.");
       return;
@@ -169,8 +187,8 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
     startTransition(async () => {
       const resultado = await crearFacilitador({
         organizacionId: form.organizacionId,
-        run: form.run.replace(/\./g, "").trim(),
-        dv: form.dv.trim().toUpperCase(),
+        run,
+        dv,
         nombres: form.nombres.trim(),
         apellidos: form.apellidos.trim(),
         tituloProfesional: form.tituloProfesional.trim() || null,
@@ -340,6 +358,7 @@ function EditarFacilitadorDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [datosBloqueados, setDatosBloqueados] = useState(false);
   const [form, setForm] = useState({
     nombres: facilitador.nombres,
     apellidos: facilitador.apellidos,
@@ -350,6 +369,24 @@ function EditarFacilitadorDialog({
   });
 
   const organizacionNombre = organizaciones.find((o) => o.id === facilitador.organizacion_id)?.razon_social;
+
+  function onOpenChange(v: boolean) {
+    setOpen(v);
+    if (!v || facilitador.tipo_proveedor !== "interno") return;
+
+    buscarPersonaPorRun(facilitador.run).then((persona) => {
+      if (persona) {
+        // El nombre pertenece a un registro existente (persona o cuenta de
+        // usuario) — se bloquea aquí y se refresca con el valor vigente,
+        // para que una corrección hecha en el origen (ej. agregar el
+        // segundo apellido) se propague en vez de quedar una copia obsoleta.
+        setForm((f) => ({ ...f, nombres: persona.nombres, apellidos: persona.apellidos }));
+        setDatosBloqueados(true);
+      } else {
+        setDatosBloqueados(false);
+      }
+    });
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -380,8 +417,8 @@ function EditarFacilitadorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="icon" variant="ghost" className="absolute top-3 right-3" />}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" />}>
         <Pencil className="size-4" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -437,6 +474,7 @@ function EditarFacilitadorDialog({
               <Input
                 id="nombresEdit"
                 required
+                disabled={datosBloqueados}
                 value={form.nombres}
                 onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))}
               />
@@ -446,11 +484,18 @@ function EditarFacilitadorDialog({
               <Input
                 id="apellidosEdit"
                 required
+                disabled={datosBloqueados}
                 value={form.apellidos}
                 onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))}
               />
             </div>
           </div>
+          {datosBloqueados && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Nombres y apellidos vienen del registro existente para este RUT (persona o cuenta de usuario) y no se
+              pueden editar aquí — se actualizan automáticamente si cambian en el origen.
+            </p>
+          )}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tituloEdit">Título profesional</Label>
             <Input
@@ -476,5 +521,36 @@ function EditarFacilitadorDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ToggleActivoButton({ facilitador }: { facilitador: Facilitador }) {
+  const [pending, startTransition] = useTransition();
+
+  function onClick() {
+    startTransition(async () => {
+      const resultado = await actualizarEstadoFacilitador({
+        facilitadorId: facilitador.id,
+        organizacionId: facilitador.organizacion_id!,
+        activo: !facilitador.activo,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success(facilitador.activo ? "Facilitador desactivado." : "Facilitador reactivado.");
+    });
+  }
+
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      disabled={pending}
+      title={facilitador.activo ? "Desactivar facilitador" : "Reactivar facilitador"}
+      onClick={onClick}
+    >
+      {facilitador.activo ? <Ban className="size-4" /> : <RotateCcw className="size-4" />}
+    </Button>
   );
 }

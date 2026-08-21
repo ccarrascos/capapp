@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { SignBadge, SignDot, type EstadoVigencia } from "@/components/status/sign-badge";
 import { crearTrabajador, crearAccesoTrabajador } from "./actions";
-import { formatearRunInput } from "@/lib/rut";
+import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -330,12 +330,20 @@ function NuevoTrabajadorDialog({
       toast.error("Selecciona una organización.");
       return;
     }
+
+    const run = form.run.replace(/\./g, "").trim();
+    const dv = form.dv.trim().toUpperCase();
+    if (!esRutValido(run, dv)) {
+      toast.error("El RUT ingresado no es válido.");
+      return;
+    }
+
     startTransition(async () => {
       const resultado = await crearTrabajador({
         organizacionId: form.organizacionId,
         centroTrabajoId: null,
-        run: form.run.replace(/\./g, "").trim(),
-        dv: form.dv.trim().toUpperCase(),
+        run,
+        dv,
         nombres: form.nombres.trim(),
         apellidoPaterno: form.apellidoPaterno.trim(),
         apellidoMaterno: form.apellidoMaterno.trim() || null,

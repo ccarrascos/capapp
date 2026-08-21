@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -83,6 +84,10 @@ export async function crearFacilitador(input: {
   tipoProveedor: TipoProveedor;
   entidadNombre: string | null;
 }) {
+  if (!esRutValido(input.run, input.dv)) {
+    return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
+  }
+
   const supabase = await createClient();
 
   const entidad = await resolverEntidadExterna(supabase, input.tipoProveedor, input.entidadNombre);
@@ -144,6 +149,35 @@ export async function actualizarFacilitador(input: {
       titulo_profesional: input.tituloProfesional,
       es_experto_prevencion: input.esExpertoPrevencion,
     })
+    .eq("id", input.facilitadorId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  revalidatePath("/facilitadores");
+  return { ok: true as const };
+}
+
+export async function actualizarEstadoFacilitador(input: {
+  facilitadorId: string;
+  organizacionId: string;
+  activo: boolean;
+}) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para modificar este facilitador." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("facilitadores")
+    .update({ activo: input.activo })
     .eq("id", input.facilitadorId);
 
   if (error) return { ok: false as const, mensaje: error.message };

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { generarPasswordTemporal } from "@/lib/password";
+import { esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -26,6 +27,10 @@ export type CrearTrabajadorInput = {
 };
 
 export async function crearTrabajador(input: CrearTrabajadorInput) {
+  if (!esRutValido(input.run, input.dv)) {
+    return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
+  }
+
   const supabase = await createClient();
 
   // La persona (identidad, por RUT) es global al sistema — si ya existe
