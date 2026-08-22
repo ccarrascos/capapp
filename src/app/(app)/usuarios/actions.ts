@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { esRutValido } from "@/lib/rut";
 import { generarPasswordTemporal } from "@/lib/password";
+import { normalizarEmail } from "@/lib/normalizar-email";
 
 const ROL_LABEL: Record<RolNombre, string> = {
   super_admin: "Super administrador",
@@ -58,6 +59,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   const run = input.run.trim();
   const dv = input.dv.trim().toUpperCase();
+  const email = normalizarEmail(input.email);
 
   if (!esRutValido(run, dv)) {
     return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
@@ -73,7 +75,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   const passwordTemporal = generarPasswordTemporal();
 
   const { data: creado, error: errorAuth } = await admin.auth.admin.createUser({
-    email: input.email,
+    email,
     password: passwordTemporal,
     email_confirm: true,
   });
@@ -88,7 +90,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     id: creado.user.id,
     nombres: input.nombres,
     apellidos: input.apellidos,
-    email: input.email,
+    email,
     run,
     dv,
   });
@@ -121,7 +123,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   const correo = await enviarCorreoBienvenida({
     nombres: input.nombres,
-    email: input.email,
+    email,
     password: passwordTemporal,
     rolLabel: ROL_LABEL[input.rol],
     rut: `${run}-${dv}`,

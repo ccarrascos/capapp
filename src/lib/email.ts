@@ -21,22 +21,22 @@ function plantillaBienvenida(params: {
   <div style="padding: 28px 24px; border: 1px solid #E2E4E1; border-top: none;">
     <p style="font-size: 15px; margin: 0 0 16px;">Hola ${params.nombres},</p>
     <p style="font-size: 14px; line-height: 1.6; color: #44494E; margin: 0 0 20px;">
-      Se creó tu cuenta en <strong>Capapp</strong>, el sistema de gestión de capacitación en
-      prevención de riesgos laborales (art. 16, DS N.º 44/2023), con el rol de
+      Se creo tu cuenta en <strong>Capapp</strong>, el sistema de gestion de capacitacion en
+      prevencion de riesgos laborales (art. 16, DS N.º 44/2023), con el rol de
       <strong>${params.rolLabel}</strong>.
     </p>
     <div style="border: 1px solid #E2E4E1; padding: 16px; margin-bottom: 20px;">
       <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; margin: 0 0 4px;">RUT de acceso</p>
       <p style="font-family: monospace; font-size: 14px; margin: 0 0 14px;">${params.rut}</p>
-      <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; margin: 0 0 4px;">Contraseña temporal</p>
+      <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; margin: 0 0 4px;">Contrasena temporal</p>
       <p style="font-family: monospace; font-size: 16px; font-weight: 700; margin: 0;">${params.password}</p>
     </div>
     <a href="${APP_URL}/login" style="display: inline-block; background: #0B4A85; color: #fff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 18px;">
-      Iniciar sesión
+      Iniciar sesion
     </a>
     <p style="font-size: 12px; color: #6B7280; margin-top: 24px; line-height: 1.5;">
-      Por seguridad, cambia esta contraseña apenas ingreses (Mi perfil → Cambiar contraseña).
-      Si no esperabas este correo, contacta a quien administra tu organización en Capapp.
+      Por seguridad, cambia esta contrasena apenas ingreses (Mi perfil - Cambiar contrasena).
+      Si no esperabas este correo, contacta a quien administra tu organizacion en Capapp.
     </p>
   </div>
 </div>`.trim();

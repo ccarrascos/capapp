@@ -8,6 +8,7 @@ import { enviarCorreoBienvenida } from "@/lib/email";
 import { generarPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
+import { normalizarEmail } from "@/lib/normalizar-email";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -54,7 +55,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     nombres: input.nombres,
     apellido_paterno: input.apellidoPaterno,
     apellido_materno: input.apellidoMaterno,
-    email: input.email,
+    email: input.email ? normalizarEmail(input.email) : null,
     fecha_nacimiento: input.fechaNacimiento,
   };
 
@@ -131,7 +132,7 @@ export async function actualizarTrabajador(input: {
       nombres: input.nombres,
       apellido_paterno: input.apellidoPaterno,
       apellido_materno: input.apellidoMaterno,
-      email: input.email,
+      email: input.email ? normalizarEmail(input.email) : null,
       fecha_nacimiento: input.fechaNacimiento,
     })
     .eq("run", input.personaRun);
@@ -174,7 +175,7 @@ export async function crearAccesoTrabajador(input: {
     return { ok: false as const, mensaje: "No tienes permiso para dar acceso a este trabajador." };
   }
 
-  const email = input.email.trim();
+  const email = normalizarEmail(input.email);
   if (!email) return { ok: false as const, mensaje: "Ingresa un correo para enviar las credenciales." };
 
   const admin = createAdminClient();
