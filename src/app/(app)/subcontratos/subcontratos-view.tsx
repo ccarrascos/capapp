@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Building } from "lucide-react";
+import { Plus, Building, Pencil, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { crearSubcontrato, asignarCentroASubcontrato } from "./actions";
+import { crearSubcontrato, actualizarSubcontrato } from "./actions";
 
 type Centro = { id: string; nombre: string; organizacion_id: string };
 
@@ -63,7 +69,11 @@ export function SubcontratosView({
           </p>
         )}
         {subcontratos.map((s) => (
-          <div key={s.id} className="border border-border bg-card p-5 flex flex-col gap-2">
+          <div key={s.id} className="relative border border-border bg-card p-5 flex flex-col gap-2">
+            <EditarSubcontratoDialog
+              subcontrato={s}
+              centrosDeLaOrg={centros.filter((c) => c.organizacion_id === s.organizacion_id)}
+            />
             <span className="flex size-9 items-center justify-center bg-secondary">
               <Building className="size-4.5 text-secondary-foreground" />
             </span>
@@ -80,15 +90,6 @@ export function SubcontratosView({
                 </span>
               ))}
             </div>
-            <AsignarCentroDialog
-              subcontratoId={s.id}
-              organizacionId={s.organizacion_id}
-              centrosDisponibles={centros.filter(
-                (c) =>
-                  c.organizacion_id === s.organizacion_id &&
-                  !s.subcontratos_centros.some((sc) => sc.centro_trabajo_id === c.id),
-              )}
-            />
           </div>
         ))}
       </div>
@@ -221,67 +222,118 @@ function NuevoSubcontratoDialog({
   );
 }
 
-function AsignarCentroDialog({
-  subcontratoId,
-  organizacionId,
-  centrosDisponibles,
+function EditarSubcontratoDialog({
+  subcontrato,
+  centrosDeLaOrg,
 }: {
-  subcontratoId: string;
-  organizacionId: string;
-  centrosDisponibles: Centro[];
+  subcontrato: Subcontrato;
+  centrosDeLaOrg: Centro[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [centroTrabajoId, setCentroTrabajoId] = useState("");
+  const [form, setForm] = useState({
+    nombre: subcontrato.nombre,
+    rut: subcontrato.rut ?? "",
+    centroIds: subcontrato.subcontratos_centros.map((sc) => sc.centro_trabajo_id),
+  });
+
+  function toggleCentro(centroId: string, marcado: boolean) {
+    setForm((f) => ({
+      ...f,
+      centroIds: marcado ? [...f.centroIds, centroId] : f.centroIds.filter((id) => id !== centroId),
+    }));
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!centroTrabajoId) return;
+    if (form.centroIds.length === 0) {
+      toast.error("Selecciona al menos un centro de trabajo.");
+      return;
+    }
     startTransition(async () => {
-      const resultado = await asignarCentroASubcontrato({ subcontratoId, organizacionId, centroTrabajoId });
+      const resultado = await actualizarSubcontrato({
+        subcontratoId: subcontrato.id,
+        organizacionId: subcontrato.organizacion_id,
+        nombre: form.nombre.trim(),
+        rut: form.rut.trim() || null,
+        centroIds: form.centroIds,
+      });
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
         return;
       }
-      toast.success("Subcontrato asignado al centro.");
+      toast.success("Subcontrato actualizado.");
       setOpen(false);
-      setCentroTrabajoId("");
     });
   }
 
-  if (centrosDisponibles.length === 0) return null;
+  const nombresSeleccionados = centrosDeLaOrg.filter((c) => form.centroIds.includes(c.id)).map((c) => c.nombre);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>Asignar a otro centro</DialogTrigger>
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="absolute top-3 right-3" />}>
+        <Pencil className="size-4" />
+      </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Asignar a otro centro</DialogTitle>
-          <DialogDescription>Este subcontrato podrá tener trabajadores también en ese centro.</DialogDescription>
+          <DialogTitle>Editar subcontrato</DialogTitle>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label>Centro de trabajo</Label>
-            <Select
-              items={Object.fromEntries(centrosDisponibles.map((c) => [c.id, c.nombre]))}
-              value={centroTrabajoId}
-              onValueChange={(v) => setCentroTrabajoId(v ?? "")}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona un centro" />
-              </SelectTrigger>
-              <SelectContent>
-                {centrosDisponibles.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
+            <Label htmlFor="nombreEdit">Nombre de la empresa</Label>
+            <Input
+              id="nombreEdit"
+              required
+              value={form.nombre}
+              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rutEdit">RUT (opcional)</Label>
+            <Input
+              id="rutEdit"
+              value={form.rut}
+              onChange={(e) => setForm((f) => ({ ...f, rut: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Centros de trabajo</Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between font-normal"
+                  />
+                }
+              >
+                <span className="truncate text-left">
+                  {nombresSeleccionados.length > 0 ? nombresSeleccionados.join(", ") : "Selecciona uno o más centros"}
+                </span>
+                <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-(--anchor-width)">
+                {centrosDeLaOrg.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.id}
+                    checked={form.centroIds.includes(c.id)}
+                    onCheckedChange={(marcado) => toggleCentro(c.id, marcado)}
+                  >
                     {c.nombre}
-                  </SelectItem>
+                  </DropdownMenuCheckboxItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {centrosDeLaOrg.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No hay centros registrados para esta organización — agrégalos en Centros de trabajo.
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={pending || !centroTrabajoId}>
-              {pending ? "Asignando…" : "Asignar"}
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar cambios"}
             </Button>
           </DialogFooter>
         </form>

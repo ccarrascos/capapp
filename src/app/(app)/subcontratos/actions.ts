@@ -51,10 +51,12 @@ export async function crearSubcontrato(input: {
   return { ok: true as const };
 }
 
-export async function asignarCentroASubcontrato(input: {
+export async function actualizarSubcontrato(input: {
   subcontratoId: string;
   organizacionId: string;
-  centroTrabajoId: string;
+  nombre: string;
+  rut: string | null;
+  centroIds: string[];
 }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
@@ -62,17 +64,50 @@ export async function asignarCentroASubcontrato(input: {
     return { ok: false as const, mensaje: "No tienes permiso para gestionar subcontratos." };
   }
 
+  if (input.centroIds.length === 0) {
+    return { ok: false as const, mensaje: "Selecciona al menos un centro de trabajo." };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("subcontratos_centros")
-    .insert({ subcontrato_id: input.subcontratoId, centro_trabajo_id: input.centroTrabajoId });
+    .from("subcontratos")
+    .update({ nombre: input.nombre, rut: input.rut })
+    .eq("id", input.subcontratoId)
+    .eq("organizacion_id", input.organizacionId);
 
   if (error) {
     const mensaje = error.message.includes("duplicate key")
-      ? "Este subcontrato ya está asignado a ese centro."
+      ? "Ya existe otro subcontrato con ese nombre en esta organización."
       : error.message;
     return { ok: false as const, mensaje };
+  }
+
+  const { data: actuales } = await supabase
+    .from("subcontratos_centros")
+    .select("centro_trabajo_id")
+    .eq("subcontrato_id", input.subcontratoId);
+
+  const centroIdsActuales = new Set((actuales ?? []).map((c) => c.centro_trabajo_id));
+  const centroIdsNuevos = new Set(input.centroIds);
+
+  const aAgregar = input.centroIds.filter((id) => !centroIdsActuales.has(id));
+  const aQuitar = [...centroIdsActuales].filter((id) => !centroIdsNuevos.has(id));
+
+  if (aAgregar.length > 0) {
+    const { error: errorAgregar } = await supabase
+      .from("subcontratos_centros")
+      .insert(aAgregar.map((centroTrabajoId) => ({ subcontrato_id: input.subcontratoId, centro_trabajo_id: centroTrabajoId })));
+    if (errorAgregar) return { ok: false as const, mensaje: errorAgregar.message };
+  }
+
+  if (aQuitar.length > 0) {
+    const { error: errorQuitar } = await supabase
+      .from("subcontratos_centros")
+      .delete()
+      .eq("subcontrato_id", input.subcontratoId)
+      .in("centro_trabajo_id", aQuitar);
+    if (errorQuitar) return { ok: false as const, mensaje: errorQuitar.message };
   }
 
   revalidatePath("/subcontratos");
