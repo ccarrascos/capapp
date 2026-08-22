@@ -9,7 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { actualizarPerfil, subirAvatar } from "./actions";
+import { actualizarPerfil, subirAvatar, exportarMisDatos, solicitarBajaCuenta } from "./actions";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function PerfilView({
   nombres,
@@ -52,6 +54,8 @@ export function PerfilView({
       </div>
 
       <CambiarContrasena />
+
+      <MisDatos />
     </div>
   );
 }
@@ -237,5 +241,80 @@ function CambiarContrasena() {
         {pending ? "Actualizando…" : "Actualizar contraseña"}
       </Button>
     </form>
+  );
+}
+
+function MisDatos() {
+  const router = useRouter();
+  const [pendingExport, startExport] = useTransition();
+  const [pendingBaja, startBaja] = useTransition();
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+
+  function onExportar() {
+    startExport(async () => {
+      const resultado = await exportarMisDatos();
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      const blob = new Blob([JSON.stringify(resultado.datos, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "mis-datos-capapp.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Descarga lista.");
+    });
+  }
+
+  function onSolicitarBaja() {
+    if (!confirmandoBaja) {
+      setConfirmandoBaja(true);
+      return;
+    }
+    startBaja(async () => {
+      const resultado = await solicitarBajaCuenta();
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      router.replace("/login");
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4 border-t border-border pt-6">
+      <h2 className="font-heading text-lg font-bold uppercase tracking-wide">Mis datos</h2>
+      <p className="text-sm text-muted-foreground">
+        Conforme a la Ley N.º 21.719, puedes descargar una copia de tus datos personales o solicitar la baja de tu
+        cuenta. Ver <Link href="/privacidad" className="underline hover:text-foreground">política de privacidad</Link>.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" disabled={pendingExport} onClick={onExportar} className="w-fit">
+          {pendingExport ? "Preparando…" : "Descargar mis datos"}
+        </Button>
+        <Button
+          type="button"
+          variant={confirmandoBaja ? "destructive" : "outline"}
+          disabled={pendingBaja}
+          onClick={onSolicitarBaja}
+          className="w-fit"
+        >
+          {pendingBaja
+            ? "Procesando…"
+            : confirmandoBaja
+              ? "Confirmar baja de mi cuenta"
+              : "Solicitar baja de mi cuenta"}
+        </Button>
+      </div>
+      {confirmandoBaja && !pendingBaja && (
+        <p className="text-xs text-muted-foreground max-w-md">
+          Esto desactiva tu acceso a Capapp de inmediato. Tus registros de capacitación se conservan según lo exige
+          el DS 44, incluso después de la baja.
+        </p>
+      )}
+    </div>
   );
 }

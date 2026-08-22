@@ -1,10 +1,6 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 
-/**
- * Temporal: mientras el envío de correo no esté confirmado, todas las cuentas
- * nuevas se crean con esta clave fija para no depender del email. Cuando el
- * correo esté funcionando, volver a generar una aleatoria (randomBytes).
- */
 export function generarPasswordTemporal() {
-  return "Capapp2026!";
+  return randomBytes(9).toString("base64url");
 }

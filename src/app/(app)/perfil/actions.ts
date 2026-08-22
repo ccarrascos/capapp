@@ -69,3 +69,66 @@ export async function actualizarPerfil(input: { nombres: string; apellidos: stri
   revalidatePath("/perfil");
   return { ok: true as const };
 }
+
+export async function exportarMisDatos() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false as const, mensaje: "No autenticado." };
+
+  const [{ data: usuario }, { data: roles }, { data: persona }] = await Promise.all([
+    supabase.from("usuarios").select("nombres, apellidos, email, telefono, run, dv, created_at").eq("id", user.id).single(),
+    supabase
+      .from("usuario_roles")
+      .select("organizacion_id, centro_trabajo_id, roles(nombre), organizaciones(razon_social)")
+      .eq("usuario_id", user.id),
+    supabase
+      .from("personas")
+      .select(
+        "run, dv, nombres, apellido_paterno, apellido_materno, email, telefono, fecha_nacimiento, created_at",
+      )
+      .eq("usuario_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  let capacitacion: unknown = null;
+  if (persona) {
+    const { data } = await supabase
+      .from("inscripciones")
+      .select(
+        "fecha_inscripcion, estado, fecha_aprobacion, vigencia_hasta, manual_entregado, ediciones_curso(cursos(nombre)), certificados(numero_certificado, fecha_emision, fecha_vigencia_hasta)",
+      )
+      .eq("persona_run", persona.run);
+    capacitacion = data;
+  }
+
+  return {
+    ok: true as const,
+    datos: {
+      exportado_en: new Date().toISOString(),
+      cuenta: usuario,
+      roles,
+      identidad_laboral: persona,
+      capacitacion,
+    },
+  };
+}
+
+export async function solicitarBajaCuenta() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false as const, mensaje: "No autenticado." };
+
+  const { error } = await supabase.from("usuarios").update({ activo: false }).eq("id", user.id);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  await supabase.auth.signOut();
+
+  return { ok: true as const };
+}

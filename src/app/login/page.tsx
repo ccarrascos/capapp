@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +134,12 @@ function LoginForm() {
               {pending ? "Verificando…" : "Ingresar"}
             </Button>
           </form>
+
+          <p className="text-xs text-muted-foreground text-center mt-6">
+            <Link href="/privacidad" className="hover:text-foreground hover:underline">
+              Política de privacidad
+            </Link>
+          </p>
         </div>
       </div>
     </div>
