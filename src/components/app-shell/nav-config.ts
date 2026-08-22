@@ -9,6 +9,7 @@ import {
   UserCog2,
   Landmark,
   Briefcase,
+  BarChart3,
 } from "lucide-react";
 
 export type NavItem = {
@@ -24,6 +25,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/trabajadores",
     label: "Matriz de vigencia",
     icon: ShieldCheck,
+    roles: ["super_admin", "admin_organizacion", "prevencionista", "supervisor_centro", "auditor"],
+  },
+  {
+    href: "/analitica",
+    label: "Analítica",
+    icon: BarChart3,
     roles: ["super_admin", "admin_organizacion", "prevencionista", "supervisor_centro", "auditor"],
   },
   {
