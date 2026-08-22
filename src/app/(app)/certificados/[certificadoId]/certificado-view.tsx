@@ -14,6 +14,7 @@ export function CertificadoView({
   cursoNombre,
   cursoHoras,
   organizacionNombre,
+  organizacionLogoUrl,
 }: {
   qrDataUrl: string;
   numeroCertificado: string;
@@ -25,6 +26,7 @@ export function CertificadoView({
   cursoNombre: string;
   cursoHoras: number;
   organizacionNombre: string;
+  organizacionLogoUrl: string | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -49,11 +51,17 @@ export function CertificadoView({
             </span>
             <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
           </div>
-          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground text-right">
-            DS N.º 44/2023
-            <br />
-            Artículo 16
-          </p>
+          <div className="flex flex-col items-end gap-1.5">
+            {organizacionLogoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- logo subido a Storage, no requiere optimización de next/image
+              <img src={organizacionLogoUrl} alt={organizacionNombre} className="h-8 max-w-40 object-contain object-right" />
+            )}
+            <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground text-right">
+              DS N.º 44/2023
+              <br />
+              Artículo 16
+            </p>
+          </div>
         </div>
 
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground text-center mb-2">

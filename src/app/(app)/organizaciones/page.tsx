@@ -11,7 +11,7 @@ export default async function OrganizacionesPage() {
   const supabase = await createClient();
   const { data: organizaciones } = await supabase
     .from("organizaciones")
-    .select("id, rut, razon_social, nombre_fantasia, sector_economico, comuna, region, activo")
+    .select("id, rut, razon_social, nombre_fantasia, sector_economico, comuna, region, activo, logo_url")
     .order("razon_social");
 
   return <OrganizacionesView organizaciones={organizaciones ?? []} />;

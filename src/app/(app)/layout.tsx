@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Topbar } from "@/components/app-shell/topbar";
 
@@ -11,7 +12,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const rolesUsuario = sesion.roles.map((r) => r.rol);
-  const organizacionActual = sesion.roles.find((r) => r.organizacionNombre)?.organizacionNombre ?? null;
+  const rolConOrganizacion = sesion.roles.find((r) => r.organizacionNombre);
+  const organizacionActual = rolConOrganizacion?.organizacionNombre ?? null;
+
+  let organizacionLogoUrl: string | null = null;
+  if (rolConOrganizacion?.organizacionId) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("organizaciones")
+      .select("logo_url")
+      .eq("id", rolConOrganizacion.organizacionId)
+      .maybeSingle();
+    organizacionLogoUrl = data?.logo_url ?? null;
+  }
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
@@ -22,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           apellidos={sesion.apellidos}
           rolPrincipal={sesion.rolPrincipal}
           organizacionActual={sesion.esSuperAdmin ? "Todas las organizaciones" : organizacionActual}
+          organizacionLogoUrl={sesion.esSuperAdmin ? null : organizacionLogoUrl}
           rolesUsuario={rolesUsuario}
           esSuperAdmin={sesion.esSuperAdmin}
           avatarUrl={sesion.avatarUrl}

@@ -37,6 +37,7 @@ export function Topbar({
   apellidos,
   rolPrincipal,
   organizacionActual,
+  organizacionLogoUrl,
   rolesUsuario,
   esSuperAdmin,
   avatarUrl,
@@ -45,6 +46,7 @@ export function Topbar({
   apellidos: string;
   rolPrincipal: RolNombre;
   organizacionActual: string | null;
+  organizacionLogoUrl: string | null;
   rolesUsuario: RolNombre[];
   esSuperAdmin: boolean;
   avatarUrl: string | null;
@@ -88,10 +90,15 @@ export function Topbar({
       </Sheet>
 
       <div className="flex-1">
-        {organizacionActual && (
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {organizacionActual}
-          </p>
+        {organizacionLogoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- logo subido a Storage, no requiere optimización de next/image
+          <img src={organizacionLogoUrl} alt={organizacionActual ?? ""} className="h-8 max-w-40 object-contain object-left" />
+        ) : (
+          organizacionActual && (
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              {organizacionActual}
+            </p>
+          )
         )}
       </div>
 

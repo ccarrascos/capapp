@@ -26,7 +26,7 @@ export default async function CertificadoPage({
   const { data: certificado } = await supabase
     .from("certificados")
     .select(
-      "id, numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, persona_run, cursos(nombre, horas_totales, organizacion_id, organizaciones(razon_social, rut)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
+      "id, numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, persona_run, cursos(nombre, horas_totales, organizacion_id, organizaciones(razon_social, rut, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
     )
     .eq("id", certificadoId)
     .maybeSingle();
@@ -83,6 +83,7 @@ export default async function CertificadoPage({
       cursoNombre={certificado.cursos.nombre}
       cursoHoras={certificado.cursos.horas_totales}
       organizacionNombre={certificado.cursos.organizaciones?.razon_social ?? "—"}
+      organizacionLogoUrl={certificado.cursos.organizaciones?.logo_url ?? null}
     />
   );
 }

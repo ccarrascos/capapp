@@ -853,6 +853,7 @@ export type Database = {
           direccion: string | null
           email_contacto: string | null
           id: string
+          logo_url: string | null
           nombre_fantasia: string | null
           oal_id: string | null
           razon_social: string
@@ -870,6 +871,7 @@ export type Database = {
           direccion?: string | null
           email_contacto?: string | null
           id?: string
+          logo_url?: string | null
           nombre_fantasia?: string | null
           oal_id?: string | null
           razon_social: string
@@ -887,6 +889,7 @@ export type Database = {
           direccion?: string | null
           email_contacto?: string | null
           id?: string
+          logo_url?: string | null
           nombre_fantasia?: string | null
           oal_id?: string | null
           razon_social?: string
@@ -1269,6 +1272,7 @@ export type Database = {
       app_es_super_admin: { Args: never; Returns: boolean }
       app_organizaciones_usuario: { Args: never; Returns: string[] }
       app_persona_run_actual: { Args: never; Returns: string }
+      app_puede_gestionar_trabajadores: { Args: never; Returns: boolean }
       app_tiene_rol_en_org: {
         Args: {
           p_org: string

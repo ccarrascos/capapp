@@ -18,7 +18,7 @@ export default async function ValidarCertificadoPage({
   const { data: certificado } = await admin
     .from("certificados")
     .select(
-      "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizaciones(razon_social)), personas(nombres, apellido_paterno, apellido_materno, run, dv)",
+      "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv)",
     )
     .eq("numero_certificado", numeroCertificado)
     .maybeSingle();
@@ -53,6 +53,17 @@ export default async function ValidarCertificadoPage({
           </span>
           <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
         </div>
+
+        {certificado?.cursos?.organizaciones?.logo_url && (
+          <div className="flex items-center justify-center mb-6">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo subido a Storage, no requiere optimización de next/image */}
+            <img
+              src={certificado.cursos.organizaciones.logo_url}
+              alt={certificado.cursos.organizaciones.razon_social}
+              className="h-10 max-w-48 object-contain"
+            />
+          </div>
+        )}
 
         {!certificado || !certificado.cursos || !certificado.personas ? (
           <div className="border border-alert/30 bg-alert/10 p-6 text-center">
