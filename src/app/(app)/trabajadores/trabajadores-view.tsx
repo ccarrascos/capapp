@@ -1028,7 +1028,9 @@ function DetalleTrabajadorDialog({
                           {estadoVigencia && (
                             <span className="flex items-center gap-1.5">
                               <SignBadge estado={estadoVigencia} size="sm" />
-                              {i.vigencia_hasta && <span>hasta {i.vigencia_hasta}</span>}
+                              {i.vigencia_hasta && (
+                                <span>{estadoVigencia === "vencido" ? "el" : "hasta"} {i.vigencia_hasta}</span>
+                              )}
                             </span>
                           )}
                         </div>
