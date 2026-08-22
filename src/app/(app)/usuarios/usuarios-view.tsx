@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Copy, Check, Ban, RotateCcw } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { Plus, Copy, Check, Ban, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { crearUsuario, actualizarEstadoUsuario } from "./actions";
 import type { RolNombre } from "@/lib/auth";
 import { parsearRut, esRutValido, formatearRut, formatearRutInput } from "@/lib/rut";
+import { cn } from "@/lib/utils";
 
 type Asignacion = {
   id: string;
@@ -68,6 +69,66 @@ const ROLES_ASIGNABLES: RolNombre[] = [
   "auditor",
 ];
 
+function textoBuscable(a: Asignacion): string {
+  return [
+    a.usuarios?.nombres,
+    a.usuarios?.apellidos,
+    a.usuarios?.run,
+    a.usuarios?.dv,
+    a.usuarios?.email,
+    a.roles ? ROL_LABEL[a.roles.nombre] : null,
+    a.usuarios?.activo ? "activa" : "inactiva",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+type ColumnaOrdenable = "nombre" | "rut" | "correo" | "rol" | "estado";
+type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
+
+function valorOrdenable(a: Asignacion, columna: ColumnaOrdenable): string | number {
+  switch (columna) {
+    case "nombre":
+      return `${a.usuarios?.nombres ?? ""} ${a.usuarios?.apellidos ?? ""}`.trim().toLowerCase();
+    case "rut":
+      return Number(a.usuarios?.run ?? 0);
+    case "correo":
+      return (a.usuarios?.email ?? "").toLowerCase();
+    case "rol":
+      return (a.roles ? ROL_LABEL[a.roles.nombre] : "").toLowerCase();
+    case "estado":
+      return a.usuarios?.activo ? 0 : 1;
+  }
+}
+
+function SortableHead({
+  label,
+  columna,
+  orden,
+  onSort,
+}: {
+  label: string;
+  columna: ColumnaOrdenable;
+  orden: Orden | null;
+  onSort: (c: ColumnaOrdenable) => void;
+}) {
+  const activo = orden?.columna === columna;
+  const Icon = activo ? (orden!.direccion === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => onSort(columna)}
+        className={cn("inline-flex items-center gap-1 hover:text-foreground", activo && "text-foreground")}
+      >
+        {label}
+        <Icon className={cn("size-3.5", !activo && "text-muted-foreground/50")} />
+      </button>
+    </TableHead>
+  );
+}
+
 export function UsuariosView({
   asignaciones,
   organizaciones,
@@ -79,6 +140,45 @@ export function UsuariosView({
   esSuperAdmin: boolean;
   usuarioActualId: string;
 }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState<Orden | null>(null);
+
+  function onSort(columna: ColumnaOrdenable) {
+    setOrden((prev) => {
+      if (prev?.columna === columna) {
+        return prev.direccion === "asc" ? { columna, direccion: "desc" } : null;
+      }
+      return { columna, direccion: "asc" };
+    });
+  }
+
+  const filtradas = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    const resultado = q ? asignaciones.filter((a) => textoBuscable(a).includes(q)) : asignaciones;
+
+    if (!orden) return resultado;
+
+    const conValor = resultado.map((a) => ({ a, v: valorOrdenable(a, orden.columna) }));
+    conValor.sort((x, y) => {
+      const xVacio = x.v === "" || x.v === null;
+      const yVacio = y.v === "" || y.v === null;
+      if (xVacio && yVacio) return 0;
+      if (xVacio) return 1;
+      if (yVacio) return -1;
+
+      const cmp =
+        typeof x.v === "string" && typeof y.v === "string"
+          ? x.v.localeCompare(y.v, "es", { sensitivity: "base" })
+          : x.v < y.v
+            ? -1
+            : x.v > y.v
+              ? 1
+              : 0;
+      return orden.direccion === "asc" ? cmp : -cmp;
+    });
+    return conValor.map((x) => x.a);
+  }, [asignaciones, busqueda, orden]);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -93,26 +193,38 @@ export function UsuariosView({
         <NuevaCuentaDialog organizaciones={organizaciones} esSuperAdmin={esSuperAdmin} />
       </div>
 
+      <div className="relative w-full sm:w-72">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nombre, RUT, correo, rol…"
+          className="pl-8"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      </div>
+
       <div className="border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>RUT</TableHead>
-              <TableHead>Correo</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
+              <SortableHead label="Nombre" columna="nombre" orden={orden} onSort={onSort} />
+              <SortableHead label="RUT" columna="rut" orden={orden} onSort={onSort} />
+              <SortableHead label="Correo" columna="correo" orden={orden} onSort={onSort} />
+              <SortableHead label="Rol" columna="rol" orden={orden} onSort={onSort} />
+              <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {asignaciones.length === 0 && (
+            {filtradas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                  No hay cuentas registradas todavía.
+                  {asignaciones.length === 0
+                    ? "No hay cuentas registradas todavía."
+                    : "No hay cuentas que coincidan con el filtro."}
                 </TableCell>
               </TableRow>
             )}
-            {asignaciones.map((a) => (
+            {filtradas.map((a) => (
               <TableRow key={a.id}>
                 <TableCell className="font-medium">
                   {a.usuarios ? `${a.usuarios.nombres} ${a.usuarios.apellidos}` : "—"}
