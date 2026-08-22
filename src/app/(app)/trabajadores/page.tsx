@@ -3,6 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { TrabajadoresView } from "./trabajadores-view";
 
 const ROLES_GESTION = ["super_admin", "admin_organizacion", "prevencionista"] as const;
+const ROLES_DETALLE = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
 
 export default async function TrabajadoresPage() {
   const sesion = await getSesion();
@@ -46,6 +53,9 @@ export default async function TrabajadoresPage() {
   const puedeGestionar = sesion.roles.some((r) =>
     ROLES_GESTION.includes(r.rol as (typeof ROLES_GESTION)[number]),
   );
+  const puedeVerDetalle =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
 
   return (
     <TrabajadoresView
@@ -54,6 +64,7 @@ export default async function TrabajadoresPage() {
       cargos={cargos ?? []}
       centros={centros ?? []}
       puedeGestionar={puedeGestionar}
+      puedeVerDetalle={puedeVerDetalle}
     />
   );
 }

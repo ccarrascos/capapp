@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SignBadge, SignDot, type EstadoVigencia } from "@/components/status/sign-badge";
-import { crearTrabajador, crearAccesoTrabajador, actualizarTrabajador } from "./actions";
+import { crearTrabajador, crearAccesoTrabajador, actualizarTrabajador, obtenerDetalleTrabajador } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { toast } from "sonner";
@@ -117,6 +117,14 @@ function SortableHead({
   );
 }
 
+const ESTADO_INSCRIPCION_LABEL: Record<string, { label: string; className: string }> = {
+  inscrito: { label: "Inscrito", className: "text-steel" },
+  en_progreso: { label: "En progreso", className: "text-signal" },
+  aprobado: { label: "Aprobado", className: "text-clear" },
+  reprobado: { label: "Reprobado", className: "text-alert" },
+  desertor: { label: "Desertor", className: "text-alert" },
+};
+
 const ESTADOS: { value: EstadoVigencia | "todos"; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "vigente", label: "Vigente" },
@@ -143,12 +151,14 @@ export function TrabajadoresView({
   cargos,
   centros,
   puedeGestionar,
+  puedeVerDetalle,
 }: {
   filas: FilaMatriz[];
   organizaciones: { id: string; razon_social: string }[];
   cargos: Cargo[];
   centros: Centro[];
   puedeGestionar: boolean;
+  puedeVerDetalle: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState<EstadoVigencia | "todos">("todos");
@@ -272,7 +282,17 @@ export function TrabajadoresView({
             {filtradas.map((f) => (
               <TableRow key={f.persona_run}>
                 <TableCell className="font-medium">
-                  {f.nombres} {f.apellido_paterno} {f.apellido_materno}
+                  {puedeVerDetalle && f.persona_run && f.organizacion_id ? (
+                    <DetalleTrabajadorDialog
+                      personaRun={f.persona_run}
+                      organizacionId={f.organizacion_id}
+                      nombreCompleto={`${f.nombres} ${f.apellido_paterno} ${f.apellido_materno ?? ""}`}
+                    />
+                  ) : (
+                    <>
+                      {f.nombres} {f.apellido_paterno} {f.apellido_materno}
+                    </>
+                  )}
                 </TableCell>
                 <TableCell className="font-mono text-sm">
                   {f.run}-{f.dv}
@@ -875,6 +895,149 @@ function DarAccesoDialog({
               </DialogFooter>
             </form>
           </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type DetalleTrabajador = Extract<Awaited<ReturnType<typeof obtenerDetalleTrabajador>>, { ok: true }>;
+
+function DetalleTrabajadorDialog({
+  personaRun,
+  organizacionId,
+  nombreCompleto,
+}: {
+  personaRun: string;
+  organizacionId: string;
+  nombreCompleto: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [detalle, setDetalle] = useState<DetalleTrabajador | null>(null);
+
+  function onOpenChange(v: boolean) {
+    setOpen(v);
+    if (v) {
+      setDetalle(null);
+      startTransition(async () => {
+        const res = await obtenerDetalleTrabajador(personaRun, organizacionId);
+        if (!res.ok) {
+          toast.error(res.mensaje);
+          setOpen(false);
+          return;
+        }
+        setDetalle(res);
+      });
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<button type="button" className="text-left hover:underline underline-offset-2" />}>
+        {nombreCompleto}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{nombreCompleto}</DialogTitle>
+          <DialogDescription>Vistazo rápido — capacitación, centros y evaluaciones.</DialogDescription>
+        </DialogHeader>
+        {pending || !detalle ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <section>
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Situación actual</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm border border-border p-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">RUT</p>
+                  <p className="font-mono">
+                    {detalle.persona.run}-{detalle.persona.dv}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Cargo</p>
+                  <p>{detalle.vinculo?.cargos?.nombre ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Centro</p>
+                  <p>{detalle.vinculo?.centros_trabajo?.nombre ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Modalidad</p>
+                  <p className="capitalize">
+                    {detalle.vinculo?.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
+                  </p>
+                </div>
+                {detalle.vinculo?.fecha_ingreso && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ingreso</p>
+                    <p className="font-mono">{detalle.vinculo.fecha_ingreso}</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                Cursos y evaluaciones
+              </h3>
+              {detalle.inscripciones.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin inscripciones registradas.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {detalle.inscripciones.map((i) => {
+                    const nota = i.evaluaciones_resultado.find((e) => e.modulo_id === null);
+                    const estadoInfo = ESTADO_INSCRIPCION_LABEL[i.estado] ?? {
+                      label: i.estado,
+                      className: "",
+                    };
+                    return (
+                      <div key={i.id} className="border border-border p-3 text-sm flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{i.ediciones_curso?.cursos?.nombre ?? "Curso"}</p>
+                          <span className={cn("text-xs font-medium", estadoInfo.className)}>
+                            {estadoInfo.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Edición: {i.ediciones_curso?.fecha_inicio ?? "—"}
+                          {i.ediciones_curso?.fecha_termino ? ` – ${i.ediciones_curso.fecha_termino}` : ""}
+                          {i.ediciones_curso?.centros_trabajo?.nombre
+                            ? ` · ${i.ediciones_curso.centros_trabajo.nombre}`
+                            : ""}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {nota?.puntaje != null && (
+                            <span>
+                              Nota: <span className="font-mono text-foreground">{nota.puntaje}</span>
+                            </span>
+                          )}
+                          {i.vigencia_hasta && <span>Vigente hasta {i.vigencia_hasta}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Cambios de centro</h3>
+              {detalle.historialCentro.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin cambios registrados.</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {detalle.historialCentro.map((h, idx) => (
+                    <p key={idx} className="text-sm">
+                      <span className="font-mono text-xs text-muted-foreground">{h.cambiado_en.slice(0, 10)}</span>{" "}
+                      {h.centro_anterior?.nombre ?? "Sin centro"} → {h.centro_nuevo?.nombre ?? "Sin centro"}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         )}
       </DialogContent>
     </Dialog>

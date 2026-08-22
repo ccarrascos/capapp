@@ -629,6 +629,86 @@ export type Database = {
           },
         ]
       }
+      historial_centro_trabajo: {
+        Row: {
+          cambiado_en: string
+          cambiado_por: string | null
+          centro_anterior_id: string | null
+          centro_nuevo_id: string | null
+          id: string
+          organizacion_id: string
+          persona_run: string
+        }
+        Insert: {
+          cambiado_en?: string
+          cambiado_por?: string | null
+          centro_anterior_id?: string | null
+          centro_nuevo_id?: string | null
+          id?: string
+          organizacion_id: string
+          persona_run: string
+        }
+        Update: {
+          cambiado_en?: string
+          cambiado_por?: string | null
+          centro_anterior_id?: string | null
+          centro_nuevo_id?: string | null
+          id?: string
+          organizacion_id?: string
+          persona_run?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_centro_trabajo_cambiado_por_fkey"
+            columns: ["cambiado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_centro_anterior_id_fkey"
+            columns: ["centro_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "centros_trabajo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_centro_nuevo_id_fkey"
+            columns: ["centro_nuevo_id"]
+            isOneToOne: false
+            referencedRelation: "centros_trabajo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_organizacion_id_fkey"
+            columns: ["organizacion_id"]
+            isOneToOne: false
+            referencedRelation: "organizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_persona_run_fkey"
+            columns: ["persona_run"]
+            isOneToOne: false
+            referencedRelation: "matriz_vigencia_capacitacion"
+            referencedColumns: ["persona_run"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_persona_run_fkey"
+            columns: ["persona_run"]
+            isOneToOne: false
+            referencedRelation: "matriz_vigencia_capacitacion"
+            referencedColumns: ["run"]
+          },
+          {
+            foreignKeyName: "historial_centro_trabajo_persona_run_fkey"
+            columns: ["persona_run"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["run"]
+          },
+        ]
+      }
       inscripciones: {
         Row: {
           created_at: string

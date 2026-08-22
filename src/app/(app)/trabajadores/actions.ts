@@ -139,6 +139,13 @@ export async function actualizarTrabajador(input: {
 
   if (errorPersona) return { ok: false as const, mensaje: errorPersona.message };
 
+  const { data: vinculoActual } = await supabase
+    .from("vinculos_laborales")
+    .select("centro_trabajo_id")
+    .eq("persona_run", input.personaRun)
+    .eq("organizacion_id", input.organizacionId)
+    .maybeSingle();
+
   const { error: errorVinculo } = await supabase
     .from("vinculos_laborales")
     .update({
@@ -152,9 +159,83 @@ export async function actualizarTrabajador(input: {
 
   if (errorVinculo) return { ok: false as const, mensaje: errorVinculo.message };
 
+  if (vinculoActual && vinculoActual.centro_trabajo_id !== input.centroTrabajoId) {
+    await supabase.from("historial_centro_trabajo").insert({
+      persona_run: input.personaRun,
+      organizacion_id: input.organizacionId,
+      centro_anterior_id: vinculoActual.centro_trabajo_id,
+      centro_nuevo_id: input.centroTrabajoId,
+      cambiado_por: sesion.usuarioId,
+    });
+  }
+
   revalidatePath("/trabajadores");
   revalidatePath("/dashboard");
   return { ok: true as const };
+}
+
+const ROLES_DETALLE = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
+
+export async function obtenerDetalleTrabajador(personaRun: string, organizacionId: string) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === organizacionId,
+    );
+
+  if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para ver este detalle." };
+
+  const supabase = await createClient();
+
+  const [{ data: persona }, { data: vinculo }, { data: inscripciones }, { data: historial }] = await Promise.all([
+    supabase
+      .from("personas")
+      .select("run, dv, nombres, apellido_paterno, apellido_materno, fecha_nacimiento")
+      .eq("run", personaRun)
+      .maybeSingle(),
+    supabase
+      .from("vinculos_laborales")
+      .select(
+        "fecha_ingreso, modalidad_contractual, unidad, cargos(nombre), centros_trabajo(nombre)",
+      )
+      .eq("persona_run", personaRun)
+      .eq("organizacion_id", organizacionId)
+      .maybeSingle(),
+    supabase
+      .from("inscripciones")
+      .select(
+        "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(fecha_inicio, fecha_termino, cursos(nombre, horas_totales), centros_trabajo(nombre)), evaluaciones_resultado(puntaje, aprobado, modulo_id)",
+      )
+      .eq("persona_run", personaRun)
+      .order("fecha_inscripcion", { ascending: false }),
+    supabase
+      .from("historial_centro_trabajo")
+      .select(
+        "cambiado_en, centro_anterior:centros_trabajo!historial_centro_trabajo_centro_anterior_id_fkey(nombre), centro_nuevo:centros_trabajo!historial_centro_trabajo_centro_nuevo_id_fkey(nombre)",
+      )
+      .eq("persona_run", personaRun)
+      .eq("organizacion_id", organizacionId)
+      .order("cambiado_en", { ascending: false }),
+  ]);
+
+  if (!persona) return { ok: false as const, mensaje: "No se encontró a esta persona." };
+
+  return {
+    ok: true as const,
+    persona,
+    vinculo: vinculo ?? null,
+    inscripciones: inscripciones ?? [],
+    historialCentro: historial ?? [],
+  };
 }
 
 export async function crearAccesoTrabajador(input: {
