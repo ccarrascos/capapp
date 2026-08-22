@@ -98,6 +98,7 @@ export async function actualizarTrabajador(input: {
   email: string | null;
   fechaNacimiento: string | null;
   cargoId: string | null;
+  centroTrabajoId: string | null;
   unidad: string | null;
   modalidadContractual: ModalidadContractual;
 }) {
@@ -141,6 +142,7 @@ export async function actualizarTrabajador(input: {
     .from("vinculos_laborales")
     .update({
       cargo_id: input.cargoId,
+      centro_trabajo_id: input.centroTrabajoId,
       unidad: input.unidad,
       modalidad_contractual: input.modalidadContractual,
     })

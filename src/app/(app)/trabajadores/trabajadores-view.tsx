@@ -42,6 +42,7 @@ type FilaMatriz = Database["public"]["Views"]["matriz_vigencia_capacitacion"]["R
   usuarioId: string | null;
   personaEmail: string | null;
   fechaNacimiento: string | null;
+  centroNombre: string | null;
 };
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
 
@@ -134,16 +135,19 @@ const MODALIDADES: { value: ModalidadContractual; label: string }[] = [
 ];
 
 type Cargo = { id: string; nombre: string; organizacion_id: string };
+type Centro = { id: string; nombre: string; organizacion_id: string };
 
 export function TrabajadoresView({
   filas,
   organizaciones,
   cargos,
+  centros,
   puedeGestionar,
 }: {
   filas: FilaMatriz[];
   organizaciones: { id: string; razon_social: string }[];
   cargos: Cargo[];
+  centros: Centro[];
   puedeGestionar: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -213,7 +217,7 @@ export function TrabajadoresView({
           </h1>
         </div>
         {puedeGestionar && (
-          <NuevoTrabajadorDialog organizaciones={organizaciones} cargos={cargos} />
+          <NuevoTrabajadorDialog organizaciones={organizaciones} cargos={cargos} centros={centros} />
         )}
       </div>
 
@@ -248,6 +252,7 @@ export function TrabajadoresView({
               <SortableHead label="Trabajador" columna="trabajador" orden={orden} onSort={onSort} />
               <SortableHead label="RUN" columna="run" orden={orden} onSort={onSort} />
               <SortableHead label="Cargo" columna="cargo" orden={orden} onSort={onSort} />
+              <TableHead>Centro</TableHead>
               <SortableHead label="Modalidad" columna="modalidad" orden={orden} onSort={onSort} />
               <TableHead>Edad</TableHead>
               <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
@@ -259,7 +264,7 @@ export function TrabajadoresView({
           <TableBody>
             {filtradas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   No hay trabajadores que coincidan con el filtro.
                 </TableCell>
               </TableRow>
@@ -273,6 +278,7 @@ export function TrabajadoresView({
                   {f.run}-{f.dv}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{f.cargo ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{f.centroNombre ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground capitalize">
                   {f.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
                 </TableCell>
@@ -296,7 +302,7 @@ export function TrabajadoresView({
                 </TableCell>
                 <TableCell>
                   {puedeGestionar && f.persona_run && f.organizacion_id && (
-                    <EditarTrabajadorDialog fila={f} cargos={cargos} />
+                    <EditarTrabajadorDialog fila={f} cargos={cargos} centros={centros} />
                   )}
                 </TableCell>
               </TableRow>
@@ -311,9 +317,11 @@ export function TrabajadoresView({
 function NuevoTrabajadorDialog({
   organizaciones,
   cargos,
+  centros,
 }: {
   organizaciones: { id: string; razon_social: string }[];
   cargos: Cargo[];
+  centros: Centro[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -325,6 +333,7 @@ function NuevoTrabajadorDialog({
     apellidoPaterno: "",
     apellidoMaterno: "",
     cargoId: "",
+    centroTrabajoId: "",
     unidad: "",
     modalidadContractual: "indefinido" as ModalidadContractual,
     email: "",
@@ -332,6 +341,7 @@ function NuevoTrabajadorDialog({
   });
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === form.organizacionId);
+  const centrosDeLaOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -355,7 +365,7 @@ function NuevoTrabajadorDialog({
     startTransition(async () => {
       const resultado = await crearTrabajador({
         organizacionId: form.organizacionId,
-        centroTrabajoId: null,
+        centroTrabajoId: form.centroTrabajoId || null,
         run,
         dv,
         nombres: form.nombres.trim(),
@@ -383,6 +393,7 @@ function NuevoTrabajadorDialog({
         apellidoPaterno: "",
         apellidoMaterno: "",
         cargoId: "",
+        centroTrabajoId: "",
         email: "",
         fechaNacimiento: "",
       }));
@@ -503,6 +514,37 @@ function NuevoTrabajadorDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
+              <Label>Centro de trabajo</Label>
+              <Select
+                items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
+                value={form.centroTrabajoId}
+                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {centrosDeLaOrg.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {centrosDeLaOrg.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay centros registrados para esta organización — agrégalos en el módulo Centros de trabajo.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="unidad">Unidad (opcional)</Label>
+              <Input id="unidad" value={form.unidad} onChange={(e) => setForm((f) => ({ ...f, unidad: e.target.value }))} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Correo (opcional)</Label>
               <Input id="email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
@@ -529,7 +571,15 @@ function NuevoTrabajadorDialog({
   );
 }
 
-function EditarTrabajadorDialog({ fila, cargos }: { fila: FilaMatriz; cargos: Cargo[] }) {
+function EditarTrabajadorDialog({
+  fila,
+  cargos,
+  centros,
+}: {
+  fila: FilaMatriz;
+  cargos: Cargo[];
+  centros: Centro[];
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const cargoActual = cargos.find((c) => c.organizacion_id === fila.organizacion_id && c.nombre === fila.cargo);
@@ -540,11 +590,13 @@ function EditarTrabajadorDialog({ fila, cargos }: { fila: FilaMatriz; cargos: Ca
     email: fila.personaEmail ?? "",
     fechaNacimiento: fila.fechaNacimiento ?? "",
     cargoId: cargoActual?.id ?? "",
+    centroTrabajoId: fila.centro_trabajo_id ?? "",
     unidad: fila.unidad ?? "",
     modalidadContractual: (fila.modalidad_contractual ?? "indefinido") as ModalidadContractual,
   });
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === fila.organizacion_id);
+  const centrosDeLaOrg = centros.filter((c) => c.organizacion_id === fila.organizacion_id);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -564,6 +616,7 @@ function EditarTrabajadorDialog({ fila, cargos }: { fila: FilaMatriz; cargos: Ca
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
         cargoId: form.cargoId || null,
+        centroTrabajoId: form.centroTrabajoId || null,
         unidad: form.unidad.trim() || null,
         modalidadContractual: form.modalidadContractual,
       });
@@ -670,6 +723,35 @@ function EditarTrabajadorDialog({ fila, cargos }: { fila: FilaMatriz; cargos: Ca
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Centro de trabajo</Label>
+              <Select
+                items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
+                value={form.centroTrabajoId}
+                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {centrosDeLaOrg.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="unidadEdit">Unidad</Label>
+              <Input
+                id="unidadEdit"
+                value={form.unidad}
+                onChange={(e) => setForm((f) => ({ ...f, unidad: e.target.value }))}
+              />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
