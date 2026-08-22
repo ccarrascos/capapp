@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Search, Plus, Pencil, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check, QrCode, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -241,9 +242,17 @@ export function TrabajadoresView({
             Matriz de vigencia
           </h1>
         </div>
-        {puedeGestionar && (
-          <NuevoTrabajadorDialog organizaciones={organizaciones} cargos={cargos} centros={centros} />
-        )}
+        <div className="flex items-center gap-2">
+          {puedeVerDetalle && (
+            <Button render={<Link href="/trabajadores/credenciales" />} nativeButton={false} variant="outline">
+              <QrCode className="size-4" />
+              Imprimir credenciales
+            </Button>
+          )}
+          {puedeGestionar && (
+            <NuevoTrabajadorDialog organizaciones={organizaciones} cargos={cargos} centros={centros} />
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
