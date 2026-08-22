@@ -1,7 +1,7 @@
 import { ShieldHalf, CircleX } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
-import { estadoVigenciaDeCurso, peorEstadoVigencia } from "@/lib/vigencia";
+import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 
 export default async function CredencialPage({
   params,
@@ -24,19 +24,25 @@ export default async function CredencialPage({
   if (vinculo) {
     const { data: inscripciones } = await admin
       .from("inscripciones")
-      .select("vigencia_hasta, ediciones_curso!inner(organizacion_id, cursos(nombre))")
+      .select("fecha_aprobacion, vigencia_hasta, ediciones_curso!inner(organizacion_id, curso_id, cursos(nombre))")
       .eq("persona_run", vinculo.persona_run)
       .eq("estado", "aprobado")
       .eq("ediciones_curso.organizacion_id", vinculo.organizacion_id)
       .order("vigencia_hasta", { ascending: false });
 
-    cursos = (inscripciones ?? [])
-      .filter((i) => i.ediciones_curso?.cursos?.nombre)
-      .map((i) => ({
-        nombre: i.ediciones_curso!.cursos!.nombre,
-        vigenciaHasta: i.vigencia_hasta,
-        estado: estadoVigenciaDeCurso(i.vigencia_hasta),
-      }));
+    // Si el mismo curso se aprobó más de una vez, sólo la aprobación más
+    // reciente cuenta para la vigencia mostrada.
+    const ultimos = ultimoAprobadoPorCurso(
+      (inscripciones ?? [])
+        .filter((i) => i.ediciones_curso?.cursos?.nombre)
+        .map((i) => ({ cursoId: i.ediciones_curso!.curso_id, fechaAprobacion: i.fecha_aprobacion, original: i })),
+    ).map((x) => x.original);
+
+    cursos = ultimos.map((i) => ({
+      nombre: i.ediciones_curso!.cursos!.nombre,
+      vigenciaHasta: i.vigencia_hasta,
+      estado: estadoVigenciaDeCurso(i.vigencia_hasta),
+    }));
   }
 
   const estadoGeneral = peorEstadoVigencia(cursos.map((c) => c.estado));

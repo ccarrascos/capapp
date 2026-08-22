@@ -54,7 +54,7 @@ import {
 } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
-import { estadoVigenciaDeCurso, peorEstadoVigencia } from "@/lib/vigencia";
+import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -1220,6 +1220,45 @@ function DetalleTrabajadorDialog({
         {pending || !detalle ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>
         ) : (
+          (() => {
+            // Si el mismo curso se aprobó más de una vez (renovación), la
+            // aprobación más reciente reemplaza a la anterior — sólo esa
+            // cuenta para el estado y aparece en la lista.
+            const aprobadosVigentes = ultimoAprobadoPorCurso(
+              detalle.inscripciones
+                .filter((i) => i.estado === "aprobado")
+                .map((i) => ({
+                  cursoId: i.ediciones_curso?.curso_id ?? i.id,
+                  fechaAprobacion: i.fecha_aprobacion,
+                  original: i,
+                })),
+            ).map((x) => x.original);
+            // Agrupa todos los intentos (aprobados o no) por curso, para
+            // poder mostrar cuántas veces lo ha tomado sin perder el
+            // historial — pero la vigencia mostrada siempre sale de la
+            // última aprobación de ese curso.
+            const gruposPorCurso = new Map<
+              string,
+              { cursoNombre: string; intentos: typeof detalle.inscripciones }
+            >();
+            for (const i of detalle.inscripciones) {
+              const cursoId = i.ediciones_curso?.curso_id ?? i.id;
+              const grupo = gruposPorCurso.get(cursoId);
+              if (grupo) grupo.intentos.push(i);
+              else
+                gruposPorCurso.set(cursoId, {
+                  cursoNombre: i.ediciones_curso?.cursos?.nombre ?? "Curso",
+                  intentos: [i],
+                });
+            }
+            const grupos = [...gruposPorCurso.values()].map((g) => ({
+              ...g,
+              intentos: [...g.intentos].sort((a, b) =>
+                (b.fecha_inscripcion ?? "").localeCompare(a.fecha_inscripcion ?? ""),
+              ),
+            }));
+
+            return (
           <div className="flex flex-col gap-5">
             <section>
               <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Situación actual</h3>
@@ -1227,11 +1266,7 @@ function DetalleTrabajadorDialog({
                 <div>
                   <p className="text-xs text-muted-foreground">Estado</p>
                   <SignBadge
-                    estado={peorEstadoVigencia(
-                      detalle.inscripciones
-                        .filter((i) => i.estado === "aprobado")
-                        .map((i) => estadoVigenciaDeCurso(i.vigencia_hasta)),
-                    )}
+                    estado={peorEstadoVigencia(aprobadosVigentes.map((i) => estadoVigenciaDeCurso(i.vigencia_hasta)))}
                     size="sm"
                   />
                 </div>
@@ -1276,48 +1311,66 @@ function DetalleTrabajadorDialog({
               <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
                 Cursos y evaluaciones
               </h3>
-              {detalle.inscripciones.length === 0 ? (
+              {grupos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin inscripciones registradas.</p>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {detalle.inscripciones.map((i) => {
-                    const nota = i.evaluaciones_resultado.find((e) => e.modulo_id === null);
-                    const estadoInfo = ESTADO_INSCRIPCION_LABEL[i.estado] ?? {
-                      label: i.estado,
-                      className: "",
-                    };
-                    const estadoVigencia = i.estado === "aprobado" ? estadoVigenciaDeCurso(i.vigencia_hasta) : null;
+                  {grupos.map((g) => {
+                    const aprobados = g.intentos.filter((i) => i.estado === "aprobado");
+                    const ultimoAprobado =
+                      aprobados.length > 0
+                        ? aprobados.reduce((a, b) => ((b.fecha_aprobacion ?? "") > (a.fecha_aprobacion ?? "") ? b : a))
+                        : null;
+                    const estadoVigencia = ultimoAprobado ? estadoVigenciaDeCurso(ultimoAprobado.vigencia_hasta) : null;
                     return (
-                      <div key={i.id} className="border border-border p-3 text-sm flex flex-col gap-1.5">
+                      <div key={g.cursoNombre + g.intentos[0].id} className="border border-border p-3 text-sm flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium">{i.ediciones_curso?.cursos?.nombre ?? "Curso"}</p>
-                          <span className={cn("text-xs font-medium", estadoInfo.className)}>
-                            {estadoInfo.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Edición: {i.ediciones_curso?.fecha_inicio ?? "—"}
-                          {i.ediciones_curso?.fecha_termino ? ` – ${i.ediciones_curso.fecha_termino}` : ""}
-                          {i.ediciones_curso?.centros_trabajo?.nombre
-                            ? ` · ${i.ediciones_curso.centros_trabajo.nombre}`
-                            : ""}
-                        </p>
-                        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                          {nota?.puntaje != null ? (
-                            <span>
-                              Nota: <span className="font-mono text-foreground">{nota.puntaje}</span>
-                            </span>
-                          ) : (
-                            <span />
-                          )}
+                          <p className="font-medium">
+                            {g.cursoNombre}
+                            {g.intentos.length > 1 && (
+                              <span className="text-xs text-muted-foreground font-normal">
+                                {" "}
+                                · {g.intentos.length} ediciones tomadas
+                              </span>
+                            )}
+                          </p>
                           {estadoVigencia && (
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1.5 text-xs shrink-0">
                               <SignBadge estado={estadoVigencia} size="sm" />
-                              {i.vigencia_hasta && (
-                                <span>{estadoVigencia === "vencido" ? "el" : "hasta"} {i.vigencia_hasta}</span>
+                              {ultimoAprobado?.vigencia_hasta && (
+                                <span className="text-muted-foreground">
+                                  {estadoVigencia === "vencido" ? "el" : "hasta"} {ultimoAprobado.vigencia_hasta}
+                                </span>
                               )}
                             </span>
                           )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {g.intentos.map((i) => {
+                            const nota = i.evaluaciones_resultado.find((e) => e.modulo_id === null);
+                            const estadoInfo = ESTADO_INSCRIPCION_LABEL[i.estado] ?? {
+                              label: i.estado,
+                              className: "",
+                            };
+                            return (
+                              <div
+                                key={i.id}
+                                className="flex items-center justify-between gap-3 text-xs border-l-2 border-border pl-2"
+                              >
+                                <span className="text-muted-foreground">
+                                  {i.ediciones_curso?.fecha_inicio ?? "—"}
+                                  {i.ediciones_curso?.fecha_termino ? ` – ${i.ediciones_curso.fecha_termino}` : ""}
+                                  {i.ediciones_curso?.centros_trabajo?.nombre
+                                    ? ` · ${i.ediciones_curso.centros_trabajo.nombre}`
+                                    : ""}
+                                </span>
+                                <span className={cn("font-medium shrink-0", estadoInfo.className)}>
+                                  {estadoInfo.label}
+                                  {nota?.puntaje != null ? ` (${nota.puntaje})` : ""}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -1342,6 +1395,8 @@ function DetalleTrabajadorDialog({
               )}
             </section>
           </div>
+            );
+          })()
         )}
       </DialogContent>
     </Dialog>

@@ -262,7 +262,7 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
     supabase
       .from("inscripciones")
       .select(
-        "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(fecha_inicio, fecha_termino, cursos(nombre, horas_totales), centros_trabajo(nombre)), evaluaciones_resultado(puntaje, aprobado, modulo_id)",
+        "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(curso_id, fecha_inicio, fecha_termino, cursos(nombre, horas_totales), centros_trabajo(nombre)), evaluaciones_resultado(puntaje, aprobado, modulo_id)",
       )
       .eq("persona_run", personaRun)
       .order("fecha_inscripcion", { ascending: false }),

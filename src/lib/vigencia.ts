@@ -20,3 +20,21 @@ export function peorEstadoVigencia(estados: EstadoVigencia[]): EstadoVigencia {
   if (estados.length === 0) return "sin_capacitacion";
   return estados.reduce((peor, actual) => (PRIORIDAD[actual] < PRIORIDAD[peor] ? actual : peor));
 }
+
+/**
+ * Cuando un trabajador aprueba el mismo curso más de una vez (renovación),
+ * la aprobación más reciente reemplaza a la anterior — sólo esa cuenta
+ * para el estado de vigencia y para la lista de cursos.
+ */
+export function ultimoAprobadoPorCurso<T extends { cursoId: string; fechaAprobacion: string | null }>(
+  aprobados: T[],
+): T[] {
+  const porCurso = new Map<string, T>();
+  for (const i of aprobados) {
+    const actual = porCurso.get(i.cursoId);
+    if (!actual || (i.fechaAprobacion ?? "") > (actual.fechaAprobacion ?? "")) {
+      porCurso.set(i.cursoId, i);
+    }
+  }
+  return [...porCurso.values()];
+}
