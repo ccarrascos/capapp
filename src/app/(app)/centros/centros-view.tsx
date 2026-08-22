@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { crearCentroTrabajo } from "./actions";
+import { RegionComunaFields } from "@/components/region-comuna-fields";
 
 type Centro = {
   id: string;
@@ -150,14 +151,12 @@ function NuevoCentroDialog({ organizaciones }: { organizaciones: { id: string; r
             <Input id="direccion" value={form.direccion} onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="comuna">Comuna</Label>
-              <Input id="comuna" value={form.comuna} onChange={(e) => setForm((f) => ({ ...f, comuna: e.target.value }))} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="region">Región</Label>
-              <Input id="region" value={form.region} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))} />
-            </div>
+            <RegionComunaFields
+              region={form.region}
+              comuna={form.comuna}
+              onRegionChange={(region) => setForm((f) => ({ ...f, region }))}
+              onComunaChange={(comuna) => setForm((f) => ({ ...f, comuna }))}
+            />
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
