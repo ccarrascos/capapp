@@ -1,4 +1,4 @@
-import { ShieldHalf, CircleX } from "lucide-react";
+import { ShieldHalf, CircleX, UserX } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
@@ -14,7 +14,7 @@ export default async function CredencialPage({
   const { data: vinculo } = await admin
     .from("vinculos_laborales")
     .select(
-      "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
+      "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv, usuarios(activo)), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
     )
     .eq("qr_token", qrToken)
     .maybeSingle();
@@ -47,6 +47,7 @@ export default async function CredencialPage({
 
   const estadoGeneral = peorEstadoVigencia(cursos.map((c) => c.estado));
   const persona = vinculo?.personas;
+  const cuentaDesactivada = persona?.usuarios?.activo === false;
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
@@ -77,6 +78,18 @@ export default async function CredencialPage({
             </h1>
             <p className="text-sm text-muted-foreground">
               Este código no corresponde a una credencial válida de Capapp.
+            </p>
+          </div>
+        ) : cuentaDesactivada ? (
+          <div className="border border-alert/30 bg-alert/10 p-6 text-center">
+            <UserX className="size-8 text-alert mx-auto mb-3" />
+            <h1 className="font-heading text-lg font-bold uppercase tracking-tight mb-1">Usuario desactivado</h1>
+            <p className="text-sm text-muted-foreground mb-3">
+              {persona.nombres} {persona.apellido_paterno}
+              {persona.apellido_materno ? ` ${persona.apellido_materno}` : ""}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Esta credencial ya no está vigente — la cuenta asociada fue desactivada.
             </p>
           </div>
         ) : (
