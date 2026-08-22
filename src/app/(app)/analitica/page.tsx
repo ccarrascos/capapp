@@ -58,6 +58,8 @@ export default async function AnaliticaPage() {
       centro: (f.centro_trabajo_id ? nombreCentroPorId.get(f.centro_trabajo_id) : null) ?? "Sin asignar",
       edad: fecha ? calcularEdad(fecha) : null,
       estado: (f.estado_vigencia ?? "sin_capacitacion") as (typeof ESTADOS)[number]["estado"],
+      tipoVinculo: (f.tipo_vinculo ?? "directo") as "directo" | "subcontrato",
+      subcontrato: f.subcontrato_nombre ?? null,
     };
   });
 

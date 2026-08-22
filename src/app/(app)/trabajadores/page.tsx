@@ -17,10 +17,16 @@ export default async function TrabajadoresPage() {
 
   const supabase = await createClient();
 
-  const [{ data: matriz }, { data: cargos }, { data: centros }, { data: orgsPropias }] = await Promise.all([
+  const [{ data: matriz }, { data: cargos }, { data: centros }, { data: subcontratos }, { data: orgsPropias }] =
+    await Promise.all([
     supabase.from("matriz_vigencia_capacitacion").select("*").order("nombres"),
     supabase.from("cargos").select("id, nombre, organizacion_id").eq("activo", true).order("nombre"),
     supabase.from("centros_trabajo").select("id, nombre, organizacion_id").eq("activo", true).order("nombre"),
+    supabase
+      .from("subcontratos")
+      .select("id, nombre, organizacion_id, subcontratos_centros(centro_trabajo_id)")
+      .eq("activo", true)
+      .order("nombre"),
     sesion.esSuperAdmin
       ? supabase.from("organizaciones").select("id, razon_social").order("razon_social")
       : Promise.resolve({
@@ -50,6 +56,13 @@ export default async function TrabajadoresPage() {
     centroNombre: (f.centro_trabajo_id && centroPorId.get(f.centro_trabajo_id)) ?? null,
   }));
 
+  const subcontratosPorOrg = (subcontratos ?? []).map((s) => ({
+    id: s.id,
+    nombre: s.nombre,
+    organizacion_id: s.organizacion_id,
+    centroIds: s.subcontratos_centros.map((sc) => sc.centro_trabajo_id),
+  }));
+
   const puedeGestionar = sesion.roles.some((r) =>
     ROLES_GESTION.includes(r.rol as (typeof ROLES_GESTION)[number]),
   );
@@ -63,6 +76,7 @@ export default async function TrabajadoresPage() {
       organizaciones={orgsPropias ?? []}
       cargos={cargos ?? []}
       centros={centros ?? []}
+      subcontratos={subcontratosPorOrg}
       puedeGestionar={puedeGestionar}
       puedeVerDetalle={puedeVerDetalle}
     />

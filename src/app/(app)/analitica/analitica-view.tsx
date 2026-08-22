@@ -21,7 +21,18 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 type EstadoConfig = { estado: string; label: string; color: string };
-type FilaAnalitica = { centro: string; edad: number | null; estado: string };
+type FilaAnalitica = {
+  centro: string;
+  edad: number | null;
+  estado: string;
+  tipoVinculo: "directo" | "subcontrato";
+  subcontrato: string | null;
+};
+
+const TIPO_VINCULO_LABEL: Record<"directo" | "subcontrato", string> = {
+  directo: "Directo",
+  subcontrato: "Subcontrato",
+};
 
 const RANGOS_EDAD: { label: string; min: number; max: number }[] = [
   { label: "18-24", min: 18, max: 24 },
@@ -42,18 +53,32 @@ function opacidad(seleccionActiva: boolean, esteSeleccionado: boolean) {
   return esteSeleccionado ? 1 : 0.3;
 }
 
-type Filtros = { centro: string | null; estado: string | null; rango: string | null };
+type Filtros = {
+  centro: string | null;
+  estado: string | null;
+  rango: string | null;
+  tipoVinculo: "directo" | "subcontrato" | null;
+  subcontrato: string | null;
+};
 
 function aplicarFiltros(
   datos: FilaAnalitica[],
   filtros: Filtros,
-  opts: { excluirCentro?: boolean; excluirEstado?: boolean; excluirRango?: boolean } = {},
+  opts: {
+    excluirCentro?: boolean;
+    excluirEstado?: boolean;
+    excluirRango?: boolean;
+    excluirTipoVinculo?: boolean;
+    excluirSubcontrato?: boolean;
+  } = {},
 ) {
   return datos.filter(
     (f) =>
       (opts.excluirCentro || !filtros.centro || f.centro === filtros.centro) &&
       (opts.excluirEstado || !filtros.estado || f.estado === filtros.estado) &&
-      (opts.excluirRango || !filtros.rango || rangoDeEdad(f.edad) === filtros.rango),
+      (opts.excluirRango || !filtros.rango || rangoDeEdad(f.edad) === filtros.rango) &&
+      (opts.excluirTipoVinculo || !filtros.tipoVinculo || f.tipoVinculo === filtros.tipoVinculo) &&
+      (opts.excluirSubcontrato || !filtros.subcontrato || f.subcontrato === filtros.subcontrato),
   );
 }
 
@@ -83,10 +108,16 @@ export function AnaliticaView({
   estadosConfig: EstadoConfig[];
 }) {
   const centros = useMemo(() => [...new Set(filas.map((f) => f.centro))].sort(), [filas]);
+  const subcontratosNombres = useMemo(
+    () => [...new Set(filas.map((f) => f.subcontrato).filter((s): s is string => !!s))].sort(),
+    [filas],
+  );
 
   const [filtroCentro, setFiltroCentro] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
   const [filtroRango, setFiltroRango] = useState<string | null>(null);
+  const [filtroTipoVinculo, setFiltroTipoVinculo] = useState<"directo" | "subcontrato" | null>(null);
+  const [filtroSubcontrato, setFiltroSubcontrato] = useState<string | null>(null);
 
   function toggleCentro(c: string) {
     setFiltroCentro((prev) => (prev === c ? null : c));
@@ -97,17 +128,33 @@ export function AnaliticaView({
   function toggleRango(r: string) {
     setFiltroRango((prev) => (prev === r ? null : r));
   }
+  function toggleTipoVinculo(t: "directo" | "subcontrato") {
+    setFiltroTipoVinculo((prev) => (prev === t ? null : t));
+    if (t === "directo") setFiltroSubcontrato(null);
+  }
+  function toggleSubcontrato(s: string) {
+    setFiltroSubcontrato((prev) => (prev === s ? null : s));
+    setFiltroTipoVinculo("subcontrato");
+  }
 
   const filtros: Filtros = useMemo(
-    () => ({ centro: filtroCentro, estado: filtroEstado, rango: filtroRango }),
-    [filtroCentro, filtroEstado, filtroRango],
+    () => ({
+      centro: filtroCentro,
+      estado: filtroEstado,
+      rango: filtroRango,
+      tipoVinculo: filtroTipoVinculo,
+      subcontrato: filtroSubcontrato,
+    }),
+    [filtroCentro, filtroEstado, filtroRango, filtroTipoVinculo, filtroSubcontrato],
   );
-  const hayFiltros = !!(filtroCentro || filtroEstado || filtroRango);
+  const hayFiltros = !!(filtroCentro || filtroEstado || filtroRango || filtroTipoVinculo || filtroSubcontrato);
 
   function limpiarFiltros() {
     setFiltroCentro(null);
     setFiltroEstado(null);
     setFiltroRango(null);
+    setFiltroTipoVinculo(null);
+    setFiltroSubcontrato(null);
   }
 
   // Cada gráfico se calcula excluyendo su propia dimensión de los filtros
@@ -167,6 +214,30 @@ export function AnaliticaView({
     [baseCumplimiento, centros, estadosConfig],
   );
 
+  const baseTipoVinculo = useMemo(
+    () => aplicarFiltros(filas, filtros, { excluirTipoVinculo: true, excluirSubcontrato: true }),
+    [filas, filtros],
+  );
+  const porTipoVinculo = useMemo(
+    () =>
+      (["directo", "subcontrato"] as const).map((t) => ({
+        tipo: TIPO_VINCULO_LABEL[t],
+        codigo: t,
+        cantidad: baseTipoVinculo.filter((f) => f.tipoVinculo === t).length,
+      })),
+    [baseTipoVinculo],
+  );
+
+  const baseSubcontrato = useMemo(() => aplicarFiltros(filas, filtros, { excluirSubcontrato: true }), [filas, filtros]);
+  const trabajadoresPorSubcontrato = useMemo(
+    () =>
+      subcontratosNombres
+        .map((sub) => ({ subcontrato: sub, cantidad: baseSubcontrato.filter((f) => f.subcontrato === sub).length }))
+        .filter((s) => s.cantidad > 0)
+        .sort((a, b) => b.cantidad - a.cantidad),
+    [baseSubcontrato, subcontratosNombres],
+  );
+
   const filasFiltradas = useMemo(() => aplicarFiltros(filas, filtros), [filas, filtros]);
   const totalActivos = filasFiltradas.length;
   const vigentes = filasFiltradas.filter((f) => f.estado === "vigente").length;
@@ -203,6 +274,27 @@ export function AnaliticaView({
             </SelectContent>
           </Select>
         </div>
+        <div className="flex flex-col gap-1.5 w-full sm:w-56">
+          <Label>Tipo de vínculo</Label>
+          <Select
+            items={{ todos: "Todos", ...TIPO_VINCULO_LABEL }}
+            value={filtroTipoVinculo ?? "todos"}
+            onValueChange={(v) => {
+              const nuevo = !v || v === "todos" ? null : (v as "directo" | "subcontrato");
+              setFiltroTipoVinculo(nuevo);
+              if (nuevo !== "subcontrato") setFiltroSubcontrato(null);
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="directo">Directo</SelectItem>
+              <SelectItem value="subcontrato">Subcontrato</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {hayFiltros && (
@@ -232,17 +324,46 @@ export function AnaliticaView({
               Edad: {filtroRango} <X className="size-3" />
             </button>
           )}
+          {filtroTipoVinculo && (
+            <button
+              onClick={() => {
+                setFiltroTipoVinculo(null);
+                setFiltroSubcontrato(null);
+              }}
+              className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs hover:bg-secondary/70"
+            >
+              Vínculo: {TIPO_VINCULO_LABEL[filtroTipoVinculo]} <X className="size-3" />
+            </button>
+          )}
+          {filtroSubcontrato && (
+            <button
+              onClick={() => setFiltroSubcontrato(null)}
+              className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs hover:bg-secondary/70"
+            >
+              Subcontrato: {filtroSubcontrato} <X className="size-3" />
+            </button>
+          )}
           <Button size="sm" variant="ghost" onClick={limpiarFiltros} className="h-6 text-xs">
             Limpiar todo
           </Button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <KpiTile label="Trabajadores" value={totalActivos} accent="steel" />
         <KpiTile label="Cumplimiento" value={cumplimientoGlobal} suffix="%" accent="signal" />
         <KpiTile label="Centros" value={trabajadoresPorCentro.length} accent="clear" />
         <KpiTile label="Rango etario más numeroso" value={rangoMasNumeroso} accent="hazard" />
+        <KpiTile
+          label="Directos"
+          value={filasFiltradas.filter((f) => f.tipoVinculo === "directo").length}
+          accent="steel"
+        />
+        <KpiTile
+          label="Subcontratados"
+          value={filasFiltradas.filter((f) => f.tipoVinculo === "subcontrato").length}
+          accent="hazard"
+        />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
@@ -357,6 +478,86 @@ export function AnaliticaView({
               ))}
             </BarChart>
           </ResponsiveContainer>
+        </TarjetaGrafico>
+
+        <TarjetaGrafico titulo="Directo vs. subcontrato" subtitulo="Clic en un segmento para filtrar por tipo de vínculo">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={porTipoVinculo}
+                dataKey="cantidad"
+                nameKey="tipo"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={90}
+                paddingAngle={2}
+                cursor="pointer"
+              >
+                {porTipoVinculo.map((t, i) => (
+                  <Cell
+                    key={t.codigo}
+                    fill={i === 0 ? "var(--chart-1)" : "var(--chart-3)"}
+                    fillOpacity={opacidad(!!filtroTipoVinculo, filtroTipoVinculo === t.codigo)}
+                    onClick={() => toggleTipoVinculo(t.codigo)}
+                  />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Legend
+                verticalAlign="bottom"
+                height={32}
+                wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </TarjetaGrafico>
+
+        <TarjetaGrafico
+          titulo="Trabajadores por subcontrato"
+          subtitulo="Clic en una barra para filtrar por ese subcontrato"
+        >
+          {trabajadoresPorSubcontrato.length === 0 ? (
+            <p className="h-full flex items-center justify-center text-sm text-muted-foreground">
+              No hay trabajadores subcontratados con los filtros actuales.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={trabajadoresPorSubcontrato}
+                layout="vertical"
+                margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  dataKey="subcontrato"
+                  type="category"
+                  width={110}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  axisLine={{ stroke: "var(--border)" }}
+                  tickLine={false}
+                />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
+                <Bar dataKey="cantidad" name="Trabajadores" radius={[0, 3, 3, 0]} cursor="pointer">
+                  {trabajadoresPorSubcontrato.map((entry) => (
+                    <Cell
+                      key={entry.subcontrato}
+                      fill="var(--chart-3)"
+                      fillOpacity={opacidad(!!filtroSubcontrato, filtroSubcontrato === entry.subcontrato)}
+                      onClick={() => toggleSubcontrato(entry.subcontrato)}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </TarjetaGrafico>
       </div>
     </div>

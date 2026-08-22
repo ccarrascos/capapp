@@ -3,6 +3,7 @@ import {
   LayoutGrid,
   GraduationCap,
   Building2,
+  Building,
   ShieldCheck,
   ClipboardList,
   UserCog,
@@ -61,6 +62,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/centros",
     label: "Centros de trabajo",
     icon: Building2,
+    roles: ["super_admin", "admin_organizacion"],
+  },
+  {
+    href: "/subcontratos",
+    label: "Subcontratos",
+    icon: Building,
     roles: ["super_admin", "admin_organizacion"],
   },
   {

@@ -13,8 +13,30 @@ import { generarQrDataUrl } from "@/lib/qr";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
+type TipoVinculoLaboral = Database["public"]["Enums"]["tipo_vinculo_laboral"];
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+async function validarSubcontrato(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tipoVinculo: TipoVinculoLaboral,
+  subcontratoId: string | null,
+  centroTrabajoId: string | null,
+): Promise<string | null> {
+  if (tipoVinculo === "directo") return null;
+  if (!subcontratoId) return "Selecciona el subcontrato.";
+  if (!centroTrabajoId) return "Selecciona el centro de trabajo para validar el subcontrato.";
+
+  const { data } = await supabase
+    .from("subcontratos_centros")
+    .select("id")
+    .eq("subcontrato_id", subcontratoId)
+    .eq("centro_trabajo_id", centroTrabajoId)
+    .maybeSingle();
+
+  if (!data) return "Ese subcontrato no está asignado a este centro de trabajo.";
+  return null;
+}
 
 export type CrearTrabajadorInput = {
   organizacionId: string;
@@ -29,6 +51,8 @@ export type CrearTrabajadorInput = {
   modalidadContractual: ModalidadContractual;
   email: string | null;
   fechaNacimiento: string | null;
+  tipoVinculo: TipoVinculoLaboral;
+  subcontratoId: string | null;
 };
 
 export async function crearTrabajador(input: CrearTrabajadorInput) {
@@ -44,6 +68,14 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
   }
 
   const supabase = await createClient();
+
+  const errorSubcontrato = await validarSubcontrato(
+    supabase,
+    input.tipoVinculo,
+    input.subcontratoId,
+    input.centroTrabajoId,
+  );
+  if (errorSubcontrato) return { ok: false as const, mensaje: errorSubcontrato };
 
   // La persona (identidad, por RUT) es global al sistema — si ya existe
   // porque trabajó en otra organización, reutilizamos su registro y
@@ -79,6 +111,8 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     cargo_id: input.cargoId,
     unidad: input.unidad,
     modalidad_contractual: input.modalidadContractual,
+    tipo_vinculo: input.tipoVinculo,
+    subcontrato_id: input.subcontratoId,
   });
 
   if (errorVinculo) {
@@ -105,6 +139,8 @@ export async function actualizarTrabajador(input: {
   centroTrabajoId: string | null;
   unidad: string | null;
   modalidadContractual: ModalidadContractual;
+  tipoVinculo: TipoVinculoLaboral;
+  subcontratoId: string | null;
 }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
@@ -128,6 +164,14 @@ export async function actualizarTrabajador(input: {
   }
 
   const supabase = await createClient();
+
+  const errorSubcontrato = await validarSubcontrato(
+    supabase,
+    input.tipoVinculo,
+    input.subcontratoId,
+    input.centroTrabajoId,
+  );
+  if (errorSubcontrato) return { ok: false as const, mensaje: errorSubcontrato };
 
   const { error: errorPersona } = await supabase
     .from("personas")
@@ -156,6 +200,8 @@ export async function actualizarTrabajador(input: {
       centro_trabajo_id: input.centroTrabajoId,
       unidad: input.unidad,
       modalidad_contractual: input.modalidadContractual,
+      tipo_vinculo: input.tipoVinculo,
+      subcontrato_id: input.subcontratoId,
     })
     .eq("persona_run", input.personaRun)
     .eq("organizacion_id", input.organizacionId);
@@ -208,7 +254,7 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
     supabase
       .from("vinculos_laborales")
       .select(
-        "fecha_ingreso, modalidad_contractual, unidad, cargos(nombre), centros_trabajo(nombre)",
+        "fecha_ingreso, modalidad_contractual, unidad, tipo_vinculo, cargos(nombre), centros_trabajo(nombre), subcontratos(nombre)",
       )
       .eq("persona_run", personaRun)
       .eq("organizacion_id", organizacionId)

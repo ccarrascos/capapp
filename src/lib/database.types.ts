@@ -1109,6 +1109,80 @@ export type Database = {
         }
         Relationships: []
       }
+      subcontratos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          nombre: string
+          organizacion_id: string
+          rut: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre: string
+          organizacion_id: string
+          rut?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre?: string
+          organizacion_id?: string
+          rut?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontratos_organizacion_id_fkey"
+            columns: ["organizacion_id"]
+            isOneToOne: false
+            referencedRelation: "organizaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subcontratos_centros: {
+        Row: {
+          centro_trabajo_id: string
+          created_at: string
+          id: string
+          subcontrato_id: string
+        }
+        Insert: {
+          centro_trabajo_id: string
+          created_at?: string
+          id?: string
+          subcontrato_id: string
+        }
+        Update: {
+          centro_trabajo_id?: string
+          created_at?: string
+          id?: string
+          subcontrato_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontratos_centros_centro_trabajo_id_fkey"
+            columns: ["centro_trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "centros_trabajo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcontratos_centros_subcontrato_id_fkey"
+            columns: ["subcontrato_id"]
+            isOneToOne: false
+            referencedRelation: "subcontratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_roles: {
         Row: {
           centro_trabajo_id: string | null
@@ -1223,6 +1297,8 @@ export type Database = {
           organizacion_id: string
           persona_run: string
           qr_token: string
+          subcontrato_id: string | null
+          tipo_vinculo: Database["public"]["Enums"]["tipo_vinculo_laboral"]
           unidad: string | null
           updated_at: string
         }
@@ -1238,6 +1314,8 @@ export type Database = {
           organizacion_id: string
           persona_run: string
           qr_token?: string
+          subcontrato_id?: string | null
+          tipo_vinculo?: Database["public"]["Enums"]["tipo_vinculo_laboral"]
           unidad?: string | null
           updated_at?: string
         }
@@ -1253,6 +1331,8 @@ export type Database = {
           organizacion_id?: string
           persona_run?: string
           qr_token?: string
+          subcontrato_id?: string | null
+          tipo_vinculo?: Database["public"]["Enums"]["tipo_vinculo_laboral"]
           unidad?: string | null
           updated_at?: string
         }
@@ -1299,6 +1379,13 @@ export type Database = {
             referencedRelation: "personas"
             referencedColumns: ["run"]
           },
+          {
+            foreignKeyName: "vinculos_laborales_subcontrato_id_fkey"
+            columns: ["subcontrato_id"]
+            isOneToOne: false
+            referencedRelation: "subcontratos"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1321,6 +1408,11 @@ export type Database = {
           organizacion_id: string | null
           persona_run: string | null
           run: string | null
+          subcontrato_id: string | null
+          subcontrato_nombre: string | null
+          tipo_vinculo:
+            | Database["public"]["Enums"]["tipo_vinculo_laboral"]
+            | null
           trabajador_activo: boolean | null
           unidad: string | null
           vigencia_hasta: string | null
@@ -1346,6 +1438,13 @@ export type Database = {
             columns: ["organizacion_id"]
             isOneToOne: false
             referencedRelation: "organizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vinculos_laborales_subcontrato_id_fkey"
+            columns: ["subcontrato_id"]
+            isOneToOne: false
+            referencedRelation: "subcontratos"
             referencedColumns: ["id"]
           },
         ]
@@ -1407,6 +1506,7 @@ export type Database = {
         | "nueva_inscripcion"
         | "curso_finalizado"
       tipo_proveedor: "interno" | "oal" | "otec"
+      tipo_vinculo_laboral: "directo" | "subcontrato"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1582,6 +1682,7 @@ export const Constants = {
         "curso_finalizado",
       ],
       tipo_proveedor: ["interno", "oal", "otec"],
+      tipo_vinculo_laboral: ["directo", "subcontrato"],
     },
   },
 } as const

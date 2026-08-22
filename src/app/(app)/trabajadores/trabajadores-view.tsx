@@ -2,7 +2,20 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Plus, Pencil, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check, QrCode, Printer } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  KeyRound,
+  Copy,
+  Check,
+  QrCode,
+  Printer,
+  FileSpreadsheet,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +79,28 @@ function calcularEdad(fechaNacimiento: string | null): number | null {
     (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
   if (aunNoCumple) edad -= 1;
   return edad;
+}
+
+function textoBuscable(f: FilaMatriz): string {
+  return [
+    f.nombres,
+    f.apellido_paterno,
+    f.apellido_materno,
+    f.run,
+    f.dv,
+    f.cargo,
+    f.centroNombre,
+    f.unidad,
+    f.modalidad_contractual?.replace(/_/g, " "),
+    f.estado_vigencia?.replace(/_/g, " "),
+    f.vigencia_hasta,
+    f.tipo_vinculo,
+    f.subcontrato_nombre,
+    f.personaEmail,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "modalidad" | "vence" | "estado";
@@ -141,6 +176,58 @@ const ESTADOS: { value: EstadoVigencia | "todos"; label: string }[] = [
   { value: "sin_capacitacion", label: "Sin capacitación" },
 ];
 
+const ESTADO_LABEL_POR_CODIGO = Object.fromEntries(
+  ESTADOS.filter((e) => e.value !== "todos").map((e) => [e.value, e.label]),
+) as Record<string, string>;
+
+function csvEscapar(valor: string): string {
+  return `"${valor.replace(/"/g, '""')}"`;
+}
+
+function exportarCsv(filas: FilaMatriz[]) {
+  const encabezados = [
+    "Trabajador",
+    "RUN",
+    "Cargo",
+    "Centro",
+    "Modalidad",
+    "Vínculo",
+    "Subcontrato",
+    "Edad",
+    "Vence",
+    "Estado",
+    "Unidad",
+    "Correo",
+  ];
+
+  const filasCsv = filas.map((f) => [
+    `${f.nombres ?? ""} ${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.replace(/\s+/g, " ").trim(),
+    f.run && f.dv ? `${f.run}-${f.dv}` : "",
+    f.cargo ?? "",
+    f.centroNombre ?? "",
+    f.modalidad_contractual ? (f.modalidad_contractual as string).replace(/_/g, " ") : "",
+    f.tipo_vinculo === "subcontrato" ? "Subcontrato" : "Directo",
+    f.subcontrato_nombre ?? "",
+    calcularEdad(f.fechaNacimiento)?.toString() ?? "",
+    f.vigencia_hasta ?? "",
+    ESTADO_LABEL_POR_CODIGO[f.estado_vigencia ?? ""] ?? "",
+    f.unidad ?? "",
+    f.personaEmail ?? "",
+  ]);
+
+  const lineas = [encabezados, ...filasCsv].map((fila) => fila.map((v) => csvEscapar(String(v))).join(";"));
+  const BOM = String.fromCharCode(0xfeff);
+  const csv = BOM + lineas.join("\r\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `matriz-vigencia-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const MODALIDADES: { value: ModalidadContractual; label: string }[] = [
   { value: "indefinido", label: "Indefinido" },
   { value: "plazo_fijo", label: "Plazo fijo" },
@@ -152,12 +239,20 @@ const MODALIDADES: { value: ModalidadContractual; label: string }[] = [
 
 type Cargo = { id: string; nombre: string; organizacion_id: string };
 type Centro = { id: string; nombre: string; organizacion_id: string };
+type Subcontrato = { id: string; nombre: string; organizacion_id: string; centroIds: string[] };
+type TipoVinculoLaboral = Database["public"]["Enums"]["tipo_vinculo_laboral"];
+
+const TIPO_VINCULO_LABEL: Record<TipoVinculoLaboral, string> = {
+  directo: "Directo",
+  subcontrato: "Subcontrato",
+};
 
 export function TrabajadoresView({
   filas,
   organizaciones,
   cargos,
   centros,
+  subcontratos,
   puedeGestionar,
   puedeVerDetalle,
 }: {
@@ -165,6 +260,7 @@ export function TrabajadoresView({
   organizaciones: { id: string; razon_social: string }[];
   cargos: Cargo[];
   centros: Centro[];
+  subcontratos: Subcontrato[];
   puedeGestionar: boolean;
   puedeVerDetalle: boolean;
 }) {
@@ -187,8 +283,7 @@ export function TrabajadoresView({
       const coincideEstado = estado === "todos" || f.estado_vigencia === estado;
       if (!coincideEstado) return false;
       if (!q) return true;
-      const nombreCompleto = `${f.nombres} ${f.apellido_paterno} ${f.apellido_materno ?? ""}`.toLowerCase();
-      return nombreCompleto.includes(q) || (f.run ?? "").includes(q) || (f.cargo ?? "").toLowerCase().includes(q);
+      return textoBuscable(f).includes(q);
     });
 
     if (!orden) return resultado;
@@ -235,6 +330,10 @@ export function TrabajadoresView({
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => exportarCsv(filtradas)}>
+            <FileSpreadsheet className="size-4" />
+            Exportar a Excel
+          </Button>
           {puedeVerDetalle && (
             <Button render={<Link href="/trabajadores/credenciales" />} nativeButton={false} variant="outline">
               <QrCode className="size-4" />
@@ -242,7 +341,12 @@ export function TrabajadoresView({
             </Button>
           )}
           {puedeGestionar && (
-            <NuevoTrabajadorDialog organizaciones={organizaciones} cargos={cargos} centros={centros} />
+            <NuevoTrabajadorDialog
+              organizaciones={organizaciones}
+              cargos={cargos}
+              centros={centros}
+              subcontratos={subcontratos}
+            />
           )}
         </div>
       </div>
@@ -263,7 +367,7 @@ export function TrabajadoresView({
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, RUN o cargo…"
+            placeholder="Buscar por cualquier dato: nombre, RUN, cargo, centro, subcontrato…"
             className="pl-8"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
@@ -279,6 +383,7 @@ export function TrabajadoresView({
               <SortableHead label="RUN" columna="run" orden={orden} onSort={onSort} />
               <SortableHead label="Cargo" columna="cargo" orden={orden} onSort={onSort} />
               <TableHead>Centro</TableHead>
+              <TableHead>Vínculo</TableHead>
               <SortableHead label="Modalidad" columna="modalidad" orden={orden} onSort={onSort} />
               <TableHead>Edad</TableHead>
               <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
@@ -290,7 +395,7 @@ export function TrabajadoresView({
           <TableBody>
             {filtradas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   No hay trabajadores que coincidan con el filtro.
                 </TableCell>
               </TableRow>
@@ -315,6 +420,9 @@ export function TrabajadoresView({
                 </TableCell>
                 <TableCell className="text-muted-foreground">{f.cargo ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{f.centroNombre ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {f.tipo_vinculo === "subcontrato" ? (f.subcontrato_nombre ?? "Subcontrato") : "Directo"}
+                </TableCell>
                 <TableCell className="text-muted-foreground capitalize">
                   {f.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
                 </TableCell>
@@ -347,7 +455,7 @@ export function TrabajadoresView({
                       />
                     )}
                     {puedeGestionar && f.persona_run && f.organizacion_id && (
-                      <EditarTrabajadorDialog fila={f} cargos={cargos} centros={centros} />
+                      <EditarTrabajadorDialog fila={f} cargos={cargos} centros={centros} subcontratos={subcontratos} />
                     )}
                   </div>
                 </TableCell>
@@ -364,10 +472,12 @@ function NuevoTrabajadorDialog({
   organizaciones,
   cargos,
   centros,
+  subcontratos,
 }: {
   organizaciones: { id: string; razon_social: string }[];
   cargos: Cargo[];
   centros: Centro[];
+  subcontratos: Subcontrato[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -384,10 +494,15 @@ function NuevoTrabajadorDialog({
     modalidadContractual: "indefinido" as ModalidadContractual,
     email: "",
     fechaNacimiento: "",
+    tipoVinculo: "directo" as TipoVinculoLaboral,
+    subcontratoId: "",
   });
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === form.organizacionId);
   const centrosDeLaOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
+  const subcontratosDelCentro = subcontratos.filter(
+    (s) => s.organizacion_id === form.organizacionId && s.centroIds.includes(form.centroTrabajoId),
+  );
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -408,6 +523,11 @@ function NuevoTrabajadorDialog({
       return;
     }
 
+    if (form.tipoVinculo === "subcontrato" && !form.subcontratoId) {
+      toast.error("Selecciona el subcontrato.");
+      return;
+    }
+
     startTransition(async () => {
       const resultado = await crearTrabajador({
         organizacionId: form.organizacionId,
@@ -422,6 +542,8 @@ function NuevoTrabajadorDialog({
         modalidadContractual: form.modalidadContractual,
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
+        tipoVinculo: form.tipoVinculo,
+        subcontratoId: form.tipoVinculo === "subcontrato" ? form.subcontratoId : null,
       });
 
       if (!resultado.ok) {
@@ -442,6 +564,8 @@ function NuevoTrabajadorDialog({
         centroTrabajoId: "",
         email: "",
         fechaNacimiento: "",
+        tipoVinculo: "directo",
+        subcontratoId: "",
       }));
     });
   }
@@ -564,7 +688,7 @@ function NuevoTrabajadorDialog({
               <Select
                 items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.centroTrabajoId}
-                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "", subcontratoId: "" }))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Sin asignar" />
@@ -587,6 +711,62 @@ function NuevoTrabajadorDialog({
               <Label htmlFor="unidad">Unidad (opcional)</Label>
               <Input id="unidad" value={form.unidad} onChange={(e) => setForm((f) => ({ ...f, unidad: e.target.value }))} />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Tipo de vínculo</Label>
+              <Select
+                items={TIPO_VINCULO_LABEL}
+                value={form.tipoVinculo}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    tipoVinculo: (v ?? "directo") as TipoVinculoLaboral,
+                    subcontratoId: "",
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(TIPO_VINCULO_LABEL) as TipoVinculoLaboral[]).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TIPO_VINCULO_LABEL[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.tipoVinculo === "subcontrato" && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Subcontrato</Label>
+                <Select
+                  items={Object.fromEntries(subcontratosDelCentro.map((s) => [s.id, s.nombre]))}
+                  value={form.subcontratoId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, subcontratoId: v ?? "" }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un subcontrato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcontratosDelCentro.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {subcontratosDelCentro.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {form.centroTrabajoId
+                      ? "Ningún subcontrato está asignado a este centro — agrégalo en el módulo Subcontratos."
+                      : "Primero selecciona el centro de trabajo."}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -621,10 +801,12 @@ function EditarTrabajadorDialog({
   fila,
   cargos,
   centros,
+  subcontratos,
 }: {
   fila: FilaMatriz;
   cargos: Cargo[];
   centros: Centro[];
+  subcontratos: Subcontrato[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -639,16 +821,26 @@ function EditarTrabajadorDialog({
     centroTrabajoId: fila.centro_trabajo_id ?? "",
     unidad: fila.unidad ?? "",
     modalidadContractual: (fila.modalidad_contractual ?? "indefinido") as ModalidadContractual,
+    tipoVinculo: (fila.tipo_vinculo ?? "directo") as TipoVinculoLaboral,
+    subcontratoId: fila.subcontrato_id ?? "",
   });
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === fila.organizacion_id);
   const centrosDeLaOrg = centros.filter((c) => c.organizacion_id === fila.organizacion_id);
+  const subcontratosDelCentro = subcontratos.filter(
+    (s) => s.organizacion_id === fila.organizacion_id && s.centroIds.includes(form.centroTrabajoId),
+  );
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (form.fechaNacimiento && !esFechaNacimientoValida(form.fechaNacimiento)) {
       toast.error("La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.");
+      return;
+    }
+
+    if (form.tipoVinculo === "subcontrato" && !form.subcontratoId) {
+      toast.error("Selecciona el subcontrato.");
       return;
     }
 
@@ -665,6 +857,8 @@ function EditarTrabajadorDialog({
         centroTrabajoId: form.centroTrabajoId || null,
         unidad: form.unidad.trim() || null,
         modalidadContractual: form.modalidadContractual,
+        tipoVinculo: form.tipoVinculo,
+        subcontratoId: form.tipoVinculo === "subcontrato" ? form.subcontratoId : null,
       });
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
@@ -777,7 +971,7 @@ function EditarTrabajadorDialog({
               <Select
                 items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.centroTrabajoId}
-                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "", subcontratoId: "" }))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Sin asignar" />
@@ -799,6 +993,61 @@ function EditarTrabajadorDialog({
                 onChange={(e) => setForm((f) => ({ ...f, unidad: e.target.value }))}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Tipo de vínculo</Label>
+              <Select
+                items={TIPO_VINCULO_LABEL}
+                value={form.tipoVinculo}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    tipoVinculo: (v ?? "directo") as TipoVinculoLaboral,
+                    subcontratoId: "",
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(TIPO_VINCULO_LABEL) as TipoVinculoLaboral[]).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TIPO_VINCULO_LABEL[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.tipoVinculo === "subcontrato" && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Subcontrato</Label>
+                <Select
+                  items={Object.fromEntries(subcontratosDelCentro.map((s) => [s.id, s.nombre]))}
+                  value={form.subcontratoId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, subcontratoId: v ?? "" }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un subcontrato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcontratosDelCentro.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {subcontratosDelCentro.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {form.centroTrabajoId
+                      ? "Ningún subcontrato está asignado a este centro."
+                      : "Primero selecciona el centro de trabajo."}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="emailEdit">Correo</Label>
@@ -993,6 +1242,14 @@ function DetalleTrabajadorDialog({
                   <p className="text-xs text-muted-foreground">Modalidad</p>
                   <p className="capitalize">
                     {detalle.vinculo?.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Vínculo</p>
+                  <p>
+                    {detalle.vinculo?.tipo_vinculo === "subcontrato"
+                      ? `Subcontrato — ${detalle.vinculo.subcontratos?.nombre ?? "—"}`
+                      : "Directo"}
                   </p>
                 </div>
                 {detalle.vinculo?.fecha_ingreso && (
