@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Search, Plus, Pencil, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check } from "lucide-react";
+import { Search, Plus, Pencil, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check, QrCode, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SignBadge, SignDot, type EstadoVigencia } from "@/components/status/sign-badge";
-import { crearTrabajador, crearAccesoTrabajador, actualizarTrabajador, obtenerDetalleTrabajador } from "./actions";
+import {
+  crearTrabajador,
+  crearAccesoTrabajador,
+  actualizarTrabajador,
+  obtenerDetalleTrabajador,
+  obtenerCredencialQr,
+} from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { toast } from "sonner";
@@ -330,9 +336,19 @@ export function TrabajadoresView({
                   )}
                 </TableCell>
                 <TableCell>
-                  {puedeGestionar && f.persona_run && f.organizacion_id && (
-                    <EditarTrabajadorDialog fila={f} cargos={cargos} centros={centros} />
-                  )}
+                  <div className="flex items-center gap-1">
+                    {puedeVerDetalle && f.persona_run && f.organizacion_id && (
+                      <CredencialQrDialog
+                        personaRun={f.persona_run}
+                        organizacionId={f.organizacion_id}
+                        nombreCompleto={`${f.nombres} ${f.apellido_paterno} ${f.apellido_materno ?? ""}`}
+                        runDv={`${f.run}-${f.dv}`}
+                      />
+                    )}
+                    {puedeGestionar && f.persona_run && f.organizacion_id && (
+                      <EditarTrabajadorDialog fila={f} cargos={cargos} centros={centros} />
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -1059,6 +1075,81 @@ function DetalleTrabajadorDialog({
           </div>
         )}
       </DialogContent>
+    </Dialog>
+  );
+}
+
+function CredencialQrDialog({
+  personaRun,
+  organizacionId,
+  nombreCompleto,
+  runDv,
+}: {
+  personaRun: string;
+  organizacionId: string;
+  nombreCompleto: string;
+  runDv: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [credencial, setCredencial] = useState<{ url: string; qrDataUrl: string } | null>(null);
+
+  function onOpenChange(v: boolean) {
+    setOpen(v);
+    if (v) {
+      setCredencial(null);
+      startTransition(async () => {
+        const res = await obtenerCredencialQr(personaRun, organizacionId);
+        if (!res.ok) {
+          toast.error(res.mensaje);
+          setOpen(false);
+          return;
+        }
+        setCredencial(res);
+      });
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" title="Credencial QR" />}>
+        <QrCode className="size-4" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xs">
+        <DialogHeader className="no-print">
+          <DialogTitle>Credencial QR</DialogTitle>
+          <DialogDescription>
+            Para imprimir en la credencial o el casco. Al escanearlo, cualquiera ve el estado de
+            capacitación vigente — sin necesidad de iniciar sesión.
+          </DialogDescription>
+        </DialogHeader>
+        {pending || !credencial ? (
+          <p className="text-sm text-muted-foreground py-8 text-center no-print">Generando…</p>
+        ) : (
+          <>
+            <div id="credencial-imprimible" className="flex flex-col items-center gap-2 py-2 text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- data URL generado en el servidor */}
+              <img src={credencial.qrDataUrl} alt="Código QR de la credencial" className="size-40" />
+              <p className="font-medium text-sm">{nombreCompleto}</p>
+              <p className="font-mono text-xs text-muted-foreground">{runDv}</p>
+            </div>
+            <DialogFooter className="no-print">
+              <Button variant="outline" onClick={() => window.print()}>
+                <Printer className="size-4" />
+                Imprimir etiqueta
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body * { visibility: hidden; }
+          #credencial-imprimible, #credencial-imprimible * { visibility: visible; }
+          #credencial-imprimible { position: fixed; inset: 0; margin: auto; height: fit-content; }
+        }
+      `}</style>
     </Dialog>
   );
 }

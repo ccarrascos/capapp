@@ -9,9 +9,12 @@ import { generarPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { normalizarEmail } from "@/lib/normalizar-email";
+import { generarQrDataUrl } from "@/lib/qr";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export type CrearTrabajadorInput = {
   organizacionId: string;
@@ -343,4 +346,33 @@ export async function crearAccesoTrabajador(input: {
   }
 
   return { ok: true as const, emailEnviado: true as const };
+}
+
+export async function obtenerCredencialQr(personaRun: string, organizacionId: string) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === organizacionId,
+    );
+
+  if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para generar esta credencial." };
+
+  const supabase = await createClient();
+
+  const { data: vinculo } = await supabase
+    .from("vinculos_laborales")
+    .select("qr_token")
+    .eq("persona_run", personaRun)
+    .eq("organizacion_id", organizacionId)
+    .maybeSingle();
+
+  if (!vinculo) return { ok: false as const, mensaje: "No se encontró el vínculo laboral." };
+
+  const url = `${APP_URL}/credencial/${vinculo.qr_token}`;
+  const qrDataUrl = await generarQrDataUrl(url);
+
+  return { ok: true as const, url, qrDataUrl };
 }

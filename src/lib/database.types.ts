@@ -1222,6 +1222,7 @@ export type Database = {
           modalidad_contractual: Database["public"]["Enums"]["modalidad_contractual"]
           organizacion_id: string
           persona_run: string
+          qr_token: string
           unidad: string | null
           updated_at: string
         }
@@ -1236,6 +1237,7 @@ export type Database = {
           modalidad_contractual?: Database["public"]["Enums"]["modalidad_contractual"]
           organizacion_id: string
           persona_run: string
+          qr_token?: string
           unidad?: string | null
           updated_at?: string
         }
@@ -1250,6 +1252,7 @@ export type Database = {
           modalidad_contractual?: Database["public"]["Enums"]["modalidad_contractual"]
           organizacion_id?: string
           persona_run?: string
+          qr_token?: string
           unidad?: string | null
           updated_at?: string
         }
