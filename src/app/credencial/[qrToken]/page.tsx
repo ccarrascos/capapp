@@ -1,6 +1,7 @@
 import { ShieldHalf, CircleX } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
+import { estadoVigenciaDeCurso, peorEstadoVigencia } from "@/lib/vigencia";
 
 export default async function CredencialPage({
   params,
@@ -18,27 +19,27 @@ export default async function CredencialPage({
     .eq("qr_token", qrToken)
     .maybeSingle();
 
-  let cursoNombre: string | null = null;
-  let vigenciaHasta: string | null = null;
-  let estadoVigencia: EstadoVigencia = "sin_capacitacion";
+  let cursos: { nombre: string; vigenciaHasta: string | null; estado: EstadoVigencia }[] = [];
 
   if (vinculo) {
-    const { data: matriz } = await admin
-      .from("matriz_vigencia_capacitacion")
-      .select("curso_id, vigencia_hasta, estado_vigencia")
+    const { data: inscripciones } = await admin
+      .from("inscripciones")
+      .select("vigencia_hasta, ediciones_curso!inner(organizacion_id, cursos(nombre))")
       .eq("persona_run", vinculo.persona_run)
-      .eq("organizacion_id", vinculo.organizacion_id)
-      .maybeSingle();
+      .eq("estado", "aprobado")
+      .eq("ediciones_curso.organizacion_id", vinculo.organizacion_id)
+      .order("vigencia_hasta", { ascending: false });
 
-    vigenciaHasta = matriz?.vigencia_hasta ?? null;
-    estadoVigencia = (matriz?.estado_vigencia as EstadoVigencia | undefined) ?? "sin_capacitacion";
-
-    if (matriz?.curso_id) {
-      const { data: curso } = await admin.from("cursos").select("nombre").eq("id", matriz.curso_id).maybeSingle();
-      cursoNombre = curso?.nombre ?? null;
-    }
+    cursos = (inscripciones ?? [])
+      .filter((i) => i.ediciones_curso?.cursos?.nombre)
+      .map((i) => ({
+        nombre: i.ediciones_curso!.cursos!.nombre,
+        vigenciaHasta: i.vigencia_hasta,
+        estado: estadoVigenciaDeCurso(i.vigencia_hasta),
+      }));
   }
 
+  const estadoGeneral = peorEstadoVigencia(cursos.map((c) => c.estado));
   const persona = vinculo?.personas;
 
   return (
@@ -75,7 +76,7 @@ export default async function CredencialPage({
         ) : (
           <div className="border border-border bg-card">
             <div className="flex items-center gap-2 px-6 py-3 text-sm font-medium bg-muted/50 border-b border-border">
-              <SignBadge estado={estadoVigencia} />
+              <SignBadge estado={estadoGeneral} />
             </div>
             <div className="p-6 flex flex-col gap-4">
               <div>
@@ -98,17 +99,28 @@ export default async function CredencialPage({
                   <p className="text-sm">{vinculo.centros_trabajo?.nombre ?? "—"}</p>
                 </div>
               </div>
-              {cursoNombre && (
-                <div className="border-t border-border pt-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Capacitación</p>
-                  <p className="text-sm">{cursoNombre}</p>
-                  {vigenciaHasta && (
-                    <p className="font-mono text-xs text-muted-foreground mt-1">
-                      {estadoVigencia === "vencido" ? "Vencida el" : "Vigente hasta"} {vigenciaHasta}
-                    </p>
-                  )}
-                </div>
-              )}
+              <div className="border-t border-border pt-4 flex flex-col gap-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Capacitación{cursos.length > 1 ? "es" : ""}
+                </p>
+                {cursos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin capacitación aprobada registrada.</p>
+                ) : (
+                  cursos.map((c, idx) => (
+                    <div key={idx} className="flex flex-col gap-1">
+                      <p className="text-sm">{c.nombre}</p>
+                      <div className="flex items-center gap-2">
+                        <SignBadge estado={c.estado} size="sm" />
+                        {c.vigenciaHasta && (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {c.estado === "vencido" ? "el" : "hasta"} {c.vigenciaHasta}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
               <p className="text-xs text-muted-foreground border-t border-border pt-4">
                 Registro de cumplimiento art. 16, DS N.º 44/2023.
               </p>

@@ -41,6 +41,7 @@ import {
 } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
+import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -65,15 +66,6 @@ function calcularEdad(fechaNacimiento: string | null): number | null {
     (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
   if (aunNoCumple) edad -= 1;
   return edad;
-}
-
-function estadoVigenciaDeCurso(vigenciaHasta: string | null): EstadoVigencia {
-  if (!vigenciaHasta) return "sin_capacitacion";
-  const hoy = new Date().toISOString().slice(0, 10);
-  const limite = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  if (vigenciaHasta < hoy) return "vencido";
-  if (vigenciaHasta <= limite) return "por_vencer";
-  return "vigente";
 }
 
 type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "modalidad" | "vence" | "estado";
