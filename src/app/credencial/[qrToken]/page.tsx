@@ -14,7 +14,7 @@ export default async function CredencialPage({
   const { data: vinculo } = await admin
     .from("vinculos_laborales")
     .select(
-      "persona_run, organizacion_id, personas(nombres, apellido_paterno, apellido_materno, run, dv), cargos(nombre), centros_trabajo(nombre), organizaciones(razon_social, logo_url)",
+      "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
     )
     .eq("qr_token", qrToken)
     .maybeSingle();
@@ -97,6 +97,14 @@ export default async function CredencialPage({
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Centro</p>
                   <p className="text-sm">{vinculo.centros_trabajo?.nombre ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Vínculo</p>
+                  <p className="text-sm">
+                    {vinculo.tipo_vinculo === "subcontrato"
+                      ? `Subcontrato — ${vinculo.subcontratos?.nombre ?? "—"}`
+                      : "Directo"}
+                  </p>
                 </div>
               </div>
               <div className="border-t border-border pt-4 flex flex-col gap-3">
