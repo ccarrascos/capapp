@@ -102,7 +102,7 @@ export default async function CredencialPage({
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Vínculo</p>
                   <p className="text-sm">
                     {vinculo.tipo_vinculo === "subcontrato"
-                      ? `Subcontrato — ${vinculo.subcontratos?.nombre ?? "—"}`
+                      ? `Subcontrato - ${vinculo.subcontratos?.nombre ?? "—"}`
                       : "Directo"}
                   </p>
                 </div>

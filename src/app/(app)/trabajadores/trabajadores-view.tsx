@@ -54,7 +54,7 @@ import {
 } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
-import { estadoVigenciaDeCurso } from "@/lib/vigencia";
+import { estadoVigenciaDeCurso, peorEstadoVigencia } from "@/lib/vigencia";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -1225,6 +1225,17 @@ function DetalleTrabajadorDialog({
               <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Situación actual</h3>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm border border-border p-3">
                 <div>
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <SignBadge
+                    estado={peorEstadoVigencia(
+                      detalle.inscripciones
+                        .filter((i) => i.estado === "aprobado")
+                        .map((i) => estadoVigenciaDeCurso(i.vigencia_hasta)),
+                    )}
+                    size="sm"
+                  />
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground">RUT</p>
                   <p className="font-mono">
                     {detalle.persona.run}-{detalle.persona.dv}
@@ -1248,7 +1259,7 @@ function DetalleTrabajadorDialog({
                   <p className="text-xs text-muted-foreground">Vínculo</p>
                   <p>
                     {detalle.vinculo?.tipo_vinculo === "subcontrato"
-                      ? `Subcontrato — ${detalle.vinculo.subcontratos?.nombre ?? "—"}`
+                      ? `Subcontrato - ${detalle.vinculo.subcontratos?.nombre ?? "—"}`
                       : "Directo"}
                   </p>
                 </div>
