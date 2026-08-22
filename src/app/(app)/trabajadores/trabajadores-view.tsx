@@ -60,6 +60,15 @@ function calcularEdad(fechaNacimiento: string | null): number | null {
   return edad;
 }
 
+function estadoVigenciaDeCurso(vigenciaHasta: string | null): EstadoVigencia {
+  if (!vigenciaHasta) return "sin_capacitacion";
+  const hoy = new Date().toISOString().slice(0, 10);
+  const limite = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  if (vigenciaHasta < hoy) return "vencido";
+  if (vigenciaHasta <= limite) return "por_vencer";
+  return "vigente";
+}
+
 type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "modalidad" | "vence" | "estado";
 type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
 
@@ -992,8 +1001,9 @@ function DetalleTrabajadorDialog({
                       label: i.estado,
                       className: "",
                     };
+                    const estadoVigencia = i.estado === "aprobado" ? estadoVigenciaDeCurso(i.vigencia_hasta) : null;
                     return (
-                      <div key={i.id} className="border border-border p-3 text-sm flex flex-col gap-1">
+                      <div key={i.id} className="border border-border p-3 text-sm flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">{i.ediciones_curso?.cursos?.nombre ?? "Curso"}</p>
                           <span className={cn("text-xs font-medium", estadoInfo.className)}>
@@ -1007,13 +1017,20 @@ function DetalleTrabajadorDialog({
                             ? ` · ${i.ediciones_curso.centros_trabajo.nombre}`
                             : ""}
                         </p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          {nota?.puntaje != null && (
+                        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                          {nota?.puntaje != null ? (
                             <span>
                               Nota: <span className="font-mono text-foreground">{nota.puntaje}</span>
                             </span>
+                          ) : (
+                            <span />
                           )}
-                          {i.vigencia_hasta && <span>Vigente hasta {i.vigencia_hasta}</span>}
+                          {estadoVigencia && (
+                            <span className="flex items-center gap-1.5">
+                              <SignBadge estado={estadoVigencia} size="sm" />
+                              {i.vigencia_hasta && <span>hasta {i.vigencia_hasta}</span>}
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
