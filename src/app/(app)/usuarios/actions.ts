@@ -136,3 +136,37 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   return { ok: true as const, emailEnviado: true as const };
 }
+
+export async function actualizarEstadoUsuario(input: {
+  usuarioId: string;
+  organizacionId: string | null;
+  activo: boolean;
+}) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  if (input.usuarioId === sesion.usuarioId) {
+    return { ok: false as const, mensaje: "No puedes desactivar tu propia cuenta desde aquí." };
+  }
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    (!!input.organizacionId &&
+      sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId));
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para modificar esta cuenta." };
+  }
+
+  // upd_usuarios_propio (RLS) sólo permite que cada quien edite su propio
+  // perfil o que un super_admin edite cualquiera — un admin_organizacion no
+  // puede tocar usuarios.activo de terceros con el cliente normal, así que
+  // se usa el cliente admin, con la autorización ya validada arriba.
+  const admin = createAdminClient();
+  const { error } = await admin.from("usuarios").update({ activo: input.activo }).eq("id", input.usuarioId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  revalidatePath("/usuarios");
+  return { ok: true as const };
+}

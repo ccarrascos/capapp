@@ -36,6 +36,7 @@ export default async function UsuariosPage() {
       asignaciones={asignaciones ?? []}
       organizaciones={organizaciones ?? []}
       esSuperAdmin={sesion.esSuperAdmin}
+      usuarioActualId={sesion.usuarioId}
     />
   );
 }

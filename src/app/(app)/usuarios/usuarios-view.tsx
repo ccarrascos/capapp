@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Copy, Check } from "lucide-react";
+import { Plus, Copy, Check, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearUsuario } from "./actions";
+import { crearUsuario, actualizarEstadoUsuario } from "./actions";
 import type { RolNombre } from "@/lib/auth";
 import { parsearRut, esRutValido, formatearRut, formatearRutInput } from "@/lib/rut";
 
@@ -72,10 +72,12 @@ export function UsuariosView({
   asignaciones,
   organizaciones,
   esSuperAdmin,
+  usuarioActualId,
 }: {
   asignaciones: Asignacion[];
   organizaciones: { id: string; razon_social: string }[];
   esSuperAdmin: boolean;
+  usuarioActualId: string;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -125,11 +127,16 @@ export function UsuariosView({
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {a.usuarios?.activo ? (
-                    <span className="text-xs text-clear">Activa</span>
-                  ) : (
-                    <span className="text-xs text-alert">Inactiva</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {a.usuarios?.activo ? (
+                      <span className="text-xs text-clear">Activa</span>
+                    ) : (
+                      <span className="text-xs text-alert">Inactiva</span>
+                    )}
+                    {a.usuarios && a.usuarios.id !== usuarioActualId && (
+                      <ToggleActivoButton usuario={a.usuarios} organizacionId={a.organizacion_id} />
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -338,5 +345,43 @@ function NuevaCuentaDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ToggleActivoButton({
+  usuario,
+  organizacionId,
+}: {
+  usuario: { id: string; activo: boolean };
+  organizacionId: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  function onClick() {
+    startTransition(async () => {
+      const resultado = await actualizarEstadoUsuario({
+        usuarioId: usuario.id,
+        organizacionId,
+        activo: !usuario.activo,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success(usuario.activo ? "Cuenta desactivada." : "Cuenta reactivada.");
+    });
+  }
+
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className="size-6"
+      disabled={pending}
+      title={usuario.activo ? "Desactivar cuenta" : "Reactivar cuenta"}
+      onClick={onClick}
+    >
+      {usuario.activo ? <Ban className="size-3.5" /> : <RotateCcw className="size-3.5" />}
+    </Button>
   );
 }
