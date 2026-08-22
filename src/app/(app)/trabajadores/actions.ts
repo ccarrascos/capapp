@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { generarPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
+import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -31,23 +32,37 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
   }
 
+  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
+    return {
+      ok: false as const,
+      mensaje: "La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.",
+    };
+  }
+
   const supabase = await createClient();
 
   // La persona (identidad, por RUT) es global al sistema — si ya existe
   // porque trabajó en otra organización, reutilizamos su registro y
   // reconocemos su capacitación previa (portabilidad, DS 44 punto 6.4).
-  const { error: errorPersona } = await supabase.from("personas").upsert(
-    {
-      run: input.run,
-      dv: input.dv,
-      nombres: input.nombres,
-      apellido_paterno: input.apellidoPaterno,
-      apellido_materno: input.apellidoMaterno,
-      email: input.email,
-      fecha_nacimiento: input.fechaNacimiento,
-    },
-    { onConflict: "run" },
-  );
+  // Nota: se hace un select + insert/update explícito en vez de upsert,
+  // porque Postgres exige que un INSERT ... ON CONFLICT DO UPDATE cumpla
+  // simultáneamente las políticas RLS de INSERT y UPDATE incluso cuando
+  // no hay conflicto real, lo que rechazaba altas de personas nuevas.
+  const datosPersona = {
+    run: input.run,
+    dv: input.dv,
+    nombres: input.nombres,
+    apellido_paterno: input.apellidoPaterno,
+    apellido_materno: input.apellidoMaterno,
+    email: input.email,
+    fecha_nacimiento: input.fechaNacimiento,
+  };
+
+  const { data: personaExistente } = await supabase.from("personas").select("run").eq("run", input.run).maybeSingle();
+
+  const { error: errorPersona } = personaExistente
+    ? await supabase.from("personas").update(datosPersona).eq("run", input.run)
+    : await supabase.from("personas").insert(datosPersona);
 
   if (errorPersona) {
     return { ok: false as const, mensaje: errorPersona.message };
@@ -68,6 +83,71 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
       : errorVinculo.message;
     return { ok: false as const, mensaje };
   }
+
+  revalidatePath("/trabajadores");
+  revalidatePath("/dashboard");
+  return { ok: true as const };
+}
+
+export async function actualizarTrabajador(input: {
+  personaRun: string;
+  organizacionId: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string | null;
+  email: string | null;
+  fechaNacimiento: string | null;
+  cargoId: string | null;
+  unidad: string | null;
+  modalidadContractual: ModalidadContractual;
+}) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) =>
+        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
+    );
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para editar a este trabajador." };
+  }
+
+  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
+    return {
+      ok: false as const,
+      mensaje: "La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  const { error: errorPersona } = await supabase
+    .from("personas")
+    .update({
+      nombres: input.nombres,
+      apellido_paterno: input.apellidoPaterno,
+      apellido_materno: input.apellidoMaterno,
+      email: input.email,
+      fecha_nacimiento: input.fechaNacimiento,
+    })
+    .eq("run", input.personaRun);
+
+  if (errorPersona) return { ok: false as const, mensaje: errorPersona.message };
+
+  const { error: errorVinculo } = await supabase
+    .from("vinculos_laborales")
+    .update({
+      cargo_id: input.cargoId,
+      unidad: input.unidad,
+      modalidad_contractual: input.modalidadContractual,
+    })
+    .eq("persona_run", input.personaRun)
+    .eq("organizacion_id", input.organizacionId);
+
+  if (errorVinculo) return { ok: false as const, mensaje: errorVinculo.message };
 
   revalidatePath("/trabajadores");
   revalidatePath("/dashboard");

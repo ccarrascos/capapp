@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Search, Plus, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check } from "lucide-react";
+import { Search, Plus, Pencil, ArrowUp, ArrowDown, ArrowUpDown, KeyRound, Copy, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,8 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SignBadge, SignDot, type EstadoVigencia } from "@/components/status/sign-badge";
-import { crearTrabajador, crearAccesoTrabajador } from "./actions";
+import { crearTrabajador, crearAccesoTrabajador, actualizarTrabajador } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
+import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -43,6 +44,8 @@ type FilaMatriz = Database["public"]["Views"]["matriz_vigencia_capacitacion"]["R
   fechaNacimiento: string | null;
 };
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
+
+const FECHA_MAXIMA_NACIMIENTO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 function calcularEdad(fechaNacimiento: string | null): number | null {
   if (!fechaNacimiento) return null;
@@ -250,12 +253,13 @@ export function TrabajadoresView({
               <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
               <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
               <TableHead>Acceso</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtradas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   No hay trabajadores que coincidan con el filtro.
                 </TableCell>
               </TableRow>
@@ -288,6 +292,11 @@ export function TrabajadoresView({
                     />
                   ) : (
                     <span className="text-xs text-muted-foreground">Sin acceso</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {puedeGestionar && f.persona_run && f.organizacion_id && (
+                    <EditarTrabajadorDialog fila={f} cargos={cargos} />
                   )}
                 </TableCell>
               </TableRow>
@@ -335,6 +344,11 @@ function NuevoTrabajadorDialog({
     const dv = form.dv.trim().toUpperCase();
     if (!esRutValido(run, dv)) {
       toast.error("El RUT ingresado no es válido.");
+      return;
+    }
+
+    if (form.fechaNacimiento && !esFechaNacimientoValida(form.fechaNacimiento)) {
+      toast.error("La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.");
       return;
     }
 
@@ -497,6 +511,7 @@ function NuevoTrabajadorDialog({
               <Input
                 id="fechaNacimiento"
                 type="date"
+                max={FECHA_MAXIMA_NACIMIENTO}
                 value={form.fechaNacimiento}
                 onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))}
               />
@@ -506,6 +521,169 @@ function NuevoTrabajadorDialog({
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Guardando…" : "Agregar trabajador"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditarTrabajadorDialog({ fila, cargos }: { fila: FilaMatriz; cargos: Cargo[] }) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const cargoActual = cargos.find((c) => c.organizacion_id === fila.organizacion_id && c.nombre === fila.cargo);
+  const [form, setForm] = useState({
+    nombres: fila.nombres ?? "",
+    apellidoPaterno: fila.apellido_paterno ?? "",
+    apellidoMaterno: fila.apellido_materno ?? "",
+    email: fila.personaEmail ?? "",
+    fechaNacimiento: fila.fechaNacimiento ?? "",
+    cargoId: cargoActual?.id ?? "",
+    unidad: fila.unidad ?? "",
+    modalidadContractual: (fila.modalidad_contractual ?? "indefinido") as ModalidadContractual,
+  });
+
+  const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === fila.organizacion_id);
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (form.fechaNacimiento && !esFechaNacimientoValida(form.fechaNacimiento)) {
+      toast.error("La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.");
+      return;
+    }
+
+    startTransition(async () => {
+      const resultado = await actualizarTrabajador({
+        personaRun: fila.persona_run!,
+        organizacionId: fila.organizacion_id!,
+        nombres: form.nombres.trim(),
+        apellidoPaterno: form.apellidoPaterno.trim(),
+        apellidoMaterno: form.apellidoMaterno.trim() || null,
+        email: form.email.trim() || null,
+        fechaNacimiento: form.fechaNacimiento || null,
+        cargoId: form.cargoId || null,
+        unidad: form.unidad.trim() || null,
+        modalidadContractual: form.modalidadContractual,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Trabajador actualizado.");
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" />}>
+        <Pencil className="size-4" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar trabajador</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label>RUN</Label>
+            <Input value={`${fila.run}-${fila.dv}`} disabled className="font-mono" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="nombresEdit">Nombres</Label>
+              <Input
+                id="nombresEdit"
+                required
+                value={form.nombres}
+                onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="apellidoPaternoEdit">Apellido paterno</Label>
+              <Input
+                id="apellidoPaternoEdit"
+                required
+                value={form.apellidoPaterno}
+                onChange={(e) => setForm((f) => ({ ...f, apellidoPaterno: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="apellidoMaternoEdit">Apellido materno</Label>
+              <Input
+                id="apellidoMaternoEdit"
+                value={form.apellidoMaterno}
+                onChange={(e) => setForm((f) => ({ ...f, apellidoMaterno: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fechaNacimientoEdit">Fecha de nacimiento</Label>
+              <Input
+                id="fechaNacimientoEdit"
+                type="date"
+                max={FECHA_MAXIMA_NACIMIENTO}
+                value={form.fechaNacimiento}
+                onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Cargo</Label>
+              <Select
+                items={Object.fromEntries(cargosDeLaOrg.map((c) => [c.id, c.nombre]))}
+                value={form.cargoId}
+                onValueChange={(v) => setForm((f) => ({ ...f, cargoId: v ?? "" }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona un cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cargosDeLaOrg.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Modalidad contractual</Label>
+              <Select
+                items={Object.fromEntries(MODALIDADES.map((m) => [m.value, m.label]))}
+                value={form.modalidadContractual}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, modalidadContractual: (v ?? "indefinido") as ModalidadContractual }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODALIDADES.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="emailEdit">Correo</Label>
+            <Input
+              id="emailEdit"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar cambios"}
             </Button>
           </DialogFooter>
         </form>
