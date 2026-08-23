@@ -101,6 +101,9 @@ export const CERTIFICADO_PRINT_STYLE = `
     .no-print { display: none !important; }
     body * { visibility: hidden; }
     #certificado-imprimible, #certificado-imprimible * { visibility: visible; }
+    body *:not(:has(#certificado-imprimible)):not(#certificado-imprimible):not(#certificado-imprimible *) {
+      display: none !important;
+    }
     html, body { height: auto !important; overflow: visible !important; }
     [data-slot="dialog-overlay"] { display: none !important; }
     [data-slot="dialog-content"] {
