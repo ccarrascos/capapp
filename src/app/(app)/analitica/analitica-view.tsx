@@ -11,7 +11,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ReferenceLine,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
@@ -137,7 +136,7 @@ function SemiGauge({ pct, color }: { pct: number; color: string }) {
     { nombre: "resto", cantidad: 100 - valor },
   ];
   return (
-    <div className="relative w-full" style={{ height: 92 }}>
+    <div className="relative w-full" style={{ height: 68 }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <Pie
@@ -147,8 +146,8 @@ function SemiGauge({ pct, color }: { pct: number; color: string }) {
             startAngle={180}
             endAngle={0}
             cx="50%"
-            cy="94%"
-            innerRadius="74%"
+            cy="92%"
+            innerRadius="70%"
             outerRadius="100%"
             stroke="none"
             isAnimationActive={false}
@@ -158,8 +157,8 @@ function SemiGauge({ pct, color }: { pct: number; color: string }) {
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-      <div className="absolute inset-x-0 bottom-4 flex justify-center">
-        <span className="font-heading text-lg font-bold tabular-nums">{valor.toFixed(2)}%</span>
+      <div className="absolute inset-x-0 top-6 flex justify-center">
+        <span className="font-heading text-base font-bold tabular-nums">{valor.toFixed(2)}%</span>
       </div>
       <div className="absolute inset-x-1 bottom-0 flex justify-between text-[10px] text-muted-foreground tabular-nums">
         <span>0.00%</span>
@@ -195,27 +194,25 @@ function KpiGaugeCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "border bg-card p-4 flex flex-col gap-2.5 text-left transition-colors",
+        "border bg-card p-3 flex flex-col gap-1.5 text-left transition-colors",
         seleccionado ? "border-foreground/40" : "border-border",
         atenuado && "opacity-45",
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0" title={`${label} — ${sublabel}`}>
         <span
-          className="flex size-8 items-center justify-center shrink-0"
+          className="flex size-7 items-center justify-center shrink-0"
           style={{ backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)` }}
         >
-          <Icon className="size-4" style={{ color }} />
+          <Icon className="size-3.5" style={{ color }} />
         </span>
-        <div className="min-w-0">
-          <p className="text-[12.5px] font-semibold leading-tight">{label}</p>
-          <p className="text-[10.5px] text-muted-foreground leading-tight">{sublabel}</p>
-        </div>
+        <p className="text-[12.5px] font-semibold leading-tight truncate min-w-0">{label}</p>
       </div>
-      <p className="font-heading text-4xl font-bold leading-none tabular-nums" style={{ color }}>
+      <p className="text-[10.5px] text-muted-foreground leading-tight truncate">{sublabel}</p>
+      <p className="font-heading text-3xl font-bold leading-none tabular-nums" style={{ color }}>
         {valor}
       </p>
-      <p className="text-[10.5px] text-muted-foreground -mt-1 leading-tight">% del total en pantalla</p>
+      <p className="text-[10.5px] text-muted-foreground leading-tight">% del total en pantalla</p>
       <SemiGauge pct={pct} color={color} />
     </button>
   );
@@ -232,10 +229,12 @@ function TarjetaVinculo({
 }) {
   const total = datos.reduce((s, d) => s + d.cantidad, 0);
   return (
-    <div className="border border-border bg-card p-4 flex flex-col gap-1">
-      <p className="text-[13px] font-semibold">Vínculo laboral</p>
-      <p className="text-[11px] text-muted-foreground mb-1">Directo vs. subcontrato</p>
-      <div className="relative" style={{ height: 116 }}>
+    <div className="border border-border bg-card p-3 flex flex-col gap-1">
+      <div className="min-h-[30px] flex flex-col justify-center">
+        <p className="text-[12.5px] font-semibold leading-tight">Vínculo laboral</p>
+        <p className="text-[10.5px] text-muted-foreground leading-tight">Directo vs. subcontrato</p>
+      </div>
+      <div className="relative" style={{ height: 90 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -244,8 +243,8 @@ function TarjetaVinculo({
               nameKey="tipo"
               cx="50%"
               cy="50%"
-              innerRadius={38}
-              outerRadius={54}
+              innerRadius={30}
+              outerRadius={42}
               paddingAngle={3}
               stroke="none"
               cursor="pointer"
@@ -264,7 +263,7 @@ function TarjetaVinculo({
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="font-heading text-2xl font-bold tabular-nums">{total}</span>
+          <span className="font-heading text-xl font-bold tabular-nums">{total}</span>
           <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Total</span>
         </div>
       </div>
@@ -367,11 +366,6 @@ export function AnaliticaView({
       })),
     [baseEdad],
   );
-  const promedioEdadHistograma = useMemo(() => {
-    if (histogramaEdad.length === 0) return 0;
-    return histogramaEdad.reduce((s, r) => s + r.cantidad, 0) / histogramaEdad.length;
-  }, [histogramaEdad]);
-
   const baseEstado = useMemo(() => aplicarFiltros(filas, filtros, { excluirEstado: true }), [filas, filtros]);
   const totalBaseEstado = baseEstado.length;
   const estadoCapacitacion = useMemo(
@@ -594,7 +588,6 @@ export function AnaliticaView({
                 <XAxis dataKey="rango" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
                 <YAxis hide domain={[0, "dataMax + 4"]} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
-                <ReferenceLine y={promedioEdadHistograma} stroke="var(--alert)" strokeDasharray="4 4" strokeWidth={1} />
                 <Bar dataKey="cantidad" name="Trabajadores" radius={[3, 3, 0, 0]} cursor="pointer">
                   <LabelList dataKey="cantidad" position="top" style={ETIQUETA_STYLE} />
                   {histogramaEdad.map((entry) => (
