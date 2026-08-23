@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Building2 } from "lucide-react";
+import { Plus, Building2, Pencil } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearCentroTrabajo } from "./actions";
+import { crearCentroTrabajo, actualizarCentroTrabajo, actualizarActivoCentroTrabajo } from "./actions";
 import { RegionComunaFields } from "@/components/region-comuna-fields";
 
 type Centro = {
@@ -63,7 +64,14 @@ export function CentrosView({
           </p>
         )}
         {centros.map((c) => (
-          <div key={c.id} className="border border-border bg-card p-5 flex flex-col gap-2">
+          <div
+            key={c.id}
+            className={cn(
+              "relative border border-border bg-card p-5 flex flex-col gap-2",
+              !c.activo && "opacity-60",
+            )}
+          >
+            <EditarCentroDialog centro={c} />
             <span className="flex size-9 items-center justify-center bg-secondary">
               <Building2 className="size-4.5 text-secondary-foreground" />
             </span>
@@ -72,6 +80,7 @@ export function CentrosView({
             <p className="text-xs text-muted-foreground">
               {[c.direccion, c.comuna, c.region].filter(Boolean).join(", ") || "Sin dirección registrada"}
             </p>
+            <ToggleActivoCentroButton centro={c} />
           </div>
         ))}
       </div>
@@ -166,5 +175,108 @@ function NuevoCentroDialog({ organizaciones }: { organizaciones: { id: string; r
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function EditarCentroDialog({ centro }: { centro: Centro }) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [form, setForm] = useState({
+    nombre: centro.nombre,
+    direccion: centro.direccion ?? "",
+    comuna: centro.comuna ?? "",
+    region: centro.region ?? "",
+  });
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const resultado = await actualizarCentroTrabajo({
+        centroId: centro.id,
+        organizacionId: centro.organizacion_id,
+        nombre: form.nombre.trim(),
+        direccion: form.direccion.trim() || null,
+        comuna: form.comuna.trim() || null,
+        region: form.region.trim() || null,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Centro de trabajo actualizado.");
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="absolute top-3 right-3" />}>
+        <Pencil className="size-4" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar centro de trabajo</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nombreEdit">Nombre</Label>
+            <Input
+              id="nombreEdit"
+              required
+              value={form.nombre}
+              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="direccionEdit">Dirección</Label>
+            <Input
+              id="direccionEdit"
+              value={form.direccion}
+              onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <RegionComunaFields
+              region={form.region}
+              comuna={form.comuna}
+              onRegionChange={(region) => setForm((f) => ({ ...f, region }))}
+              onComunaChange={(comuna) => setForm((f) => ({ ...f, comuna }))}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ToggleActivoCentroButton({ centro }: { centro: Centro }) {
+  const [pending, startTransition] = useTransition();
+  const [activo, setActivo] = useState(centro.activo);
+
+  function onToggle() {
+    const nuevo = !activo;
+    startTransition(async () => {
+      const resultado = await actualizarActivoCentroTrabajo({
+        centroId: centro.id,
+        organizacionId: centro.organizacion_id,
+        activo: nuevo,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setActivo(nuevo);
+    });
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onToggle} className="self-start mt-1">
+      {activo ? "Activo" : "Inactivo"}
+    </Button>
   );
 }

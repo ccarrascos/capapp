@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Briefcase } from "lucide-react";
+import { Plus, Briefcase, Pencil } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearCargo, actualizarActivoCargo } from "./actions";
+import { crearCargo, actualizarCargo, actualizarActivoCargo } from "./actions";
 
 type Cargo = {
   id: string;
@@ -68,11 +69,16 @@ export function CargosView({
 function CargoCard({ cargo, mostrarOrg }: { cargo: Cargo; mostrarOrg: boolean }) {
   const [pending, startTransition] = useTransition();
   const [activo, setActivo] = useState(cargo.activo);
+  const [nombre, setNombre] = useState(cargo.nombre);
 
   function onToggle() {
     const nuevo = !activo;
     startTransition(async () => {
-      const resultado = await actualizarActivoCargo({ cargoId: cargo.id, activo: nuevo });
+      const resultado = await actualizarActivoCargo({
+        cargoId: cargo.id,
+        organizacionId: cargo.organizacion_id,
+        activo: nuevo,
+      });
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
         return;
@@ -82,22 +88,84 @@ function CargoCard({ cargo, mostrarOrg }: { cargo: Cargo; mostrarOrg: boolean })
   }
 
   return (
-    <div className="border border-border bg-card p-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5 min-w-0">
+    <div className={cn("relative border border-border bg-card p-4 flex flex-col gap-3", !activo && "opacity-60")}>
+      <EditarCargoDialog cargo={{ ...cargo, nombre }} onGuardado={setNombre} />
+      <div className="flex items-center gap-2.5 min-w-0 pr-8">
         <span className="flex size-8 items-center justify-center bg-secondary shrink-0">
           <Briefcase className="size-4 text-secondary-foreground" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{cargo.nombre}</p>
+          <p className="text-sm font-medium text-wrap break-words">{nombre}</p>
           {mostrarOrg && (
-            <p className="text-xs text-muted-foreground truncate">{cargo.organizaciones?.razon_social}</p>
+            <p className="text-xs text-muted-foreground text-wrap break-words">{cargo.organizaciones?.razon_social}</p>
           )}
         </div>
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onToggle}>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={onToggle}
+        className="self-start"
+      >
         {activo ? "Activo" : "Inactivo"}
       </Button>
     </div>
+  );
+}
+
+function EditarCargoDialog({
+  cargo,
+  onGuardado,
+}: {
+  cargo: Cargo;
+  onGuardado: (nombre: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [nombre, setNombre] = useState(cargo.nombre);
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const resultado = await actualizarCargo({
+        cargoId: cargo.id,
+        organizacionId: cargo.organizacion_id,
+        nombre: nombre.trim(),
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Cargo actualizado.");
+      onGuardado(nombre.trim());
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="absolute top-3 right-3" />}>
+        <Pencil className="size-4" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Editar cargo</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nombreCargoEdit">Nombre del cargo</Label>
+            <Input id="nombreCargoEdit" required value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

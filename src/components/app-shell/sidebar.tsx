@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./nav-config";
+import { navParaRoles } from "./nav-config";
 import type { RolNombre } from "@/lib/auth";
 import { ShieldHalf } from "lucide-react";
 
@@ -15,10 +15,7 @@ export function Sidebar({
   esSuperAdmin: boolean;
 }) {
   const pathname = usePathname();
-  const items = NAV_ITEMS.filter(
-    (item) =>
-      item.roles === "all" || esSuperAdmin || item.roles.some((r) => rolesUsuario.includes(r)),
-  );
+  const items = navParaRoles(rolesUsuario, esSuperAdmin);
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">

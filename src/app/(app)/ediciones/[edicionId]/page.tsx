@@ -1,8 +1,16 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { EdicionView } from "./edicion-view";
+
+const ROLES_DETALLE = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
 
 export default async function EdicionDetallePage({
   params,
@@ -15,17 +23,32 @@ export default async function EdicionDetallePage({
 
   const supabase = await createClient();
 
-  const { data: edicion } = await supabase
-    .from("ediciones_curso")
-    .select(
-      "id, fecha_inicio, fecha_limite, estado, curso_id, organizacion_id, facilitador_id, cursos(nombre), facilitadores(nombres, apellidos), centros_trabajo(nombre)",
-    )
-    .eq("id", edicionId)
-    .maybeSingle();
+  const [{ data: edicion }, { data: miFacilitador }] = await Promise.all([
+    supabase
+      .from("ediciones_curso")
+      .select(
+        "id, fecha_inicio, fecha_limite, estado, curso_id, organizacion_id, facilitador_id, cursos(nombre), facilitadores(nombres, apellidos), centros_trabajo(nombre)",
+      )
+      .eq("id", edicionId)
+      .maybeSingle(),
+    supabase.from("facilitadores").select("id").eq("usuario_id", sesion.usuarioId).maybeSingle(),
+  ]);
 
   if (!edicion) notFound();
 
-  const [{ data: modulos }, { data: inscripciones }, { data: vinculosOrg }, { data: miFacilitador }] = await Promise.all([
+  const esAdminOrgOPrevencionista = sesion.roles.some(
+    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
+  );
+  const esFacilitadorDeEstaEdicion = miFacilitador?.id != null && miFacilitador.id === edicion.facilitador_id;
+  const puedeVer =
+    sesion.esSuperAdmin ||
+    esFacilitadorDeEstaEdicion ||
+    sesion.roles.some(
+      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === edicion.organizacion_id,
+    );
+  if (!puedeVer) redirect("/dashboard");
+
+  const [{ data: modulos }, { data: inscripciones }, { data: vinculosOrg }] = await Promise.all([
     supabase.from("modulos").select("id, orden, nombre").eq("curso_id", edicion.curso_id).order("orden"),
     supabase
       .from("inscripciones")
@@ -40,7 +63,6 @@ export default async function EdicionDetallePage({
       .eq("organizacion_id", edicion.organizacion_id)
       .eq("activo", true)
       .order("persona_run"),
-    supabase.from("facilitadores").select("id").eq("usuario_id", sesion.usuarioId).maybeSingle(),
   ]);
 
   const idsInscritos = new Set((inscripciones ?? []).map((i) => i.personas?.run));
@@ -49,11 +71,6 @@ export default async function EdicionDetallePage({
     .map((v) => v.personas)
     .filter((p): p is NonNullable<typeof p> => p !== null)
     .sort((a, b) => a.nombres.localeCompare(b.nombres, "es"));
-
-  const esAdminOrgOPrevencionista = sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
-  );
-  const esFacilitadorDeEstaEdicion = miFacilitador?.id != null && miFacilitador.id === edicion.facilitador_id;
 
   // Inscribir trabajadores (decidir quién toma el curso) es una decisión de gestión.
   const puedeInscribir = sesion.esSuperAdmin || esAdminOrgOPrevencionista;

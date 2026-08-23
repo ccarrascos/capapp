@@ -1,10 +1,18 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { NuevaEdicionDialog } from "./nueva-edicion-dialog";
 import { FileField } from "@/components/materiales/file-field";
 import { guardarManualCurso, guardarMaterialModulo } from "./materiales-actions";
+
+const ROLES_DETALLE = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
 
 const TEMA_LABEL: Record<string, string> = {
   introduccion: "Introducción",
@@ -27,24 +35,35 @@ export default async function CursoDetallePage({
 
   const supabase = await createClient();
 
-  const [{ data: curso }, { data: modulos }, { data: ediciones }, { data: facilitadores }, { data: centros }] =
-    await Promise.all([
-      supabase.from("cursos").select("*").eq("id", cursoId).maybeSingle(),
-      supabase.from("modulos").select("*").eq("curso_id", cursoId).order("orden"),
-      supabase
-        .from("ediciones_curso")
-        .select("id, fecha_inicio, fecha_limite, estado, facilitadores(nombres, apellidos), centros_trabajo(nombre), inscripciones(id)")
-        .eq("curso_id", cursoId)
-        .order("fecha_inicio", { ascending: false }),
-      supabase.from("facilitadores").select("id, nombres, apellidos").eq("activo", true),
-      supabase.from("centros_trabajo").select("id, nombre"),
-    ]);
+  const [{ data: curso }, { data: miFacilitador }] = await Promise.all([
+    supabase.from("cursos").select("*").eq("id", cursoId).maybeSingle(),
+    supabase.from("facilitadores").select("id, organizacion_id").eq("usuario_id", sesion.usuarioId).maybeSingle(),
+  ]);
 
   if (!curso) notFound();
 
   const puedeGestionar = sesion.esSuperAdmin || sesion.roles.some(
     (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === curso.organizacion_id,
   );
+  const esFacilitadorDeLaOrg = miFacilitador?.organizacion_id != null && miFacilitador.organizacion_id === curso.organizacion_id;
+  const puedeVer =
+    sesion.esSuperAdmin ||
+    esFacilitadorDeLaOrg ||
+    sesion.roles.some(
+      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === curso.organizacion_id,
+    );
+  if (!puedeVer) redirect("/dashboard");
+
+  const [{ data: modulos }, { data: ediciones }, { data: facilitadores }, { data: centros }] = await Promise.all([
+    supabase.from("modulos").select("*").eq("curso_id", cursoId).order("orden"),
+    supabase
+      .from("ediciones_curso")
+      .select("id, fecha_inicio, fecha_limite, estado, facilitadores(nombres, apellidos), centros_trabajo(nombre), inscripciones(id)")
+      .eq("curso_id", cursoId)
+      .order("fecha_inicio", { ascending: false }),
+    supabase.from("facilitadores").select("id, nombres, apellidos").eq("activo", true),
+    supabase.from("centros_trabajo").select("id, nombre"),
+  ]);
 
   const storagePrefixCurso = `${curso.organizacion_id}/cursos/${cursoId}`;
 

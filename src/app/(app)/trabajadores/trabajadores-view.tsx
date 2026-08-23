@@ -104,7 +104,16 @@ function textoBuscable(f: FilaMatriz): string {
     .toLowerCase();
 }
 
-type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "centro" | "vinculo" | "modalidad" | "vence" | "estado";
+type ColumnaOrdenable =
+  | "trabajador"
+  | "run"
+  | "cargo"
+  | "centro"
+  | "vinculo"
+  | "modalidad"
+  | "edad"
+  | "vence"
+  | "estado";
 type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
 
 const RANGO_ESTADO: Record<string, number> = {
@@ -128,6 +137,8 @@ function valorOrdenable(f: FilaMatriz, columna: ColumnaOrdenable): string | numb
       return f.tipo_vinculo === "subcontrato" ? (f.subcontrato_nombre ?? "").toLowerCase() : "directo";
     case "modalidad":
       return (f.modalidad_contractual ?? "").toLowerCase();
+    case "edad":
+      return calcularEdad(f.fechaNacimiento) ?? "";
     case "vence":
       return f.vigencia_hasta ?? "";
     case "estado":
@@ -385,14 +396,14 @@ export function TrabajadoresView({
           <TableHeader>
             <TableRow>
               <SortableHead label="Trabajador" columna="trabajador" orden={orden} onSort={onSort} />
+              <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
+              <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
               <SortableHead label="RUN" columna="run" orden={orden} onSort={onSort} />
               <SortableHead label="Cargo" columna="cargo" orden={orden} onSort={onSort} />
               <SortableHead label="Centro" columna="centro" orden={orden} onSort={onSort} />
               <SortableHead label="Vínculo" columna="vinculo" orden={orden} onSort={onSort} />
               <SortableHead label="Modalidad" columna="modalidad" orden={orden} onSort={onSort} />
-              <TableHead>Edad</TableHead>
-              <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
-              <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
+              <SortableHead label="Edad" columna="edad" orden={orden} onSort={onSort} />
               <TableHead>Acceso</TableHead>
               <TableHead />
             </TableRow>
@@ -420,6 +431,10 @@ export function TrabajadoresView({
                     </>
                   )}
                 </TableCell>
+                <TableCell>
+                  <SignBadge estado={(f.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia} size="sm" />
+                </TableCell>
+                <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "—"}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {f.run}-{f.dv}
                 </TableCell>
@@ -432,10 +447,6 @@ export function TrabajadoresView({
                   {f.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{calcularEdad(f.fechaNacimiento) ?? "—"}</TableCell>
-                <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "—"}</TableCell>
-                <TableCell>
-                  <SignBadge estado={(f.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia} size="sm" />
-                </TableCell>
                 <TableCell>
                   {f.usuarioId ? (
                     <span className="text-xs text-clear">Con acceso</span>

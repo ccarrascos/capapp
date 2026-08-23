@@ -16,7 +16,7 @@ export default async function SubcontratosPage() {
     supabase
       .from("subcontratos")
       .select(
-        "id, nombre, rut, organizacion_id, organizaciones(razon_social), subcontratos_centros(centro_trabajo_id, centros_trabajo(nombre))",
+        "id, nombre, rut, activo, organizacion_id, organizaciones(razon_social), subcontratos_centros(centro_trabajo_id, centros_trabajo(nombre))",
       )
       .order("nombre"),
     supabase.from("centros_trabajo").select("id, nombre, organizacion_id").eq("activo", true).order("nombre"),

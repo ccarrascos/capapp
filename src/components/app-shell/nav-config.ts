@@ -91,10 +91,13 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export function navParaRoles(rolesUsuario: RolNombre[], esSuperAdmin: boolean): NavItem[] {
-  return NAV_ITEMS.filter(
-    (item) =>
-      item.roles === "all" ||
-      esSuperAdmin ||
-      item.roles.some((r) => rolesUsuario.includes(r)),
-  );
+  // Para quien solo tiene el rol trabajador, "Panel" (/dashboard) muestra un subconjunto
+  // de lo que ya ve en "Mi capacitación" — se omite para no duplicar el destino.
+  const soloTrabajador =
+    !esSuperAdmin && rolesUsuario.length > 0 && rolesUsuario.every((r) => r === "trabajador");
+
+  return NAV_ITEMS.filter((item) => {
+    if (item.href === "/dashboard" && soloTrabajador) return false;
+    return item.roles === "all" || esSuperAdmin || item.roles.some((r) => rolesUsuario.includes(r));
+  });
 }

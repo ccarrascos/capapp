@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Building, Pencil, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ import {
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { crearSubcontrato, actualizarSubcontrato } from "./actions";
+import { crearSubcontrato, actualizarSubcontrato, actualizarActivoSubcontrato } from "./actions";
 
 type Centro = { id: string; nombre: string; organizacion_id: string };
 
@@ -36,6 +37,7 @@ type Subcontrato = {
   id: string;
   nombre: string;
   rut: string | null;
+  activo: boolean;
   organizacion_id: string;
   organizaciones: { razon_social: string } | null;
   subcontratos_centros: { centro_trabajo_id: string; centros_trabajo: { nombre: string } | null }[];
@@ -69,7 +71,13 @@ export function SubcontratosView({
           </p>
         )}
         {subcontratos.map((s) => (
-          <div key={s.id} className="relative border border-border bg-card p-5 flex flex-col gap-2">
+          <div
+            key={s.id}
+            className={cn(
+              "relative border border-border bg-card p-5 flex flex-col gap-2",
+              !s.activo && "opacity-60",
+            )}
+          >
             <EditarSubcontratoDialog
               subcontrato={s}
               centrosDeLaOrg={centros.filter((c) => c.organizacion_id === s.organizacion_id)}
@@ -90,6 +98,7 @@ export function SubcontratosView({
                 </span>
               ))}
             </div>
+            <ToggleActivoSubcontratoButton subcontrato={s} />
           </div>
         ))}
       </div>
@@ -339,5 +348,32 @@ function EditarSubcontratoDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ToggleActivoSubcontratoButton({ subcontrato }: { subcontrato: Subcontrato }) {
+  const [pending, startTransition] = useTransition();
+  const [activo, setActivo] = useState(subcontrato.activo);
+
+  function onToggle() {
+    const nuevo = !activo;
+    startTransition(async () => {
+      const resultado = await actualizarActivoSubcontrato({
+        subcontratoId: subcontrato.id,
+        organizacionId: subcontrato.organizacion_id,
+        activo: nuevo,
+      });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setActivo(nuevo);
+    });
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onToggle} className="self-start mt-1">
+      {activo ? "Activo" : "Inactivo"}
+    </Button>
   );
 }

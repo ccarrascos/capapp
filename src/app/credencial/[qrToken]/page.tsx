@@ -128,7 +128,7 @@ export default async function CredencialPage({
               </div>
               <div className="border-t border-border pt-4 flex flex-col gap-3">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Capacitación{cursos.length > 1 ? "es" : ""}
+                  {cursos.length > 1 ? "Capacitaciones" : "Capacitación"}
                 </p>
                 {cursos.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin capacitación aprobada registrada.</p>

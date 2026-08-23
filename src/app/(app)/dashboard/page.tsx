@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
@@ -30,7 +31,9 @@ export default async function DashboardPage() {
 
   if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} />;
   if (esFacilitador) return <DashboardFacilitador nombres={sesion.nombres} />;
-  return <DashboardTrabajador nombres={sesion.nombres} />;
+  // Quien solo tiene el rol trabajador no tiene un panel propio — "Mi capacitación"
+  // ya muestra ese mismo resumen más el historial completo, sin duplicar destino.
+  redirect("/mi-capacitacion");
 }
 
 async function DashboardOrganizacion({ nombres }: { nombres: string }) {
@@ -49,10 +52,16 @@ async function DashboardOrganizacion({ nombres }: { nombres: string }) {
   const sinCapacitacion = conteo("sin_capacitacion");
   const cumplimiento = total > 0 ? Math.round((vigentes / total) * 100) : 0;
 
-  const proximos = filas
-    .filter((f) => f.estado_vigencia === "por_vencer" || f.estado_vigencia === "vencido")
-    .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
-    .slice(0, 8);
+  // Prioriza lo que aún se puede evitar (por vencer, ordenado por lo más próximo)
+  // y solo completa con lo ya vencido si sobra espacio — así el bloque muestra
+  // primero lo accionable, no solo lo que ya se pasó.
+  const porVencerOrdenados = filas
+    .filter((f) => f.estado_vigencia === "por_vencer")
+    .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""));
+  const vencidosOrdenados = filas
+    .filter((f) => f.estado_vigencia === "vencido")
+    .sort((a, b) => (b.vigencia_hasta ?? "").localeCompare(a.vigencia_hasta ?? ""));
+  const proximos = [...porVencerOrdenados, ...vencidosOrdenados].slice(0, 8);
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl">
@@ -76,7 +85,7 @@ async function DashboardOrganizacion({ nombres }: { nombres: string }) {
       <div className="border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
-            Próximos vencimientos
+            Por vencer y vencidos
           </h2>
           <Button render={<Link href="/trabajadores" />} nativeButton={false} variant="outline" size="sm">
             Ver matriz completa
@@ -172,46 +181,3 @@ async function DashboardFacilitador({ nombres }: { nombres: string }) {
   );
 }
 
-async function DashboardTrabajador({ nombres }: { nombres: string }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: persona } = await supabase
-    .from("personas")
-    .select("run")
-    .eq("usuario_id", user!.id)
-    .maybeSingle();
-
-  const { data: fila } = persona
-    ? await supabase
-        .from("matriz_vigencia_capacitacion")
-        .select("*")
-        .eq("persona_run", persona.run)
-        .maybeSingle()
-    : { data: null };
-
-  const estado = (fila?.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia;
-
-  return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">Mi capacitación</p>
-        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Hola, {nombres}</h1>
-      </div>
-      <div className="border border-border bg-card p-8 flex flex-col items-center text-center gap-4">
-        <SignBadge estado={estado} size="md" className="text-lg" />
-        {fila?.vigencia_hasta ? (
-          <p className="text-sm text-muted-foreground">
-            Vigente hasta <span className="font-mono text-foreground">{fila.vigencia_hasta}</span>
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Aún no registras una capacitación aprobada del art. 16 del DS 44.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}

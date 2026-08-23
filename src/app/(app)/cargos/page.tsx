@@ -1,10 +1,24 @@
+import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CargosView } from "./cargos-view";
 
+const ROLES_DETALLE = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
+
 export default async function CargosPage() {
   const sesion = await getSesion();
   if (!sesion) return null;
+
+  const puedeVer =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
+  if (!puedeVer) redirect("/dashboard");
 
   const supabase = await createClient();
 

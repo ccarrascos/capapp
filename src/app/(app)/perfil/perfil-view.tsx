@@ -53,7 +53,7 @@ export function PerfilView({
         </div>
       </div>
 
-      <CambiarContrasena />
+      <CambiarContrasena email={email} />
 
       <MisDatos />
     </div>
@@ -196,13 +196,18 @@ function DatosPersonales({
   );
 }
 
-function CambiarContrasena() {
+function CambiarContrasena({ email }: { email: string }) {
   const [pending, startTransition] = useTransition();
+  const [actual, setActual] = useState("");
   const [password, setPassword] = useState("");
   const [confirmacion, setConfirmacion] = useState("");
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!actual) {
+      toast.error("Ingresa tu contraseña actual.");
+      return;
+    }
     if (password.length < 8) {
       toast.error("La contraseña debe tener al menos 8 caracteres.");
       return;
@@ -213,12 +218,18 @@ function CambiarContrasena() {
     }
     startTransition(async () => {
       const supabase = createClient();
+      const { error: errorActual } = await supabase.auth.signInWithPassword({ email, password: actual });
+      if (errorActual) {
+        toast.error("La contraseña actual no es correcta.");
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         toast.error(error.message);
         return;
       }
       toast.success("Contraseña actualizada.");
+      setActual("");
       setPassword("");
       setConfirmacion("");
     });
@@ -227,14 +238,18 @@ function CambiarContrasena() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4 border-t border-border pt-6">
       <h2 className="font-heading text-lg font-bold uppercase tracking-wide">Cambiar contraseña</h2>
+      <div className="flex flex-col gap-1.5 max-w-xs">
+        <Label htmlFor="actual">Contraseña actual</Label>
+        <Input id="actual" type="password" autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">Nueva contraseña</Label>
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="confirmacion">Confirmar contraseña</Label>
-          <Input id="confirmacion" type="password" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} />
+          <Input id="confirmacion" type="password" autoComplete="new-password" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} />
         </div>
       </div>
       <Button type="submit" disabled={pending} variant="outline" className="w-fit">

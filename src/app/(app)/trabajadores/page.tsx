@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { TrabajadoresView } from "./trabajadores-view";
@@ -14,6 +15,11 @@ const ROLES_DETALLE = [
 export default async function TrabajadoresPage() {
   const sesion = await getSesion();
   if (!sesion) return null;
+
+  const puedeVerDetalle =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
+  if (!puedeVerDetalle) redirect("/dashboard");
 
   const supabase = await createClient();
 
@@ -66,9 +72,6 @@ export default async function TrabajadoresPage() {
   const puedeGestionar = sesion.roles.some((r) =>
     ROLES_GESTION.includes(r.rol as (typeof ROLES_GESTION)[number]),
   );
-  const puedeVerDetalle =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
 
   return (
     <TrabajadoresView

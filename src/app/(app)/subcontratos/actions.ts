@@ -114,3 +114,29 @@ export async function actualizarSubcontrato(input: {
   revalidatePath("/trabajadores");
   return { ok: true as const };
 }
+
+export async function actualizarActivoSubcontrato(input: {
+  subcontratoId: string;
+  organizacionId: string;
+  activo: boolean;
+}) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+  if (!autorizado(sesion, input.organizacionId)) {
+    return { ok: false as const, mensaje: "No tienes permiso para gestionar subcontratos." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("subcontratos")
+    .update({ activo: input.activo })
+    .eq("id", input.subcontratoId)
+    .eq("organizacion_id", input.organizacionId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  revalidatePath("/subcontratos");
+  revalidatePath("/trabajadores");
+  return { ok: true as const };
+}
