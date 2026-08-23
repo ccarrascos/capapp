@@ -193,14 +193,20 @@ export function UsuariosView({
         <NuevaCuentaDialog organizaciones={organizaciones} esSuperAdmin={esSuperAdmin} />
       </div>
 
-      <div className="relative w-full sm:w-72">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre, RUT, correo, rol…"
-          className="pl-8"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {filtradas.length} cuenta{filtradas.length === 1 ? "" : "s"}
+        </p>
+
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, RUT, correo, rol…"
+            className="pl-8"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="border border-border bg-card overflow-x-auto">

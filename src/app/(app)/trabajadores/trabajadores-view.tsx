@@ -103,7 +103,7 @@ function textoBuscable(f: FilaMatriz): string {
     .toLowerCase();
 }
 
-type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "modalidad" | "vence" | "estado";
+type ColumnaOrdenable = "trabajador" | "run" | "cargo" | "centro" | "vinculo" | "modalidad" | "vence" | "estado";
 type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
 
 const RANGO_ESTADO: Record<string, number> = {
@@ -121,6 +121,10 @@ function valorOrdenable(f: FilaMatriz, columna: ColumnaOrdenable): string | numb
       return Number(f.run ?? 0);
     case "cargo":
       return (f.cargo ?? "").toLowerCase();
+    case "centro":
+      return (f.centroNombre ?? "").toLowerCase();
+    case "vinculo":
+      return f.tipo_vinculo === "subcontrato" ? (f.subcontrato_nombre ?? "").toLowerCase() : "directo";
     case "modalidad":
       return (f.modalidad_contractual ?? "").toLowerCase();
     case "vence":
@@ -382,8 +386,8 @@ export function TrabajadoresView({
               <SortableHead label="Trabajador" columna="trabajador" orden={orden} onSort={onSort} />
               <SortableHead label="RUN" columna="run" orden={orden} onSort={onSort} />
               <SortableHead label="Cargo" columna="cargo" orden={orden} onSort={onSort} />
-              <TableHead>Centro</TableHead>
-              <TableHead>Vínculo</TableHead>
+              <SortableHead label="Centro" columna="centro" orden={orden} onSort={onSort} />
+              <SortableHead label="Vínculo" columna="vinculo" orden={orden} onSort={onSort} />
               <SortableHead label="Modalidad" columna="modalidad" orden={orden} onSort={onSort} />
               <TableHead>Edad</TableHead>
               <SortableHead label="Vence" columna="vence" orden={orden} onSort={onSort} />
