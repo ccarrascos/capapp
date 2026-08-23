@@ -101,7 +101,20 @@ export const CERTIFICADO_PRINT_STYLE = `
     .no-print { display: none !important; }
     body * { visibility: hidden; }
     #certificado-imprimible, #certificado-imprimible * { visibility: visible; }
-    #certificado-imprimible { position: absolute; inset: 0; margin: 0; max-width: none; border: none; }
+    html, body { height: auto !important; overflow: visible !important; }
+    [data-slot="dialog-overlay"] { display: none !important; }
+    [data-slot="dialog-content"] {
+      position: static !important;
+      transform: none !important;
+      translate: none !important;
+      max-width: none !important;
+      width: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+    #certificado-imprimible { position: static; inset: auto; margin: 0 auto; max-width: none; border: none; }
   }
 `;
 
