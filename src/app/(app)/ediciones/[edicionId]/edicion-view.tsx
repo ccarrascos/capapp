@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, FileCheck2 } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { Plus, FileCheck2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -140,6 +140,7 @@ export function EdicionView({
 function InscribirDialog({ edicionId, disponibles }: { edicionId: string; disponibles: Persona[] }) {
   const [open, setOpen] = useState(false);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [busqueda, setBusqueda] = useState("");
   const [pending, startTransition] = useTransition();
 
   function toggle(id: string) {
@@ -160,12 +161,27 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
       }
       toast.success(`${seleccion.size} trabajador(es) inscrito(s).`);
       setSeleccion(new Set());
+      setBusqueda("");
       setOpen(false);
     });
   }
 
+  const disponiblesFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return disponibles;
+    return disponibles.filter((t) =>
+      `${t.nombres} ${t.apellido_paterno} ${t.run}-${t.dv}`.toLowerCase().includes(q),
+    );
+  }, [disponibles, busqueda]);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) setBusqueda("");
+      }}
+    >
       <DialogTrigger render={<Button size="sm" />}>
         <Plus className="size-4" />
         Inscribir trabajadores
@@ -174,13 +190,29 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
         <DialogHeader>
           <DialogTitle>Inscribir trabajadores</DialogTitle>
         </DialogHeader>
+        {disponibles.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o RUN…"
+              className="pl-8"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+        )}
         <div className="max-h-80 overflow-y-auto border border-border divide-y divide-border">
           {disponibles.length === 0 && (
             <p className="px-4 py-6 text-sm text-muted-foreground">
               Todos los trabajadores activos de la organización ya están inscritos.
             </p>
           )}
-          {disponibles.map((t) => (
+          {disponibles.length > 0 && disponiblesFiltrados.length === 0 && (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              Ningún trabajador coincide con &ldquo;{busqueda}&rdquo;.
+            </p>
+          )}
+          {disponiblesFiltrados.map((t) => (
             <label key={t.run} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent/40 cursor-pointer">
               <input type="checkbox" className="size-4" checked={seleccion.has(t.run)} onChange={() => toggle(t.run)} />
               <span className="flex-1">
