@@ -204,7 +204,7 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
         <div className="max-h-80 overflow-y-auto border border-border divide-y divide-border">
           {disponibles.length === 0 && (
             <p className="px-4 py-6 text-sm text-muted-foreground">
-              Todos los trabajadores activos de la organización ya están inscritos.
+              No hay nadie para inscribir: ya están en esta edición o tienen este curso vigente.
             </p>
           )}
           {disponibles.length > 0 && disponiblesFiltrados.length === 0 && (

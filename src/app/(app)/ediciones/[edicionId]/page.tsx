@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
+import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import { EdicionView } from "./edicion-view";
 
 const ROLES_DETALLE = [
@@ -48,26 +49,51 @@ export default async function EdicionDetallePage({
     );
   if (!puedeVer) redirect("/dashboard");
 
-  const [{ data: modulos }, { data: inscripciones }, { data: vinculosOrg }] = await Promise.all([
-    supabase.from("modulos").select("id, orden, nombre").eq("curso_id", edicion.curso_id).order("orden"),
-    supabase
-      .from("inscripciones")
-      .select(
-        "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, manual_entregado, manual_entregado_fecha, personas(run, nombres, apellido_paterno, dv), asistencias_modulo(modulo_id, presente), evaluaciones_resultado(id, puntaje, aprobado, modulo_id), certificados(id, numero_certificado)",
-      )
-      .eq("edicion_id", edicionId)
-      .order("fecha_inscripcion"),
-    supabase
-      .from("vinculos_laborales")
-      .select("persona_run, personas(run, nombres, apellido_paterno, dv)")
-      .eq("organizacion_id", edicion.organizacion_id)
-      .eq("activo", true)
-      .order("persona_run"),
-  ]);
+  const [{ data: modulos }, { data: inscripciones }, { data: vinculosOrg }, { data: aprobadosDelCurso }] =
+    await Promise.all([
+      supabase.from("modulos").select("id, orden, nombre").eq("curso_id", edicion.curso_id).order("orden"),
+      supabase
+        .from("inscripciones")
+        .select(
+          "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, manual_entregado, manual_entregado_fecha, personas(run, nombres, apellido_paterno, dv), asistencias_modulo(modulo_id, presente), evaluaciones_resultado(id, puntaje, aprobado, modulo_id), certificados(id, numero_certificado)",
+        )
+        .eq("edicion_id", edicionId)
+        .order("fecha_inscripcion"),
+      supabase
+        .from("vinculos_laborales")
+        .select("persona_run, personas(run, nombres, apellido_paterno, dv)")
+        .eq("organizacion_id", edicion.organizacion_id)
+        .eq("activo", true)
+        .order("persona_run"),
+      // Vigencia de este mismo curso en cualquiera de sus ediciones — para no
+      // ofrecer inscribir a quien ya lo tiene vigente (ver más abajo).
+      supabase
+        .from("inscripciones")
+        .select("persona_run, fecha_aprobacion, vigencia_hasta, ediciones_curso!inner(curso_id, organizacion_id)")
+        .eq("estado", "aprobado")
+        .eq("ediciones_curso.curso_id", edicion.curso_id)
+        .eq("ediciones_curso.organizacion_id", edicion.organizacion_id),
+    ]);
 
   const idsInscritos = new Set((inscripciones ?? []).map((i) => i.personas?.run));
+
+  // Si el mismo curso se aprobó más de una vez, sólo la aprobación más
+  // reciente de cada persona cuenta para decidir si aún lo tiene vigente.
+  const vigenciaPorPersona = new Map<string, { fechaAprobacion: string | null; vigenciaHasta: string | null }>();
+  for (const i of aprobadosDelCurso ?? []) {
+    const previa = vigenciaPorPersona.get(i.persona_run);
+    if (!previa || (i.fecha_aprobacion ?? "") > (previa.fechaAprobacion ?? "")) {
+      vigenciaPorPersona.set(i.persona_run, { fechaAprobacion: i.fecha_aprobacion, vigenciaHasta: i.vigencia_hasta });
+    }
+  }
+  const personasConEsteCursoVigente = new Set(
+    [...vigenciaPorPersona.entries()]
+      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta) === "vigente")
+      .map(([run]) => run),
+  );
+
   const disponibles = (vinculosOrg ?? [])
-    .filter((v) => !idsInscritos.has(v.persona_run))
+    .filter((v) => !idsInscritos.has(v.persona_run) && !personasConEsteCursoVigente.has(v.persona_run))
     .map((v) => v.personas)
     .filter((p): p is NonNullable<typeof p> => p !== null)
     .sort((a, b) => a.nombres.localeCompare(b.nombres, "es"));
