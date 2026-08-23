@@ -1,8 +1,8 @@
-import Link from "next/link";
-import { FileCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { cn } from "@/lib/utils";
+import { FileCheck2 } from "lucide-react";
+import { CertificadoDialog } from "../certificados/certificado-dialog";
 
 const ESTADO_INSCRIPCION_LABEL: Record<string, { label: string; className: string }> = {
   inscrito: { label: "Inscrito", className: "text-steel" },
@@ -103,14 +103,13 @@ export default async function MiCapacitacionPage() {
                     </div>
                   </div>
                   {h.certificados && (
-                    <Link
-                      href={`/certificados/${h.certificados.id}`}
-                      target="_blank"
-                      className="flex items-center gap-1.5 text-primary hover:underline text-sm border-t border-border pt-3"
+                    <CertificadoDialog
+                      certificadoId={h.certificados.id}
+                      triggerClassName="flex items-center gap-1.5 text-primary hover:underline text-sm border-t border-border pt-3"
                     >
                       <FileCheck2 className="size-4" />
                       Ver certificado
-                    </Link>
+                    </CertificadoDialog>
                   )}
                 </div>
               );

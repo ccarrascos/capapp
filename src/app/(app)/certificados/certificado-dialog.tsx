@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { FileCheck2, Printer } from "lucide-react";
+import { useState, useTransition, type ReactNode } from "react";
+import { Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CertificadoCard, CERTIFICADO_PRINT_STYLE, type CertificadoDatos } from "../certificados/[certificadoId]/certificado-view";
-import { obtenerMiCertificado } from "./actions";
+import { CertificadoCard, CERTIFICADO_PRINT_STYLE, type CertificadoDatos } from "./[certificadoId]/certificado-view";
+import { obtenerCertificado } from "./actions";
 
-export function CertificadoDialog({ certificadoId }: { certificadoId: string }) {
+export function CertificadoDialog({
+  certificadoId,
+  triggerClassName,
+  children,
+}: {
+  certificadoId: string;
+  triggerClassName?: string;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [datos, setDatos] = useState<CertificadoDatos | null>(null);
@@ -18,7 +26,7 @@ export function CertificadoDialog({ certificadoId }: { certificadoId: string }) 
     if (v) {
       setDatos(null);
       startTransition(async () => {
-        const res = await obtenerMiCertificado(certificadoId);
+        const res = await obtenerCertificado(certificadoId);
         if (!res.ok) {
           toast.error(res.mensaje);
           setOpen(false);
@@ -31,13 +39,8 @@ export function CertificadoDialog({ certificadoId }: { certificadoId: string }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <button
-        type="button"
-        onClick={() => onOpenChange(true)}
-        className="flex items-center gap-1.5 text-primary hover:underline text-sm border-t border-border pt-3"
-      >
-        <FileCheck2 className="size-4" />
-        Ver certificado
+      <button type="button" onClick={() => onOpenChange(true)} className={triggerClassName}>
+        {children}
       </button>
       <DialogContent className="sm:max-w-2xl">
         <DialogTitle className="sr-only">Certificado</DialogTitle>

@@ -3,7 +3,7 @@
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generarQrDataUrl } from "@/lib/qr";
-import type { CertificadoDatos } from "../certificados/[certificadoId]/certificado-view";
+import type { CertificadoDatos } from "./[certificadoId]/certificado-view";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -13,7 +13,7 @@ const ENTIDAD_EMISORA_LABEL: Record<string, string> = {
   otec: "OTEC",
 };
 
-export async function obtenerMiCertificado(certificadoId: string) {
+export async function obtenerCertificado(certificadoId: string) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
@@ -22,7 +22,7 @@ export async function obtenerMiCertificado(certificadoId: string) {
   const { data: certificado } = await supabase
     .from("certificados")
     .select(
-      "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
+      "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizacion_id, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
     )
     .eq("id", certificadoId)
     .maybeSingle();
@@ -31,9 +31,17 @@ export async function obtenerMiCertificado(certificadoId: string) {
     return { ok: false as const, mensaje: "Certificado no encontrado." };
   }
 
-  if (certificado.personas.usuario_id !== sesion.usuarioId) {
-    return { ok: false as const, mensaje: "No tienes permiso para ver este certificado." };
-  }
+  const organizacionId = certificado.cursos.organizacion_id;
+  const puedeVer =
+    sesion.esSuperAdmin ||
+    certificado.personas.usuario_id === sesion.usuarioId ||
+    (organizacionId &&
+      sesion.roles.some(
+        (r) =>
+          ["admin_organizacion", "prevencionista", "auditor"].includes(r.rol) && r.organizacionId === organizacionId,
+      ));
+
+  if (!puedeVer) return { ok: false as const, mensaje: "No tienes permiso para ver este certificado." };
 
   let nombreEntidadExterna: string | null = null;
   if (certificado.entidad_emisora_id) {

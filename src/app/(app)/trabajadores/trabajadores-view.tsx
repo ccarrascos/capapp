@@ -15,6 +15,7 @@ import {
   QrCode,
   Printer,
   FileSpreadsheet,
+  ArrowRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -1388,12 +1389,16 @@ function DetalleTrabajadorDialog({
               {detalle.historialCentro.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin cambios registrados.</p>
               ) : (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                   {detalle.historialCentro.map((h, idx) => (
-                    <p key={idx} className="text-sm">
-                      <span className="font-mono text-xs text-muted-foreground">{h.cambiado_en.slice(0, 10)}</span>{" "}
-                      {h.centro_anterior?.nombre ?? "Sin centro"} → {h.centro_nuevo?.nombre ?? "Sin centro"}
-                    </p>
+                    <div key={idx} className="border border-border p-3 text-sm flex flex-col gap-1.5">
+                      <p className="font-mono text-xs text-muted-foreground">{h.cambiado_en.slice(0, 10)}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-muted-foreground">{h.centro_anterior?.nombre ?? "Sin centro"}</span>
+                        <ArrowRight className="size-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{h.centro_nuevo?.nombre ?? "Sin centro"}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

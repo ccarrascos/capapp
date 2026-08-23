@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { Plus, FileCheck2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +30,7 @@ import {
   emitirCertificado,
   marcarManualEntregado,
 } from "../actions";
+import { CertificadoDialog } from "../../certificados/certificado-dialog";
 
 type Persona = { run: string; dv: string; nombres: string; apellido_paterno: string };
 
@@ -425,13 +425,12 @@ function GestionarSheet({
                     <FileCheck2 className="size-4" />
                     Certificado emitido: {inscripcion.certificados?.numero_certificado}
                   </p>
-                  <Link
-                    href={`/certificados/${inscripcion.certificados?.id}`}
-                    target="_blank"
-                    className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                  <CertificadoDialog
+                    certificadoId={inscripcion.certificados!.id}
+                    triggerClassName="text-xs font-medium text-primary hover:underline whitespace-nowrap"
                   >
                     Ver certificado
-                  </Link>
+                  </CertificadoDialog>
                 </div>
               ) : (
                 <Button size="sm" disabled={pendingCert} onClick={onEmitirCertificado}>
