@@ -2,14 +2,15 @@ import Link from "next/link";
 import { FileCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+
+const ESTADO_INSCRIPCION_LABEL: Record<string, { label: string; className: string }> = {
+  inscrito: { label: "Inscrito", className: "text-steel" },
+  en_progreso: { label: "En progreso", className: "text-signal" },
+  aprobado: { label: "Aprobado", className: "text-clear" },
+  reprobado: { label: "Reprobado", className: "text-alert" },
+  desertor: { label: "Desertor", className: "text-alert" },
+};
 
 export default async function MiCapacitacionPage() {
   const supabase = await createClient();
@@ -71,54 +72,51 @@ export default async function MiCapacitacionPage() {
         <h2 className="font-heading text-lg font-bold uppercase tracking-wide mb-3">
           Historial
         </h2>
-        <div className="border border-border bg-card overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Curso</TableHead>
-                <TableHead>Inscripción</TableHead>
-                <TableHead>Aprobación</TableHead>
-                <TableHead>Vigente hasta</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Certificado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(historial ?? []).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                    Sin inscripciones registradas.
-                  </TableCell>
-                </TableRow>
-              )}
-              {(historial ?? []).map((h) => (
-                <TableRow key={h.id}>
-                  <TableCell className="font-medium">
-                    {h.ediciones_curso?.cursos?.nombre ?? "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{h.fecha_inscripcion}</TableCell>
-                  <TableCell className="font-mono text-sm">{h.fecha_aprobacion ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-sm">{h.vigencia_hasta ?? "—"}</TableCell>
-                  <TableCell className="capitalize">{h.estado.replace(/_/g, " ")}</TableCell>
-                  <TableCell>
-                    {h.certificados ? (
-                      <Link
-                        href={`/certificados/${h.certificados.id}`}
-                        target="_blank"
-                        className="flex items-center gap-1.5 text-primary hover:underline whitespace-nowrap"
-                      >
-                        <FileCheck2 className="size-4" />
-                        Ver certificado
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {(historial ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground border border-border bg-card p-8 text-center">
+            Sin inscripciones registradas.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {(historial ?? []).map((h) => {
+              const estadoInfo = ESTADO_INSCRIPCION_LABEL[h.estado] ?? { label: h.estado, className: "" };
+              return (
+                <div key={h.id} className="border border-border bg-card p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-sm">{h.ediciones_curso?.cursos?.nombre ?? "—"}</p>
+                    <span className={cn("text-xs font-medium shrink-0", estadoInfo.className)}>
+                      {estadoInfo.label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">Inscripción</p>
+                      <p className="font-mono">{h.fecha_inscripcion}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Aprobación</p>
+                      <p className="font-mono">{h.fecha_aprobacion ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Vigente hasta</p>
+                      <p className="font-mono">{h.vigencia_hasta ?? "—"}</p>
+                    </div>
+                  </div>
+                  {h.certificados && (
+                    <Link
+                      href={`/certificados/${h.certificados.id}`}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-primary hover:underline text-sm border-t border-border pt-3"
+                    >
+                      <FileCheck2 className="size-4" />
+                      Ver certificado
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
