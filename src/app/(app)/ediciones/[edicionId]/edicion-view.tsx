@@ -32,6 +32,8 @@ import {
 } from "../actions";
 import { CertificadoDialog } from "../../certificados/certificado-dialog";
 import { coincideBusqueda } from "@/lib/busqueda";
+import { usePaginacion } from "@/lib/use-paginacion";
+import { Paginacion } from "@/components/ui/paginacion";
 
 type Persona = { run: string; dv: string; nombres: string; apellido_paterno: string };
 
@@ -74,6 +76,9 @@ export function EdicionView({
   puedeInscribir: boolean;
   puedeGestionarAsistencia: boolean;
 }) {
+  const { pagina, setPagina, tamano, setTamano, totalPaginas, paginaItems, totalItems } =
+    usePaginacion(inscripciones);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -96,14 +101,14 @@ export function EdicionView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {inscripciones.length === 0 && (
+            {totalItems === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                   Aún no hay trabajadores inscritos en esta edición.
                 </TableCell>
               </TableRow>
             )}
-            {inscripciones.map((i) => {
+            {paginaItems.map((i) => {
               const estado = ESTADO_LABEL[i.estado] ?? ESTADO_LABEL.inscrito;
               return (
                 <TableRow key={i.id}>
@@ -133,6 +138,15 @@ export function EdicionView({
             })}
           </TableBody>
         </Table>
+        <Paginacion
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          totalItems={totalItems}
+          tamano={tamano}
+          onTamanoChange={setTamano}
+          onPaginaChange={setPagina}
+          etiqueta="inscrito"
+        />
       </div>
     </div>
   );

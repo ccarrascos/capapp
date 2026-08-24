@@ -1,13 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { MisEdicionesView } from "./mis-ediciones-view";
 
 export default async function MisEdicionesPage() {
   const supabase = await createClient();
@@ -37,41 +29,7 @@ export default async function MisEdicionesPage() {
         </h1>
       </div>
 
-      <div className="border border-border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Curso</TableHead>
-              <TableHead>Inicio</TableHead>
-              <TableHead>Límite (3 meses)</TableHead>
-              <TableHead>Término</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(ediciones ?? []).length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                  No tienes ediciones de curso asignadas todavía.
-                </TableCell>
-              </TableRow>
-            )}
-            {(ediciones ?? []).map((e) => (
-              <TableRow key={e.id} className="cursor-pointer hover:bg-accent/40">
-                <TableCell className="font-medium">
-                  <Link href={`/ediciones/${e.id}`} className="block">
-                    {e.cursos?.nombre}
-                  </Link>
-                </TableCell>
-                <TableCell className="font-mono text-sm">{e.fecha_inicio}</TableCell>
-                <TableCell className="font-mono text-sm">{e.fecha_limite}</TableCell>
-                <TableCell className="font-mono text-sm">{e.fecha_termino ?? "—"}</TableCell>
-                <TableCell className="capitalize">{e.estado.replace(/_/g, " ")}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <MisEdicionesView ediciones={ediciones ?? []} />
     </div>
   );
 }

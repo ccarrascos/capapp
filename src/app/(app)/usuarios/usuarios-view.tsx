@@ -33,6 +33,8 @@ import {
 import { toast } from "sonner";
 import { crearUsuario, actualizarEstadoUsuario, actualizarRolUsuario } from "./actions";
 import { coincideBusqueda } from "@/lib/busqueda";
+import { usePaginacion } from "@/lib/use-paginacion";
+import { Paginacion } from "@/components/ui/paginacion";
 import type { RolNombre } from "@/lib/auth";
 import { parsearRut, esRutValido, formatearRut, formatearRutInput } from "@/lib/rut";
 import { cn } from "@/lib/utils";
@@ -181,6 +183,8 @@ export function UsuariosView({
     return conValor.map((x) => x.a);
   }, [asignaciones, busqueda, orden]);
 
+  const { pagina, setPagina, tamano, setTamano, totalPaginas, paginaItems, totalItems } = usePaginacion(filtradas);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -197,7 +201,7 @@ export function UsuariosView({
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {filtradas.length} cuenta{filtradas.length === 1 ? "" : "s"}
+          {totalItems} cuenta{totalItems === 1 ? "" : "s"}
         </p>
 
         <div className="relative w-full sm:w-72">
@@ -223,7 +227,7 @@ export function UsuariosView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtradas.length === 0 && (
+            {totalItems === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
                   {asignaciones.length === 0
@@ -232,7 +236,7 @@ export function UsuariosView({
                 </TableCell>
               </TableRow>
             )}
-            {filtradas.map((a) => (
+            {paginaItems.map((a) => (
               <TableRow key={a.id}>
                 <TableCell className="font-medium">
                   {a.usuarios ? `${a.usuarios.nombres} ${a.usuarios.apellidos}` : "—"}
@@ -274,6 +278,15 @@ export function UsuariosView({
             ))}
           </TableBody>
         </Table>
+        <Paginacion
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          totalItems={totalItems}
+          tamano={tamano}
+          onTamanoChange={setTamano}
+          onPaginaChange={setPagina}
+          etiqueta="cuenta"
+        />
       </div>
     </div>
   );

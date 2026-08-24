@@ -57,6 +57,8 @@ import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 import { coincideBusqueda } from "@/lib/busqueda";
+import { usePaginacion } from "@/lib/use-paginacion";
+import { Paginacion } from "@/components/ui/paginacion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -333,6 +335,8 @@ export function TrabajadoresView({
     return base;
   }, [filas]);
 
+  const { pagina, setPagina, tamano, setTamano, totalPaginas, paginaItems, totalItems } = usePaginacion(filtradas);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -408,14 +412,14 @@ export function TrabajadoresView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtradas.length === 0 && (
+            {totalItems === 0 && (
               <TableRow>
                 <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   No hay trabajadores que coincidan con el filtro.
                 </TableCell>
               </TableRow>
             )}
-            {filtradas.map((f) => (
+            {paginaItems.map((f) => (
               <TableRow key={f.persona_run}>
                 <TableCell className="font-medium">
                   {puedeVerDetalle && f.persona_run && f.organizacion_id ? (
@@ -478,6 +482,15 @@ export function TrabajadoresView({
             ))}
           </TableBody>
         </Table>
+        <Paginacion
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          totalItems={totalItems}
+          tamano={tamano}
+          onTamanoChange={setTamano}
+          onPaginaChange={setPagina}
+          etiqueta="trabajador"
+        />
       </div>
     </div>
   );

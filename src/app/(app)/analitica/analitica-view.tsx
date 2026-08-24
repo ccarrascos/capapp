@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePaginacion } from "@/lib/use-paginacion";
+import { Paginacion } from "@/components/ui/paginacion";
 import {
   BarChart,
   Bar,
@@ -421,6 +423,15 @@ export function AnaliticaView({
     () => Math.max(1, ...cumplimientoPorCentro.map((c) => c.total)),
     [cumplimientoPorCentro],
   );
+  const {
+    pagina: paginaCentro,
+    setPagina: setPaginaCentro,
+    tamano: tamanoCentro,
+    setTamano: setTamanoCentro,
+    totalPaginas: totalPaginasCentro,
+    paginaItems: centrosPagina,
+    totalItems: totalCentros,
+  } = usePaginacion(cumplimientoPorCentro, 10);
 
   const baseTipoVinculo = useMemo(
     () => aplicarFiltros(filas, filtros, { excluirTipoVinculo: true, excluirSubcontrato: true }),
@@ -694,14 +705,14 @@ export function AnaliticaView({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cumplimientoPorCentro.length === 0 && (
+                  {totalCentros === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         Sin datos para los filtros actuales.
                       </TableCell>
                     </TableRow>
                   )}
-                  {cumplimientoPorCentro.map((c) => (
+                  {centrosPagina.map((c) => (
                     <TableRow
                       key={c.centro}
                       className={cn(
@@ -731,7 +742,7 @@ export function AnaliticaView({
                     </TableRow>
                   ))}
                 </TableBody>
-                {cumplimientoPorCentro.length > 0 && (
+                {totalCentros > 0 && (
                   <TableFooter>
                     <TableRow>
                       <TableCell className="font-semibold">Total</TableCell>
@@ -749,6 +760,15 @@ export function AnaliticaView({
                   </TableFooter>
                 )}
               </Table>
+              <Paginacion
+                pagina={paginaCentro}
+                totalPaginas={totalPaginasCentro}
+                totalItems={totalCentros}
+                tamano={tamanoCentro}
+                onTamanoChange={setTamanoCentro}
+                onPaginaChange={setPaginaCentro}
+                etiqueta="centro"
+              />
             </div>
           </div>
         </div>
