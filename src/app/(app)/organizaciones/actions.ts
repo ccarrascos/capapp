@@ -102,3 +102,21 @@ export async function subirLogoOrganizacion(organizacionId: string, formData: Fo
   revalidatePath("/", "layout");
   return { ok: true as const, logoUrl };
 }
+
+export async function actualizarActivoOrganizacion(input: { organizacionId: string; activo: boolean }) {
+  const sesion = await getSesion();
+  if (!sesion?.esSuperAdmin) {
+    return { ok: false as const, mensaje: "Sólo un super administrador puede activar o desactivar una organización." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizaciones")
+    .update({ activo: input.activo })
+    .eq("id", input.organizacionId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  revalidatePath("/organizaciones");
+  return { ok: true as const };
+}

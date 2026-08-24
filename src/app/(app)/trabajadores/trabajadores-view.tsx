@@ -579,7 +579,13 @@ function NuevoTrabajadorDialog({
         return;
       }
 
-      toast.success("Trabajador agregado a la matriz.");
+      if (resultado.personaYaExistia) {
+        toast.success(
+          `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) — se usaron sus datos actuales.`,
+        );
+      } else {
+        toast.success("Trabajador agregado a la matriz.");
+      }
       setOpen(false);
       setForm((f) => ({
         ...f,

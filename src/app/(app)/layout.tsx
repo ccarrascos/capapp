@@ -3,12 +3,17 @@ import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Topbar } from "@/components/app-shell/topbar";
+import { CuentaSuspendida } from "@/components/app-shell/cuenta-suspendida";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const sesion = await getSesion();
 
   if (!sesion) {
     redirect("/login");
+  }
+
+  if (!sesion.esSuperAdmin && sesion.roles.length === 0) {
+    return <CuentaSuspendida />;
   }
 
   const rolesUsuario = sesion.roles.map((r) => r.rol);

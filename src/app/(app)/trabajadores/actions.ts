@@ -94,28 +94,40 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
   // La persona (identidad, por RUT) es global al sistema — si ya existe
   // porque trabajó en otra organización, reutilizamos su registro y
   // reconocemos su capacitación previa (portabilidad, DS 44 punto 6.4).
-  // Nota: se hace un select + insert/update explícito en vez de upsert,
-  // porque Postgres exige que un INSERT ... ON CONFLICT DO UPDATE cumpla
-  // simultáneamente las políticas RLS de INSERT y UPDATE incluso cuando
-  // no hay conflicto real, lo que rechazaba altas de personas nuevas.
-  const datosPersona = {
-    run: input.run,
-    dv: input.dv,
-    nombres: input.nombres,
-    apellido_paterno: input.apellidoPaterno,
-    apellido_materno: input.apellidoMaterno,
-    email: input.email ? normalizarEmail(input.email) : null,
-    fecha_nacimiento: input.fechaNacimiento,
-  };
+  //
+  // La comprobación de existencia se hace con el cliente admin (bypassa
+  // RLS) porque sel_personas sólo deja ver a una persona con la que el
+  // actor ya comparte una organización — si esta organización es la
+  // primera con la que se vincula, el cliente normal la vería como
+  // inexistente y el INSERT de abajo chocaría contra la llave primaria
+  // (personas.run), mostrando un "ya existe" que el usuario no podría
+  // resolver. Cuando la persona ya existe se conserva su identidad tal
+  // cual está — no se sobrescribe con lo tipeado en este formulario, que
+  // puede pertenecer a una organización sin ningún vínculo con ella
+  // todavía (evita que cualquiera pise el nombre/fecha de nacimiento de
+  // alguien que no gestiona). Si hace falta corregir un dato suyo, se
+  // edita después desde "Editar trabajador" una vez creado el vínculo.
+  const admin = createAdminClient();
+  const { data: personaExistente } = await admin
+    .from("personas")
+    .select("run, nombres, apellido_paterno, apellido_materno")
+    .eq("run", input.run)
+    .maybeSingle();
 
-  const { data: personaExistente } = await supabase.from("personas").select("run").eq("run", input.run).maybeSingle();
+  if (!personaExistente) {
+    const { error: errorPersona } = await supabase.from("personas").insert({
+      run: input.run,
+      dv: input.dv,
+      nombres: input.nombres,
+      apellido_paterno: input.apellidoPaterno,
+      apellido_materno: input.apellidoMaterno,
+      email: input.email ? normalizarEmail(input.email) : null,
+      fecha_nacimiento: input.fechaNacimiento,
+    });
 
-  const { error: errorPersona } = personaExistente
-    ? await supabase.from("personas").update(datosPersona).eq("run", input.run)
-    : await supabase.from("personas").insert(datosPersona);
-
-  if (errorPersona) {
-    return { ok: false as const, mensaje: errorPersona.message };
+    if (errorPersona) {
+      return { ok: false as const, mensaje: errorPersona.message };
+    }
   }
 
   const { error: errorVinculo } = await supabase.from("vinculos_laborales").insert({
@@ -138,7 +150,13 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
 
   revalidatePath("/trabajadores");
   revalidatePath("/dashboard");
-  return { ok: true as const };
+  return personaExistente
+    ? {
+        ok: true as const,
+        personaYaExistia: true as const,
+        nombreExistente: `${personaExistente.nombres} ${personaExistente.apellido_paterno}${personaExistente.apellido_materno ? ` ${personaExistente.apellido_materno}` : ""}`,
+      }
+    : { ok: true as const, personaYaExistia: false as const };
 }
 
 export async function actualizarTrabajador(input: {

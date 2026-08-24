@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -45,9 +46,31 @@ async function resolverEntidadExterna(
 }
 
 export async function buscarPersonaPorRun(run: string) {
-  const supabase = await createClient();
+  // Se usa el cliente admin (sólo lectura de nombre, nada sensible) porque
+  // esta búsqueda debe encontrar a la persona sin importar en qué
+  // organización quedó registrada primero — igual que un facilitador o un
+  // trabajador puede repetirse en varias organizaciones. Con el cliente
+  // normal, RLS sólo deja ver personas/facilitadores de organizaciones que
+  // el actor ya administra, y el mismo RUT podía terminar registrado con
+  // nombres distintos en cada una sin que la app lo detectara.
+  const admin = createAdminClient();
 
-  const { data: persona } = await supabase
+  const { data: facilitador } = await admin
+    .from("facilitadores")
+    .select("nombres, apellidos, titulo_profesional, es_experto_prevencion")
+    .eq("run", run)
+    .maybeSingle();
+
+  if (facilitador) {
+    return {
+      nombres: facilitador.nombres,
+      apellidos: facilitador.apellidos,
+      tituloProfesional: facilitador.titulo_profesional,
+      esExpertoPrevencion: facilitador.es_experto_prevencion,
+    };
+  }
+
+  const { data: persona } = await admin
     .from("personas")
     .select("nombres, apellido_paterno, apellido_materno")
     .eq("run", run)
@@ -57,17 +80,19 @@ export async function buscarPersonaPorRun(run: string) {
     return {
       nombres: persona.nombres,
       apellidos: `${persona.apellido_paterno}${persona.apellido_materno ? ` ${persona.apellido_materno}` : ""}`,
+      tituloProfesional: null,
+      esExpertoPrevencion: null,
     };
   }
 
-  const { data: usuario } = await supabase
+  const { data: usuario } = await admin
     .from("usuarios")
     .select("nombres, apellidos")
     .eq("run", run)
     .maybeSingle();
 
   if (usuario) {
-    return { nombres: usuario.nombres, apellidos: usuario.apellidos };
+    return { nombres: usuario.nombres, apellidos: usuario.apellidos, tituloProfesional: null, esExpertoPrevencion: null };
   }
 
   return null;

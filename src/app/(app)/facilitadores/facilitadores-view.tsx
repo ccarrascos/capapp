@@ -158,9 +158,15 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
 
     const persona = await buscarPersonaPorRun(run);
     if (persona) {
-      setForm((f) => ({ ...f, nombres: persona.nombres, apellidos: persona.apellidos }));
+      setForm((f) => ({
+        ...f,
+        nombres: persona.nombres,
+        apellidos: persona.apellidos,
+        tituloProfesional: persona.tituloProfesional ?? f.tituloProfesional,
+        esExpertoPrevencion: persona.esExpertoPrevencion ?? f.esExpertoPrevencion,
+      }));
       setDatosBloqueados(true);
-      toast.success("Datos completados desde el registro existente. Ya no se pueden editar, para evitar que un mismo RUT quede con nombres distintos.");
+      toast.success("Datos completados desde el registro existente (puede ser de otra organización). Ya no se pueden editar, para evitar que un mismo RUT quede con nombres distintos.");
     }
   }
 

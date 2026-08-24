@@ -38,15 +38,20 @@ export async function getSesion(): Promise<Sesion | null> {
     supabase
       .from("usuario_roles")
       .select(
-        "organizacion_id, centro_trabajo_id, roles(nombre, nivel_jerarquico), organizaciones(razon_social)",
+        "organizacion_id, centro_trabajo_id, roles(nombre, nivel_jerarquico), organizaciones(razon_social, activo)",
       )
       .eq("usuario_id", user.id),
   ]);
 
   if (!usuario) return null;
 
+  // Una organización desactivada (ej. por falta de pago) le retira el
+  // acceso a todos sus roles — no sólo visualmente, acá mismo, para que
+  // toda verificación de rol/organización en cualquier página deje de
+  // encontrar ese rol automáticamente, sin tener que tocar cada página.
   const roles: AsignacionRol[] = (asignaciones ?? [])
     .filter((a) => a.roles)
+    .filter((a) => a.organizacion_id === null || a.organizaciones?.activo !== false)
     .map((a) => ({
       rol: a.roles!.nombre,
       nivelJerarquico: a.roles!.nivel_jerarquico,

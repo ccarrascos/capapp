@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Plus, Landmark, Camera, Pencil } from "lucide-react";
+import { Plus, Landmark, Camera, Pencil, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { crearOrganizacion, subirLogoOrganizacion } from "./actions";
+import { crearOrganizacion, subirLogoOrganizacion, actualizarActivoOrganizacion } from "./actions";
 import { RegionComunaFields } from "@/components/region-comuna-fields";
 
 type Organizacion = {
@@ -54,8 +54,9 @@ export function OrganizacionesView({ organizaciones }: { organizaciones: Organiz
         )}
         {organizaciones.map((o) => (
           <div key={o.id} className="border border-border bg-card p-5 flex flex-col gap-3 relative">
-            <div className="absolute top-3 right-3">
+            <div className="absolute top-3 right-3 flex items-center gap-0.5">
               <EditarLogoDialog organizacionId={o.id} nombre={o.razon_social} logoUrl={o.logo_url} />
+              <ToggleActivoOrganizacionDialog organizacionId={o.id} nombre={o.razon_social} activo={o.activo} />
             </div>
             <div className="flex items-start justify-between gap-2">
               {o.logo_url ? (
@@ -67,7 +68,7 @@ export function OrganizacionesView({ organizaciones }: { organizaciones: Organiz
                 </span>
               )}
               {!o.activo && (
-                <span className="text-[10px] uppercase tracking-wide text-alert border border-alert/30 px-1.5 py-0.5 mr-8">
+                <span className="text-[10px] uppercase tracking-wide text-alert border border-alert/30 px-1.5 py-0.5 mr-16">
                   Inactiva
                 </span>
               )}
@@ -148,6 +149,65 @@ function EditarLogoDialog({
           </Button>
           <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden" onChange={onFileChange} />
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ToggleActivoOrganizacionDialog({
+  organizacionId,
+  nombre,
+  activo,
+}: {
+  organizacionId: string;
+  nombre: string;
+  activo: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function onConfirmar() {
+    startTransition(async () => {
+      const resultado = await actualizarActivoOrganizacion({ organizacionId, activo: !activo });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success(activo ? "Organización desactivada." : "Organización reactivada.");
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            size="icon"
+            variant="ghost"
+            title={activo ? "Desactivar organización" : "Reactivar organización"}
+          />
+        }
+      >
+        {activo ? <Ban className="size-4" /> : <RotateCcw className="size-4" />}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{activo ? "Desactivar" : "Reactivar"} {nombre}</DialogTitle>
+          <DialogDescription>
+            {activo
+              ? "Todas las cuentas de esta organización (admins, prevencionistas, facilitadores, trabajadores) perderán acceso a la app de inmediato, por ejemplo si no ha efectuado el pago. Los datos no se eliminan y puedes reactivarla cuando quieras."
+              : "Todas las cuentas de esta organización recuperarán su acceso normal a la app."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button variant={activo ? "destructive" : "default"} disabled={pending} onClick={onConfirmar}>
+            {pending ? "Guardando…" : activo ? "Desactivar organización" : "Reactivar organización"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
