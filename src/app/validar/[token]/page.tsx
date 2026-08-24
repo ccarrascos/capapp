@@ -10,9 +10,9 @@ const ENTIDAD_EMISORA_LABEL: Record<string, string> = {
 export default async function ValidarCertificadoPage({
   params,
 }: {
-  params: Promise<{ numeroCertificado: string }>;
+  params: Promise<{ token: string }>;
 }) {
-  const { numeroCertificado } = await params;
+  const { token } = await params;
   const admin = createAdminClient();
 
   const { data: certificado } = await admin
@@ -20,7 +20,7 @@ export default async function ValidarCertificadoPage({
     .select(
       "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv)",
     )
-    .eq("numero_certificado", numeroCertificado)
+    .eq("token", token)
     .maybeSingle();
 
   let nombreEntidadExterna: string | null = null;
@@ -72,8 +72,7 @@ export default async function ValidarCertificadoPage({
               Certificado no encontrado
             </h1>
             <p className="text-sm text-muted-foreground">
-              El número <span className="font-mono">{numeroCertificado}</span> no corresponde a un certificado
-              válido emitido por Capapp.
+              Este código no corresponde a un certificado válido emitido por Capapp.
             </p>
           </div>
         ) : (

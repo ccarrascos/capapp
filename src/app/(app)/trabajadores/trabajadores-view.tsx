@@ -56,6 +56,7 @@ import {
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
+import { coincideBusqueda } from "@/lib/busqueda";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -294,12 +295,10 @@ export function TrabajadoresView({
   }
 
   const filtradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
     const resultado = filas.filter((f) => {
       const coincideEstado = estado === "todos" || f.estado_vigencia === estado;
       if (!coincideEstado) return false;
-      if (!q) return true;
-      return textoBuscable(f).includes(q);
+      return coincideBusqueda(textoBuscable(f), busqueda);
     });
 
     if (!orden) return resultado;

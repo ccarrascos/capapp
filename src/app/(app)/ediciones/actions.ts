@@ -2,11 +2,77 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSesion } from "@/lib/auth";
+
+/**
+ * Gestionar una edición (inscribir, tomar asistencia, evaluar, certificar) requiere
+ * ser admin/prevencionista de la organización dueña de la edición, o el facilitador
+ * a cargo de esa edición puntual. Se verifica en la app además de en RLS porque estas
+ * acciones producen el registro de cumplimiento del DS 44 — no basta con confiar en
+ * la política de base de datos como única barrera.
+ */
+async function autorizadoParaEdicion(
+  sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  edicionId: string,
+) {
+  const { data: edicion } = await supabase
+    .from("ediciones_curso")
+    .select("organizacion_id, facilitador_id")
+    .eq("id", edicionId)
+    .maybeSingle();
+
+  if (!edicion) return false;
+  if (sesion.esSuperAdmin) return true;
+
+  const esAdminOrgOPrevencionista = sesion.roles.some(
+    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
+  );
+  if (esAdminOrgOPrevencionista) return true;
+
+  if (edicion.facilitador_id) {
+    const { data: miFacilitador } = await supabase
+      .from("facilitadores")
+      .select("id")
+      .eq("usuario_id", sesion.usuarioId)
+      .maybeSingle();
+    if (miFacilitador?.id === edicion.facilitador_id) return true;
+  }
+
+  return false;
+}
+
+/** Sólo admin/prevencionista deciden quién toma un curso — no el facilitador que lo dicta. */
+async function autorizadoParaInscribir(
+  sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
+  edicionId: string,
+  organizacionId: string,
+) {
+  if (sesion.esSuperAdmin) return true;
+  return sesion.roles.some(
+    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
+  );
+}
 
 export async function inscribirTrabajadores(edicionId: string, personaRuns: string[]) {
   if (personaRuns.length === 0) return { ok: false as const, mensaje: "Selecciona al menos un trabajador." };
 
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
   const supabase = await createClient();
+
+  const { data: edicion } = await supabase
+    .from("ediciones_curso")
+    .select("organizacion_id")
+    .eq("id", edicionId)
+    .maybeSingle();
+  if (!edicion) return { ok: false as const, mensaje: "No se encontró la edición." };
+
+  if (!(await autorizadoParaInscribir(sesion, edicionId, edicion.organizacion_id))) {
+    return { ok: false as const, mensaje: "No tienes permiso para inscribir trabajadores en esta edición." };
+  }
+
   const { error } = await supabase.from("inscripciones").insert(
     personaRuns.map((run) => ({
       edicion_id: edicionId,
@@ -28,7 +94,14 @@ export async function registrarAsistenciaModulo(input: {
   presente: boolean;
   edicionId: string;
 }) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
   const supabase = await createClient();
+
+  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para registrar asistencia en esta edición." };
+  }
 
   const { error } = await supabase
     .from("asistencias_modulo")
@@ -66,7 +139,14 @@ export async function registrarEvaluacionFinal(input: {
     return { ok: false as const, mensaje: "El puntaje debe ser un número entero entre 0 y 100." };
   }
 
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
   const supabase = await createClient();
+
+  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para evaluar en esta edición." };
+  }
 
   if (input.aprobado) {
     const [{ data: inscripcion }, { data: edicion }] = await Promise.all([
@@ -128,7 +208,14 @@ export async function marcarManualEntregado(input: {
   edicionId: string;
   entregado: boolean;
 }) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
   const supabase = await createClient();
+
+  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para registrar esto en esta edición." };
+  }
 
   const { error } = await supabase
     .from("inscripciones")
@@ -151,17 +238,31 @@ export async function emitirCertificado(input: {
   edicionId: string;
   vigenciaHasta: string;
 }) {
-  const supabase = await createClient();
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const numeroCertificado = `DS44-${input.personaRun}-${Date.now().toString(36).toUpperCase()}`;
+  const supabase = await createClient();
 
   const { data: edicion } = await supabase
     .from("ediciones_curso")
-    .select("facilitadores(tipo_proveedor, oal_id, otec_id)")
+    .select("organizacion_id, facilitadores(tipo_proveedor, oal_id, otec_id)")
     .eq("id", input.edicionId)
     .single();
 
-  const facilitador = edicion?.facilitadores;
+  if (!edicion) return { ok: false as const, mensaje: "No se encontró la edición." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
+    );
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para emitir certificados en esta edición." };
+  }
+
+  const numeroCertificado = `DS44-${input.personaRun}-${Date.now().toString(36).toUpperCase()}`;
+
+  const facilitador = edicion.facilitadores;
   const entidadEmisoraTipo = facilitador?.tipo_proveedor === "oal" || facilitador?.tipo_proveedor === "otec"
     ? facilitador.tipo_proveedor
     : "empleador";

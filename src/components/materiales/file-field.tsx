@@ -12,6 +12,15 @@ import { obtenerUrlFirmada } from "@/app/(app)/cursos/[cursoId]/materiales-actio
  * la ruta mediante un Server Action. La subida ocurre directo desde el
  * navegador con la sesión del usuario, respetando el RLS de storage.objects.
  */
+const TIPOS_PERMITIDOS = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+];
+const TAMANO_MAXIMO = 20 * 1024 * 1024;
+
 export function FileField({
   label,
   path,
@@ -37,6 +46,16 @@ export function FileField({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+
+    if (!TIPOS_PERMITIDOS.includes(file.type)) {
+      toast.error("Formato no permitido. Usa PDF, Word o PowerPoint.");
+      return;
+    }
+
+    if (file.size > TAMANO_MAXIMO) {
+      toast.error("El archivo no puede superar los 20 MB.");
+      return;
+    }
 
     startTransition(async () => {
       const ext = file.name.split(".").pop() ?? "bin";

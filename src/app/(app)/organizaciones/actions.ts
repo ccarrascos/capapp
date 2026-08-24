@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSesion } from "@/lib/auth";
 
 export type CrearOrganizacionInput = {
   rut: string;
@@ -15,6 +16,11 @@ export type CrearOrganizacionInput = {
 };
 
 export async function crearOrganizacion(input: CrearOrganizacionInput) {
+  const sesion = await getSesion();
+  if (!sesion?.esSuperAdmin) {
+    return { ok: false as const, mensaje: "Sólo un super administrador puede crear organizaciones." };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -42,6 +48,15 @@ const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/svg+xm
 const TAMANO_MAXIMO = 2 * 1024 * 1024;
 
 export async function subirLogoOrganizacion(organizacionId: string, formData: FormData) {
+  const sesion = await getSesion();
+  const autorizado =
+    !!sesion &&
+    (sesion.esSuperAdmin ||
+      sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === organizacionId));
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para editar el logo de esta organización." };
+  }
+
   const supabase = await createClient();
 
   const archivo = formData.get("archivo");

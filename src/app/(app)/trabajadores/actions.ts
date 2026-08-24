@@ -56,6 +56,20 @@ export type CrearTrabajadorInput = {
 };
 
 export async function crearTrabajador(input: CrearTrabajadorInput) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) =>
+        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
+    );
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para registrar trabajadores en esta organización." };
+  }
+
   if (!esRutValido(input.run, input.dv)) {
     return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
   }
@@ -309,6 +323,18 @@ export async function crearAccesoTrabajador(input: {
   if (!email) return { ok: false as const, mensaje: "Ingresa un correo para enviar las credenciales." };
 
   const admin = createAdminClient();
+
+  const { data: vinculo } = await admin
+    .from("vinculos_laborales")
+    .select("persona_run")
+    .eq("persona_run", input.personaRun)
+    .eq("organizacion_id", input.organizacionId)
+    .eq("activo", true)
+    .maybeSingle();
+
+  if (!vinculo) {
+    return { ok: false as const, mensaje: "Esta persona no tiene un vínculo laboral activo en esta organización." };
+  }
 
   const { data: persona } = await admin
     .from("personas")

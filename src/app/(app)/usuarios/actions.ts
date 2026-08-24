@@ -137,6 +137,55 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   return { ok: true as const, emailEnviado: true as const };
 }
 
+export async function actualizarRolUsuario(input: {
+  usuarioRolId: string;
+  usuarioId: string;
+  organizacionId: string;
+  nuevoRol: RolNombre;
+}) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  if (input.usuarioId === sesion.usuarioId) {
+    return { ok: false as const, mensaje: "No puedes cambiar tu propio rol desde aquí." };
+  }
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para cambiar el rol de esta cuenta." };
+  }
+
+  if (input.nuevoRol === "trabajador") {
+    return {
+      ok: false as const,
+      mensaje: "El rol de trabajador se otorga desde el módulo Trabajadores (botón «Dar acceso»), no desde aquí.",
+    };
+  }
+
+  if (input.nuevoRol === "super_admin" && !sesion.esSuperAdmin) {
+    return { ok: false as const, mensaje: "Sólo un super administrador puede asignar ese rol." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: rolRow } = await supabase.from("roles").select("id").eq("nombre", input.nuevoRol).single();
+  if (!rolRow) return { ok: false as const, mensaje: "Rol inválido." };
+
+  const { error } = await supabase
+    .from("usuario_roles")
+    .update({ rol_id: rolRow.id })
+    .eq("id", input.usuarioRolId)
+    .eq("organizacion_id", input.organizacionId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  revalidatePath("/usuarios");
+  return { ok: true as const };
+}
+
 export async function actualizarEstadoUsuario(input: {
   usuarioId: string;
   organizacionId: string | null;
@@ -161,8 +210,25 @@ export async function actualizarEstadoUsuario(input: {
   // upd_usuarios_propio (RLS) sólo permite que cada quien edite su propio
   // perfil o que un super_admin edite cualquiera — un admin_organizacion no
   // puede tocar usuarios.activo de terceros con el cliente normal, así que
-  // se usa el cliente admin, con la autorización ya validada arriba.
+  // se usa el cliente admin. Como el cliente admin bypassa RLS, hay que
+  // verificar aquí mismo que el usuario objetivo realmente pertenece a la
+  // organización que el llamante administra (si no, cualquier admin_organizacion
+  // podría desactivar la cuenta de cualquier persona con sólo conocer su UUID).
   const admin = createAdminClient();
+
+  if (!sesion.esSuperAdmin && input.organizacionId) {
+    const { data: rolEnOrg } = await admin
+      .from("usuario_roles")
+      .select("usuario_id")
+      .eq("usuario_id", input.usuarioId)
+      .eq("organizacion_id", input.organizacionId)
+      .maybeSingle();
+
+    if (!rolEnOrg) {
+      return { ok: false as const, mensaje: "Esa cuenta no pertenece a tu organización." };
+    }
+  }
+
   const { error } = await admin.from("usuarios").update({ activo: input.activo }).eq("id", input.usuarioId);
 
   if (error) return { ok: false as const, mensaje: error.message };

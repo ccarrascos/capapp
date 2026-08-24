@@ -22,7 +22,7 @@ export async function obtenerCertificado(certificadoId: string) {
   const { data: certificado } = await supabase
     .from("certificados")
     .select(
-      "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizacion_id, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
+      "numero_certificado, token, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizacion_id, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv, usuario_id)",
     )
     .eq("id", certificadoId)
     .maybeSingle();
@@ -62,7 +62,7 @@ export async function obtenerCertificado(certificadoId: string) {
     }
   }
 
-  const qrDataUrl = await generarQrDataUrl(`${APP_URL}/validar/${certificado.numero_certificado}`);
+  const qrDataUrl = await generarQrDataUrl(`${APP_URL}/validar/${certificado.token}`);
 
   const datos: CertificadoDatos = {
     qrDataUrl,

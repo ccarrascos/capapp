@@ -31,6 +31,7 @@ import {
   marcarManualEntregado,
 } from "../actions";
 import { CertificadoDialog } from "../../certificados/certificado-dialog";
+import { coincideBusqueda } from "@/lib/busqueda";
 
 type Persona = { run: string; dv: string; nombres: string; apellido_paterno: string };
 
@@ -167,10 +168,9 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
   }
 
   const disponiblesFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return disponibles;
+    if (!busqueda.trim()) return disponibles;
     return disponibles.filter((t) =>
-      `${t.nombres} ${t.apellido_paterno} ${t.run}-${t.dv}`.toLowerCase().includes(q),
+      coincideBusqueda(`${t.nombres} ${t.apellido_paterno} ${t.run} ${t.dv}`, busqueda),
     );
   }, [disponibles, busqueda]);
 

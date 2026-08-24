@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Copy, Check, Ban, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Copy, Check, Ban, RotateCcw, Search, ArrowUp, ArrowDown, ArrowUpDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearUsuario, actualizarEstadoUsuario } from "./actions";
+import { crearUsuario, actualizarEstadoUsuario, actualizarRolUsuario } from "./actions";
+import { coincideBusqueda } from "@/lib/busqueda";
 import type { RolNombre } from "@/lib/auth";
 import { parsearRut, esRutValido, formatearRut, formatearRutInput } from "@/lib/rut";
 import { cn } from "@/lib/utils";
@@ -153,8 +154,9 @@ export function UsuariosView({
   }
 
   const filtradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    const resultado = q ? asignaciones.filter((a) => textoBuscable(a).includes(q)) : asignaciones;
+    const resultado = busqueda.trim()
+      ? asignaciones.filter((a) => coincideBusqueda(textoBuscable(a), busqueda))
+      : asignaciones;
 
     if (!orden) return resultado;
 
@@ -240,9 +242,21 @@ export function UsuariosView({
                 </TableCell>
                 <TableCell className="text-muted-foreground">{a.usuarios?.email ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className="rounded-sm">
-                    {a.roles ? ROL_LABEL[a.roles.nombre] : "—"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="secondary" className="rounded-sm">
+                      {a.roles ? ROL_LABEL[a.roles.nombre] : "—"}
+                    </Badge>
+                    {a.usuarios && a.organizacion_id && a.usuarios.id !== usuarioActualId && (
+                      <EditarRolDialog
+                        usuarioRolId={a.id}
+                        usuarioId={a.usuarios.id}
+                        organizacionId={a.organizacion_id}
+                        rolActual={a.roles?.nombre ?? null}
+                        nombreCompleto={`${a.usuarios.nombres} ${a.usuarios.apellidos}`}
+                        esSuperAdmin={esSuperAdmin}
+                      />
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
@@ -461,6 +475,88 @@ function NuevaCuentaDialog({
             </form>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditarRolDialog({
+  usuarioRolId,
+  usuarioId,
+  organizacionId,
+  rolActual,
+  nombreCompleto,
+  esSuperAdmin,
+}: {
+  usuarioRolId: string;
+  usuarioId: string;
+  organizacionId: string;
+  rolActual: RolNombre | null;
+  nombreCompleto: string;
+  esSuperAdmin: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const rolesDisponibles = esSuperAdmin ? (["super_admin", ...ROLES_ASIGNABLES] as RolNombre[]) : ROLES_ASIGNABLES;
+  const [nuevoRol, setNuevoRol] = useState<RolNombre>(
+    rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0],
+  );
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const resultado = await actualizarRolUsuario({ usuarioRolId, usuarioId, organizacionId, nuevoRol });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Rol actualizado.");
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setNuevoRol(rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0]);
+      }}
+    >
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6" title="Cambiar rol" />}>
+        <Pencil className="size-3.5" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Cambiar rol</DialogTitle>
+          <DialogDescription>{nombreCompleto}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label>Nuevo rol</Label>
+            <Select
+              items={Object.fromEntries(rolesDisponibles.map((r) => [r, ROL_LABEL[r]]))}
+              value={nuevoRol}
+              onValueChange={(v) => setNuevoRol((v ?? rolesDisponibles[0]) as RolNombre)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rolesDisponibles.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {ROL_LABEL[r]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending || nuevoRol === rolActual}>
+              {pending ? "Guardando…" : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

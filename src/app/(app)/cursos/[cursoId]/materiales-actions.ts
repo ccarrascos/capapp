@@ -2,6 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSesion } from "@/lib/auth";
+
+async function autorizadoParaCurso(supabase: Awaited<ReturnType<typeof createClient>>, cursoId: string) {
+  const sesion = await getSesion();
+  if (!sesion) return false;
+  if (sesion.esSuperAdmin) return true;
+
+  const { data: curso } = await supabase.from("cursos").select("organizacion_id").eq("id", cursoId).maybeSingle();
+  if (!curso) return false;
+
+  return sesion.roles.some(
+    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === curso.organizacion_id,
+  );
+}
 
 export async function guardarManualCurso(input: {
   cursoId: string;
@@ -9,6 +23,11 @@ export async function guardarManualCurso(input: {
   path: string;
 }) {
   const supabase = await createClient();
+
+  if (!(await autorizadoParaCurso(supabase, input.cursoId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para editar este curso." };
+  }
+
   const update =
     input.campo === "manual_participante_path"
       ? { manual_participante_path: input.path }
@@ -23,6 +42,11 @@ export async function guardarManualCurso(input: {
 
 export async function guardarMaterialModulo(input: { moduloId: string; cursoId: string; path: string }) {
   const supabase = await createClient();
+
+  if (!(await autorizadoParaCurso(supabase, input.cursoId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para editar este curso." };
+  }
+
   const { error } = await supabase
     .from("modulos")
     .update({ material_path: input.path })

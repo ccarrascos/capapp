@@ -1,0 +1,529 @@
+// =====================================================================
+// CAPAPP — Modelo de base de datos
+// Sistema de gestión de capacitación en prevención de riesgos laborales
+// (art. 16, DS N.º 44/2023) — TecnoFast
+//
+// Generado a partir del esquema real en producción (Supabase / Postgres),
+// introspectado vía PostgREST, contrastado con las migraciones en
+// supabase/migrations/0001..0018. Publicar en dbdocs con:
+//   npx dbdocs login
+//   npx dbdocs build docs/capapp.dbml --project capapp
+// =====================================================================
+
+Project capapp {
+  database_type: 'PostgreSQL'
+  Note: '''
+    # Capapp
+    Gestión de cumplimiento del art. 16, DS N.º 44/2023 (Chile): capacitación
+    en prevención de riesgos laborales, con matriz de vigencia por trabajador,
+    control multi-organización y portabilidad de la capacitación entre
+    empleadores.
+
+    **Identidad vs. relación laboral**: `personas` es la identidad global de
+    una persona (PK = RUN), independiente de para quién trabaja. `vinculos_laborales`
+    es la relación puntual persona↔organización — así una persona conserva su
+    historial de capacitación al cambiar de empleador (punto 6.4 del DS 44).
+
+    Seguridad: todas las tablas tienen Row Level Security habilitado, acotado
+    por organización mediante las funciones `app_es_super_admin()`,
+    `app_organizaciones_usuario()` y `app_tiene_rol_en_org(rol, org)`.
+  '''
+}
+
+// =====================================================================
+// ENUMS
+// =====================================================================
+
+Enum rol_nombre {
+  super_admin [note: 'Administra toda la plataforma, multi-organización']
+  admin_organizacion [note: 'Administra una entidad empleadora completa']
+  prevencionista [note: 'Gestiona capacitación, matriz de vigencia, PTP']
+  facilitador [note: 'Dicta cursos, registra asistencia/evaluaciones']
+  supervisor_centro [note: 'Solo lectura de un centro de trabajo']
+  auditor [note: 'Solo lectura, fiscalización']
+  trabajador [note: 'Portal propio del trabajador']
+}
+
+Enum modalidad_contractual {
+  indefinido
+  plazo_fijo
+  obra_o_faena
+  aprendiz
+  honorarios
+  otro
+}
+
+Enum tipo_vinculo_laboral {
+  directo
+  subcontrato
+}
+
+Enum tipo_proveedor {
+  interno
+  oal
+  otec
+}
+
+Enum modalidad_ejecucion {
+  telematica_asincronica
+  telematica_sincronica
+  presencial
+  mixta
+}
+
+Enum tema_modulo {
+  introduccion
+  marco_general_sst
+  identificacion_peligros_evaluacion_riesgos
+  riesgos_laborales_efectos_salud
+  medidas_preventivas_proteccion
+  gestion_emergencias_desastres
+  senalizacion_prevencion_incendios
+}
+
+Enum estado_edicion {
+  planificada
+  en_curso
+  finalizada
+  cancelada
+}
+
+Enum estado_inscripcion {
+  inscrito
+  en_progreso
+  aprobado
+  reprobado
+  desertor
+}
+
+Enum entidad_emisora_tipo {
+  empleador
+  oal
+  otec
+}
+
+Enum tipo_notificacion {
+  vencimiento_proximo
+  vencido
+  nueva_inscripcion
+  curso_finalizado
+}
+
+// =====================================================================
+// ENTIDADES EXTERNAS (OAL / OTEC)
+// =====================================================================
+
+Table organismos_administradores {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre text [not null]
+  rut text [unique]
+  tipo text [note: "'mutual' | 'isl'"]
+  contacto_nombre text
+  contacto_email text
+  contacto_telefono text
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'OAL: mutuales de seguridad / ISL, ley 16.744.'
+}
+
+Table entidades_acreditadas {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre text [not null]
+  rut text [unique]
+  codigo_sence text
+  contacto_nombre text
+  contacto_email text
+  contacto_telefono text
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'OTEC acreditadas SENCE.'
+}
+
+// =====================================================================
+// ORGANIZACIÓN
+// =====================================================================
+
+Table organizaciones {
+  id uuid [pk, default: `gen_random_uuid()`]
+  rut text [not null, unique]
+  razon_social text [not null]
+  nombre_fantasia text
+  sector_economico text
+  tamano_empresa text
+  oal_id uuid [ref: > organismos_administradores.id]
+  direccion text
+  comuna text
+  region text
+  telefono text
+  email_contacto text
+  logo_url text
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Entidad empleadora. Unidad principal de tenencia (tenant) de la app.'
+}
+
+Table centros_trabajo {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  nombre text [not null]
+  direccion text
+  comuna text
+  region text
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table cargos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  nombre text [not null]
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Catálogo de cargos propio de cada organización.'
+}
+
+Table subcontratos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  nombre text [not null]
+  rut text
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Empresa contratista que aporta trabajadores a la organización.'
+}
+
+Table subcontratos_centros {
+  id uuid [pk, default: `gen_random_uuid()`]
+  subcontrato_id uuid [not null, ref: > subcontratos.id]
+  centro_trabajo_id uuid [not null, ref: > centros_trabajo.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Centros de trabajo donde un subcontrato está autorizado a operar.'
+}
+
+// =====================================================================
+// USUARIOS Y ROLES
+// =====================================================================
+
+Table usuarios {
+  id uuid [pk, note: '1:1 con auth.users(id) de Supabase Auth']
+  nombres text [not null]
+  apellidos text [not null]
+  email text [not null]
+  telefono text
+  avatar_url text
+  run text [note: 'RUN sin puntos ni DV. Identificador de acceso (login).']
+  dv text [note: 'Dígito verificador del RUN de acceso.']
+  activo boolean [not null, default: true]
+  ultimo_acceso timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Perfil de cuenta de acceso a la app (staff y trabajadores con portal).'
+}
+
+Table roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre rol_nombre [not null, unique]
+  descripcion text
+  nivel_jerarquico int [not null]
+}
+
+Table usuario_roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, ref: > usuarios.id]
+  rol_id uuid [not null, ref: > roles.id]
+  organizacion_id uuid [ref: > organizaciones.id, note: 'null sólo para super_admin']
+  centro_trabajo_id uuid [ref: > centros_trabajo.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (usuario_id, rol_id, organizacion_id, centro_trabajo_id) [unique]
+  }
+
+  Note: 'Asignación de rol a un usuario, acotada opcionalmente por organización/centro.'
+}
+
+// =====================================================================
+// IDENTIDAD GLOBAL DE PERSONAS Y VÍNCULO LABORAL
+// (portabilidad de la capacitación entre organizaciones — DS 44 punto 6.4)
+// =====================================================================
+
+Table personas {
+  run text [pk, note: 'Identidad global, independiente de la organización.']
+  dv text [not null]
+  nombres text [not null]
+  apellido_paterno text [not null]
+  apellido_materno text
+  email text
+  telefono text
+  fecha_nacimiento date [note: 'Para reportes de cumplimiento por rango etario.']
+  usuario_id uuid [ref: > usuarios.id, note: 'Cuenta de portal propio, si se le otorgó acceso.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Identidad de una persona natural, global al sistema (no por organización).'
+}
+
+Table vinculos_laborales {
+  id uuid [pk, default: `gen_random_uuid()`]
+  persona_run text [not null, ref: > personas.run]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  centro_trabajo_id uuid [ref: > centros_trabajo.id]
+  cargo_id uuid [ref: > cargos.id]
+  unidad text
+  modalidad_contractual modalidad_contractual [not null, default: 'indefinido']
+  tipo_vinculo tipo_vinculo_laboral [not null, default: 'directo']
+  subcontrato_id uuid [ref: > subcontratos.id, note: 'Requerido cuando tipo_vinculo = subcontrato.']
+  fecha_ingreso date
+  fecha_termino date
+  activo boolean [not null, default: true]
+  qr_token uuid [not null, unique, default: `gen_random_uuid()`, note: 'Token de la credencial QR pública (/credencial/[qr_token]).']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'La relación laboral puntual persona↔organización. Reemplaza a la antigua tabla "trabajadores".'
+}
+
+Table historial_centro_trabajo {
+  id uuid [pk, default: `gen_random_uuid()`]
+  persona_run text [not null, ref: > personas.run]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  centro_anterior_id uuid [ref: > centros_trabajo.id]
+  centro_nuevo_id uuid [ref: > centros_trabajo.id]
+  cambiado_por uuid [ref: > usuarios.id]
+  cambiado_en timestamptz [not null, default: `now()`]
+
+  Note: 'Bitácora de traslados entre centros de trabajo de un vínculo laboral.'
+}
+
+Table facilitadores {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [ref: > usuarios.id]
+  run text [not null]
+  dv text [not null]
+  nombres text [not null]
+  apellidos text [not null]
+  titulo_profesional text
+  es_experto_prevencion boolean [not null, default: false]
+  tipo_proveedor tipo_proveedor [not null]
+  organizacion_id uuid [ref: > organizaciones.id, note: 'Requerido si tipo_proveedor = interno']
+  oal_id uuid [ref: > organismos_administradores.id, note: 'Requerido si tipo_proveedor = oal']
+  otec_id uuid [ref: > entidades_acreditadas.id, note: 'Requerido si tipo_proveedor = otec']
+  activo boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Quien dicta cursos: interno a la organización, o externo (OAL/OTEC). Exactamente uno de organizacion_id/oal_id/otec_id está poblado.'
+}
+
+// =====================================================================
+// PROGRAMA DE TRABAJO PREVENTIVO
+// =====================================================================
+
+Table programas_trabajo_preventivo {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  anio int [not null]
+  periodicidad_capacitacion_meses int [not null, default: 24, note: '1–24 meses']
+  fecha_aprobacion date
+  documento_url text
+  responsable_usuario_id uuid [ref: > usuarios.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (organizacion_id, anio) [unique]
+  }
+}
+
+// =====================================================================
+// CURSOS Y MÓDULOS (contenido mínimo art. 16, Anexo Metodológico)
+// =====================================================================
+
+Table cursos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nombre text [not null]
+  version text
+  tipo_proveedor tipo_proveedor [not null]
+  organizacion_id uuid [ref: > organizaciones.id]
+  oal_id uuid [ref: > organismos_administradores.id]
+  otec_id uuid [ref: > entidades_acreditadas.id]
+  horas_totales numeric(4,1) [not null, default: 8.0, note: 'Mínimo 8 horas.']
+  incorpora_enfoque_genero boolean [not null, default: true]
+  vigente boolean [not null, default: true]
+  descripcion text
+  manual_participante_path text [note: 'Ruta en Storage (bucket materiales).']
+  manual_facilitador_path text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table modulos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  curso_id uuid [not null, ref: > cursos.id]
+  orden int [not null]
+  tema tema_modulo [not null]
+  nombre text [not null]
+  objetivos_aprendizaje text
+  duracion_horas numeric(4,1) [not null]
+  modalidad modalidad_ejecucion [not null]
+  recursos_didacticos text
+  material_path text [note: 'Ruta en Storage (bucket materiales).']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (curso_id, orden) [unique]
+  }
+
+  Note: 'Los 7 bloques de contenido mínimo exigidos por el Anexo Metodológico.'
+}
+
+// =====================================================================
+// EJECUCIÓN: EDICIONES (COHORTES), INSCRIPCIONES, EVALUACIÓN
+// =====================================================================
+
+Table ediciones_curso {
+  id uuid [pk, default: `gen_random_uuid()`]
+  curso_id uuid [not null, ref: > cursos.id]
+  organizacion_id uuid [not null, ref: > organizaciones.id]
+  centro_trabajo_id uuid [ref: > centros_trabajo.id]
+  programa_trabajo_preventivo_id uuid [ref: > programas_trabajo_preventivo.id]
+  tipo_proveedor tipo_proveedor [not null]
+  oal_id uuid [ref: > organismos_administradores.id]
+  otec_id uuid [ref: > entidades_acreditadas.id]
+  facilitador_id uuid [ref: > facilitadores.id]
+  fecha_inicio date [not null]
+  fecha_limite date [not null, note: 'Máx. 3 meses desde fecha_inicio.']
+  fecha_termino date
+  estado estado_edicion [not null, default: 'planificada']
+  created_by uuid [ref: > usuarios.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Una cohorte concreta de dictado de un curso ("Ediciones" en la UI).'
+}
+
+Table inscripciones {
+  id uuid [pk, default: `gen_random_uuid()`]
+  edicion_id uuid [not null, ref: > ediciones_curso.id]
+  persona_run text [not null, ref: > personas.run]
+  estado estado_inscripcion [not null, default: 'inscrito']
+  fecha_inscripcion date [not null, default: `CURRENT_DATE`]
+  fecha_aprobacion date
+  vigencia_hasta date [note: 'fecha_aprobacion + 2 años. Calculado por trigger.']
+  manual_entregado boolean [not null, default: false]
+  manual_entregado_fecha date
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (edicion_id, persona_run) [unique]
+  }
+}
+
+Table asistencias_modulo {
+  id uuid [pk, default: `gen_random_uuid()`]
+  inscripcion_id uuid [not null, ref: > inscripciones.id]
+  modulo_id uuid [not null, ref: > modulos.id]
+  fecha date [not null]
+  hora_inicio time
+  hora_termino time
+  presente boolean [not null, default: false]
+  tiempo_permanencia_min int
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (inscripcion_id, modulo_id) [unique]
+  }
+}
+
+Table evaluaciones_resultado {
+  id uuid [pk, default: `gen_random_uuid()`]
+  inscripcion_id uuid [not null, ref: > inscripciones.id]
+  modulo_id uuid [ref: > modulos.id, note: 'null = evaluación final del curso completo.']
+  intento_numero int [not null, default: 1]
+  fecha timestamptz [not null, default: `now()`]
+  puntaje numeric(5,2)
+  aprobado boolean [not null, default: false]
+  respuestas jsonb
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table certificados {
+  id uuid [pk, default: `gen_random_uuid()`]
+  inscripcion_id uuid [not null, unique, ref: > inscripciones.id]
+  persona_run text [not null, ref: > personas.run]
+  curso_id uuid [not null, ref: > cursos.id]
+  numero_certificado text [not null, unique, note: 'Número oficial impreso, formato DS44-{RUN}-{timestamp}.']
+  token uuid [not null, unique, default: `gen_random_uuid()`, note: 'Clave aleatoria de la verificación pública (/validar/[token]) — no numero_certificado, para evitar enumeración por RUN.']
+  fecha_emision date [not null, default: `CURRENT_DATE`]
+  fecha_vigencia_hasta date [not null]
+  entidad_emisora_tipo entidad_emisora_tipo [not null]
+  entidad_emisora_id uuid [note: 'Apunta a organismos_administradores.id u entidades_acreditadas.id según entidad_emisora_tipo (FK polimórfica, no declarada en el esquema).']
+  archivo_url text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// =====================================================================
+// NOTIFICACIONES Y AUDITORÍA
+// =====================================================================
+
+Table notificaciones {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, ref: > usuarios.id]
+  persona_run text [ref: > personas.run]
+  tipo tipo_notificacion [not null]
+  mensaje text [not null]
+  leido boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table auditoria_log {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [ref: > usuarios.id]
+  accion text [not null]
+  tabla text [not null]
+  registro_id uuid
+  datos_anteriores jsonb
+  datos_nuevos jsonb
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// =====================================================================
+// VISTA DERIVADA (no es tabla base — sin RLS propio, hereda de sus fuentes)
+// =====================================================================
+
+Table matriz_vigencia_capacitacion {
+  vinculo_id uuid [pk]
+  persona_run text [pk]
+  inscripcion_id uuid [pk, note: 'Puede ser null si la persona nunca se ha inscrito a un curso.']
+  organizacion_id uuid
+  centro_trabajo_id uuid
+  run text
+  dv text
+  nombres text
+  apellido_paterno text
+  apellido_materno text
+  cargo text
+  unidad text
+  modalidad_contractual modalidad_contractual
+  tipo_vinculo tipo_vinculo_laboral
+  subcontrato_id uuid
+  subcontrato_nombre text
+  trabajador_activo boolean
+  curso_id uuid
+  fecha_aprobacion date
+  vigencia_hasta date
+  estado_vigencia text [note: "'vigente' | 'por_vencer' (≤60 días) | 'vencido' | 'sin_capacitacion'"]
+
+  Note: '''
+    Vista central de cumplimiento. Por cada vínculo laboral activo, toma —
+    entre todos sus cursos aprobados — el peor estado de vigencia (peor
+    estado gana), y dentro de un mismo curso, sólo la aprobación más
+    reciente. Excluye personas con cuenta de acceso desactivada.
+  '''
+}

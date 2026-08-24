@@ -5,6 +5,15 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM_EMAIL ?? "Capapp <onboarding@resend.dev>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+function escaparHtml(valor: string) {
+  return valor
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function plantillaBienvenida(params: {
   nombres: string;
   email: string;
@@ -19,17 +28,17 @@ function plantillaBienvenida(params: {
     <span style="color: #fff; font-weight: 700; font-size: 18px; letter-spacing: 0.02em; text-transform: uppercase;">Capapp</span>
   </div>
   <div style="padding: 28px 24px; border: 1px solid #E2E4E1; border-top: none;">
-    <p style="font-size: 15px; margin: 0 0 16px;">Hola ${params.nombres},</p>
+    <p style="font-size: 15px; margin: 0 0 16px;">Hola ${escaparHtml(params.nombres)},</p>
     <p style="font-size: 14px; line-height: 1.6; color: #44494E; margin: 0 0 20px;">
       Se creo tu cuenta en <strong>Capapp</strong>, el sistema de gestion de capacitacion en
       prevencion de riesgos laborales (art. 16, DS N.º 44/2023), con el rol de
-      <strong>${params.rolLabel}</strong>.
+      <strong>${escaparHtml(params.rolLabel)}</strong>.
     </p>
     <div style="border: 1px solid #E2E4E1; padding: 16px; margin-bottom: 20px;">
       <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; margin: 0 0 4px;">RUT de acceso</p>
-      <p style="font-family: monospace; font-size: 14px; margin: 0 0 14px;">${params.rut}</p>
+      <p style="font-family: monospace; font-size: 14px; margin: 0 0 14px;">${escaparHtml(params.rut)}</p>
       <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; margin: 0 0 4px;">Contrasena temporal</p>
-      <p style="font-family: monospace; font-size: 16px; font-weight: 700; margin: 0;">${params.password}</p>
+      <p style="font-family: monospace; font-size: 16px; font-weight: 700; margin: 0;">${escaparHtml(params.password)}</p>
     </div>
     <a href="${APP_URL}/login" style="display: inline-block; background: #0B4A85; color: #fff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 18px;">
       Iniciar sesion

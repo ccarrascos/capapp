@@ -199,6 +199,7 @@ export type Database = {
           inscripcion_id: string
           numero_certificado: string
           persona_run: string
+          token: string
         }
         Insert: {
           archivo_url?: string | null
@@ -212,6 +213,7 @@ export type Database = {
           inscripcion_id: string
           numero_certificado: string
           persona_run: string
+          token?: string
         }
         Update: {
           archivo_url?: string | null
@@ -225,6 +227,7 @@ export type Database = {
           inscripcion_id?: string
           numero_certificado?: string
           persona_run?: string
+          token?: string
         }
         Relationships: [
           {
