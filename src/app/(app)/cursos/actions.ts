@@ -39,12 +39,29 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
     return { ok: false as const, mensaje: "No tienes permiso para crear cursos en esta organización." };
   }
 
+  const nombre = input.nombre.trim();
+  if (!nombre) return { ok: false as const, mensaje: "Ingresa un nombre para el curso." };
+
   const supabase = await createClient();
+
+  const { data: existente } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("organizacion_id", input.organizacionId)
+    .ilike("nombre", nombre)
+    .maybeSingle();
+
+  if (existente) {
+    return {
+      ok: false as const,
+      mensaje: `Ya existe un curso llamado "${nombre}" en esta organización. Usa esa edición existente o cambia el nombre.`,
+    };
+  }
 
   const { data: curso, error: errorCurso } = await supabase
     .from("cursos")
     .insert({
-      nombre: input.nombre,
+      nombre,
       tipo_proveedor: "interno",
       organizacion_id: input.organizacionId,
       horas_totales: 8,
@@ -56,7 +73,10 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
     .single();
 
   if (errorCurso || !curso) {
-    return { ok: false as const, mensaje: errorCurso?.message ?? "No se pudo crear el curso." };
+    const mensaje = errorCurso?.message.includes("duplicate key")
+      ? `Ya existe un curso llamado "${nombre}" en esta organización.`
+      : (errorCurso?.message ?? "No se pudo crear el curso.");
+    return { ok: false as const, mensaje };
   }
 
   const { error: errorModulos } = await supabase.from("modulos").insert(
