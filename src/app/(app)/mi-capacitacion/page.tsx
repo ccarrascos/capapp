@@ -36,11 +36,13 @@ export default async function MiCapacitacionPage() {
     ? await supabase
         .from("inscripciones")
         .select(
-          "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(cursos(nombre)), certificados(id, numero_certificado)",
+          "id, estado, fecha_inscripcion, fecha_aprobacion, vigencia_hasta, ediciones_curso(cursos(nombre), fecha_limite), certificados(id, numero_certificado)",
         )
         .eq("persona_run", persona.run)
         .order("fecha_inscripcion", { ascending: false })
     : { data: [] };
+
+  const hoy = new Date().toISOString().slice(0, 10);
 
   const estado = (fila?.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia;
 
@@ -79,7 +81,11 @@ export default async function MiCapacitacionPage() {
         ) : (
           <div className="grid sm:grid-cols-2 gap-3">
             {(historial ?? []).map((h) => {
-              const estadoInfo = ESTADO_INSCRIPCION_LABEL[h.estado] ?? { label: h.estado, className: "" };
+              const vencida = h.ediciones_curso?.fecha_limite != null && h.ediciones_curso.fecha_limite < hoy;
+              const estadoInfo =
+                vencida && (h.estado === "inscrito" || h.estado === "en_progreso")
+                  ? { label: "Curso no realizado", className: "text-muted-foreground" }
+                  : (ESTADO_INSCRIPCION_LABEL[h.estado] ?? { label: h.estado, className: "" });
               return (
                 <div key={h.id} className="border border-border bg-card p-4 flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-2">
