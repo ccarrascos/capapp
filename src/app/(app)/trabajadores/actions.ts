@@ -716,6 +716,7 @@ export async function cargarTrabajadoresMasivo(input: {
 export type CursoConEdicionesDisponibles = {
   cursoId: string;
   cursoNombre: string;
+  cursoHoras: number | null;
   ediciones: { id: string; fechaInicio: string; fechaLimite: string; centroNombre: string | null }[];
 };
 
@@ -739,7 +740,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   const [{ data: ediciones }, { data: inscripciones }] = await Promise.all([
     supabase
       .from("ediciones_curso")
-      .select("id, curso_id, fecha_inicio, fecha_limite, cursos(nombre), centros_trabajo(nombre)")
+      .select("id, curso_id, fecha_inicio, fecha_limite, cursos(nombre, horas_totales), centros_trabajo(nombre)")
       .eq("organizacion_id", organizacionId)
       .in("estado", ["planificada", "en_curso"])
       .gte("fecha_limite", hoy)
@@ -783,7 +784,13 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
     };
     const existente = porCurso.get(e.curso_id);
     if (existente) existente.ediciones.push(fila);
-    else porCurso.set(e.curso_id, { cursoId: e.curso_id, cursoNombre: e.cursos?.nombre ?? "Curso", ediciones: [fila] });
+    else
+      porCurso.set(e.curso_id, {
+        cursoId: e.curso_id,
+        cursoNombre: e.cursos?.nombre ?? "Curso",
+        cursoHoras: e.cursos?.horas_totales ?? null,
+        ediciones: [fila],
+      });
   }
 
   return {

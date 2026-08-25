@@ -1590,16 +1590,21 @@ function InscribirCursoDialog({
       <DialogTrigger render={<Button size="icon" variant="ghost" title="Inscribir en un curso" />}>
         <GraduationCap className="size-4" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Inscribir en un curso</DialogTitle>
-          <DialogDescription>{nombreCompleto}</DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <GraduationCap className="size-4 text-muted-foreground" />
+            Inscribir en un curso
+          </DialogTitle>
+          <DialogDescription>
+            Selecciona un curso y una edición abierta para inscribir a <strong className="font-medium text-foreground">{nombreCompleto}</strong>.
+          </DialogDescription>
         </DialogHeader>
         {cursos === null ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">Cargando ediciones disponibles…</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">Buscando ediciones disponibles…</p>
         ) : cursos.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">
-            No hay ediciones abiertas disponibles para inscribirlo — crea una en el módulo Cursos.
+          <p className="text-sm text-muted-foreground py-8 text-center max-w-xs mx-auto">
+            No hay ediciones abiertas para ofrecerle — crea una nueva edición en el módulo Cursos.
           </p>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -1619,7 +1624,12 @@ function InscribirCursoDialog({
                 <SelectContent>
                   {cursos.map((c) => (
                     <SelectItem key={c.cursoId} value={c.cursoId}>
-                      {c.cursoNombre}
+                      <span className="flex flex-1 items-center justify-between gap-3">
+                        <span>{c.cursoNombre}</span>
+                        {c.cursoHoras != null && (
+                          <span className="text-xs text-muted-foreground shrink-0">{c.cursoHoras} h</span>
+                        )}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1631,7 +1641,7 @@ function InscribirCursoDialog({
                 items={Object.fromEntries(
                   (cursoSeleccionado?.ediciones ?? []).map((e) => [
                     e.id,
-                    `${e.fechaInicio} — límite ${e.fechaLimite}${e.centroNombre ? ` · ${e.centroNombre}` : ""}`,
+                    `Inicio ${e.fechaInicio} · Límite ${e.fechaLimite}`,
                   ]),
                 )}
                 value={edicionId}
@@ -1643,14 +1653,21 @@ function InscribirCursoDialog({
                 <SelectContent>
                   {(cursoSeleccionado?.ediciones ?? []).map((e) => (
                     <SelectItem key={e.id} value={e.id}>
-                      {e.fechaInicio} — límite {e.fechaLimite}
-                      {e.centroNombre ? ` · ${e.centroNombre}` : ""}
+                      <span className="flex flex-col gap-0.5 py-0.5">
+                        <span>
+                          Inicio {e.fechaInicio} · Límite {e.fechaLimite}
+                        </span>
+                        {e.centroNombre && <span className="text-xs text-muted-foreground">{e.centroNombre}</span>}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
               <Button type="submit" disabled={pending || !edicionId}>
                 {pending ? "Inscribiendo…" : "Inscribir"}
               </Button>
