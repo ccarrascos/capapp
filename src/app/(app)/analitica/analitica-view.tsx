@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
 import {
@@ -16,13 +16,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { X, ShieldCheck, Clock, ShieldAlert, CircleHelp } from "lucide-react";
+import { X, ShieldCheck, Clock, ShieldAlert, CircleHelp, Download } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { toast } from "sonner";
 
 type EstadoConfig = { estado: string; label: string; color: string };
 type FilaAnalitica = {
@@ -316,6 +317,31 @@ export function AnaliticaView({
   const [filtroTipoVinculo, setFiltroTipoVinculo] = useState<"directo" | "subcontrato" | null>(null);
   const [filtroSubcontrato, setFiltroSubcontrato] = useState<string | null>(null);
 
+  const contenedorRef = useRef<HTMLDivElement>(null);
+  const [exportando, setExportando] = useState(false);
+
+  async function descargarPng() {
+    if (!contenedorRef.current) return;
+    setExportando(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas-pro");
+      const fondo = getComputedStyle(document.body).backgroundColor;
+      const canvas = await html2canvas(contenedorRef.current, {
+        backgroundColor: fondo,
+        scale: 2,
+        ignoreElements: (nodo) => nodo instanceof HTMLElement && nodo.dataset.exportOculto === "true",
+      });
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `analitica-${new Date().toISOString().slice(0, 10)}.png`;
+      a.click();
+    } catch {
+      toast.error("No se pudo generar la imagen — intenta de nuevo.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
   function toggleCentro(c: string) {
     setFiltroCentro((prev) => (prev === c ? null : c));
   }
@@ -461,7 +487,7 @@ export function AnaliticaView({
   const totalActivos = filasFiltradas.length;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" ref={contenedorRef}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -469,7 +495,7 @@ export function AnaliticaView({
           </p>
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Analítica</h1>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1.5 w-full sm:w-48">
             <Label className="text-xs">Centro de trabajo</Label>
             <Select
@@ -510,6 +536,12 @@ export function AnaliticaView({
                 <SelectItem value="subcontrato">Subcontrato</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div data-export-oculto="true">
+            <Button type="button" variant="outline" onClick={descargarPng} disabled={exportando}>
+              <Download className="size-4" />
+              {exportando ? "Generando…" : "Descargar PNG"}
+            </Button>
           </div>
         </div>
       </div>
@@ -599,7 +631,7 @@ export function AnaliticaView({
                 <XAxis dataKey="rango" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
                 <YAxis hide domain={[0, "dataMax + 4"]} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
-                <Bar dataKey="cantidad" name="Trabajadores" radius={[3, 3, 0, 0]} cursor="pointer">
+                <Bar dataKey="cantidad" name="Trabajadores" radius={[3, 3, 0, 0]} cursor="pointer" isAnimationActive={false}>
                   <LabelList dataKey="cantidad" position="top" style={ETIQUETA_STYLE} />
                   {histogramaEdad.map((entry) => (
                     <Cell
@@ -641,7 +673,7 @@ export function AnaliticaView({
                     tickLine={false}
                   />
                   <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
-                  <Bar dataKey="cantidad" name="Trabajadores" radius={[0, 3, 3, 0]} cursor="pointer" barSize={16}>
+                  <Bar dataKey="cantidad" name="Trabajadores" radius={[0, 3, 3, 0]} cursor="pointer" barSize={16} isAnimationActive={false}>
                     <LabelList dataKey="cantidad" position="right" style={ETIQUETA_STYLE} />
                     {trabajadoresPorSubcontrato.map((entry) => (
                       <Cell
@@ -673,7 +705,7 @@ export function AnaliticaView({
                   tickLine={false}
                 />
                 <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
-                <Bar dataKey="cantidad" name="Trabajadores" radius={[0, 3, 3, 0]} cursor="pointer" barSize={14}>
+                <Bar dataKey="cantidad" name="Trabajadores" radius={[0, 3, 3, 0]} cursor="pointer" barSize={14} isAnimationActive={false}>
                   <LabelList dataKey="cantidad" position="right" style={ETIQUETA_STYLE} />
                   {trabajadoresPorCentro.map((entry) => (
                     <Cell
