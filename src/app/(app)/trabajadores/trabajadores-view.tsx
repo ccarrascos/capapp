@@ -124,7 +124,8 @@ type ColumnaOrdenable =
   | "modalidad"
   | "edad"
   | "vence"
-  | "estado";
+  | "estado"
+  | "acceso";
 type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
 
 const RANGO_ESTADO: Record<string, number> = {
@@ -154,6 +155,8 @@ function valorOrdenable(f: FilaMatriz, columna: ColumnaOrdenable): string | numb
       return f.vigencia_hasta ?? "";
     case "estado":
       return RANGO_ESTADO[f.estado_vigencia ?? ""] ?? 99;
+    case "acceso":
+      return f.usuarioId ? 0 : 1;
   }
 }
 
@@ -420,7 +423,7 @@ export function TrabajadoresView({
               <SortableHead label="Vínculo" columna="vinculo" orden={orden} onSort={onSort} />
               <SortableHead label="Modalidad" columna="modalidad" orden={orden} onSort={onSort} />
               <SortableHead label="Edad" columna="edad" orden={orden} onSort={onSort} />
-              <TableHead>Acceso</TableHead>
+              <SortableHead label="Acceso" columna="acceso" orden={orden} onSort={onSort} />
               <TableHead />
             </TableRow>
           </TableHeader>
