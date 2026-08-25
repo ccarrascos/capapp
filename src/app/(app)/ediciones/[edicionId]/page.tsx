@@ -102,6 +102,9 @@ export default async function EdicionDetallePage({
   const puedeInscribir = sesion.esSuperAdmin || esAdminOrgOPrevencionista;
   // Tomar asistencia y calificar es responsabilidad de quien dicta el curso.
   const puedeGestionarAsistencia = puedeInscribir || esFacilitadorDeEstaEdicion;
+  // Pasado el plazo, ya no tiene sentido seguir gestionando a quien nunca
+  // completó el curso — queda como "curso no realizado" en vez de "inscrito".
+  const edicionVencida = edicion.fecha_limite < new Date().toISOString().slice(0, 10);
 
   return (
     <div className="flex flex-col gap-8">
@@ -130,6 +133,7 @@ export default async function EdicionDetallePage({
         disponibles={disponibles}
         puedeInscribir={puedeInscribir}
         puedeGestionarAsistencia={puedeGestionarAsistencia}
+        edicionVencida={edicionVencida}
       />
     </div>
   );

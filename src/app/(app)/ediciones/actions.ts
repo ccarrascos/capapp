@@ -43,6 +43,34 @@ async function autorizadoParaEdicion(
   return false;
 }
 
+/**
+ * Igual que autorizadoParaEdicion, pero además exige que el plazo de la
+ * edición no haya vencido — se verifica en el servidor y no sólo ocultando
+ * el botón en la interfaz, porque de lo contrario cualquiera podría seguir
+ * llamando a la acción directamente después del plazo.
+ */
+async function verificarGestion(
+  sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  edicionId: string,
+): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  if (!(await autorizadoParaEdicion(sesion, supabase, edicionId))) {
+    return { ok: false, mensaje: "No tienes permiso para gestionar esta edición." };
+  }
+
+  const { data: edicion } = await supabase
+    .from("ediciones_curso")
+    .select("fecha_limite")
+    .eq("id", edicionId)
+    .maybeSingle();
+
+  if (edicion && edicion.fecha_limite < new Date().toISOString().slice(0, 10)) {
+    return { ok: false, mensaje: "El plazo de esta edición venció — ya no se puede gestionar." };
+  }
+
+  return { ok: true };
+}
+
 /** Sólo admin/prevencionista deciden quién toma un curso — no el facilitador que lo dicta. */
 async function autorizadoParaInscribir(
   sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
@@ -136,9 +164,8 @@ export async function registrarAsistenciaModulo(input: {
 
   const supabase = await createClient();
 
-  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
-    return { ok: false as const, mensaje: "No tienes permiso para registrar asistencia en esta edición." };
-  }
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
   const { error } = await supabase
     .from("asistencias_modulo")
@@ -181,9 +208,8 @@ export async function registrarEvaluacionFinal(input: {
 
   const supabase = await createClient();
 
-  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
-    return { ok: false as const, mensaje: "No tienes permiso para evaluar en esta edición." };
-  }
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
   if (input.aprobado) {
     const [{ data: inscripcion }, { data: edicion }] = await Promise.all([
@@ -250,9 +276,8 @@ export async function marcarManualEntregado(input: {
 
   const supabase = await createClient();
 
-  if (!(await autorizadoParaEdicion(sesion, supabase, input.edicionId))) {
-    return { ok: false as const, mensaje: "No tienes permiso para registrar esto en esta edición." };
-  }
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
   const { error } = await supabase
     .from("inscripciones")

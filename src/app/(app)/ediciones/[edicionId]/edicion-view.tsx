@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, FileCheck2 } from "lucide-react";
+import { Plus, FileCheck2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +61,74 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
   desertor: { label: "Desertor", className: "text-alert" },
 };
 
+/** Nadie puede seguir gestionando a quien nunca completó el curso una vez pasado el plazo. */
+function estadoEfectivo(i: Inscripcion, edicionVencida: boolean) {
+  if (edicionVencida && (i.estado === "inscrito" || i.estado === "en_progreso")) {
+    return { label: "Curso no realizado", className: "text-muted-foreground" };
+  }
+  return ESTADO_LABEL[i.estado] ?? ESTADO_LABEL.inscrito;
+}
+
+type ColumnaOrdenable = "trabajador" | "run" | "estado" | "vigencia" | "certificado";
+type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
+
+function textoBuscable(i: Inscripcion, edicionVencida: boolean): string {
+  return [
+    i.personas?.nombres,
+    i.personas?.apellido_paterno,
+    i.personas?.run,
+    i.personas?.dv,
+    estadoEfectivo(i, edicionVencida).label,
+    i.vigencia_hasta,
+    i.certificados?.numero_certificado,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function valorOrdenable(i: Inscripcion, edicionVencida: boolean, columna: ColumnaOrdenable): string | number {
+  switch (columna) {
+    case "trabajador":
+      return `${i.personas?.nombres ?? ""} ${i.personas?.apellido_paterno ?? ""}`.trim().toLowerCase();
+    case "run":
+      return Number(i.personas?.run ?? 0);
+    case "estado":
+      return estadoEfectivo(i, edicionVencida).label.toLowerCase();
+    case "vigencia":
+      return i.vigencia_hasta ?? "";
+    case "certificado":
+      return i.certificados?.numero_certificado ?? "";
+  }
+}
+
+function SortableHead({
+  label,
+  columna,
+  orden,
+  onSort,
+}: {
+  label: string;
+  columna: ColumnaOrdenable;
+  orden: Orden | null;
+  onSort: (c: ColumnaOrdenable) => void;
+}) {
+  const activo = orden?.columna === columna;
+  const Icon = activo ? (orden!.direccion === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => onSort(columna)}
+        className={cn("inline-flex items-center gap-1 hover:text-foreground", activo && "text-foreground")}
+      >
+        {label}
+        <Icon className={cn("size-3.5", !activo && "text-muted-foreground/50")} />
+      </button>
+    </TableHead>
+  );
+}
+
 export function EdicionView({
   edicionId,
   cursoId,
@@ -68,6 +137,7 @@ export function EdicionView({
   disponibles,
   puedeInscribir,
   puedeGestionarAsistencia,
+  edicionVencida,
 }: {
   edicionId: string;
   cursoId: string;
@@ -76,28 +146,77 @@ export function EdicionView({
   disponibles: Persona[];
   puedeInscribir: boolean;
   puedeGestionarAsistencia: boolean;
+  edicionVencida: boolean;
 }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState<Orden | null>(null);
+
+  function onSort(columna: ColumnaOrdenable) {
+    setOrden((prev) => {
+      if (prev?.columna === columna) {
+        return prev.direccion === "asc" ? { columna, direccion: "desc" } : null;
+      }
+      return { columna, direccion: "asc" };
+    });
+  }
+
+  const filtradas = useMemo(() => {
+    const resultado = busqueda.trim()
+      ? inscripciones.filter((i) => coincideBusqueda(textoBuscable(i, edicionVencida), busqueda))
+      : inscripciones;
+
+    if (!orden) return resultado;
+
+    const conValor = resultado.map((i) => ({ i, v: valorOrdenable(i, edicionVencida, orden.columna) }));
+    conValor.sort((x, y) => {
+      const xVacio = x.v === "" || x.v === null;
+      const yVacio = y.v === "" || y.v === null;
+      if (xVacio && yVacio) return 0;
+      if (xVacio) return 1;
+      if (yVacio) return -1;
+
+      const cmp =
+        typeof x.v === "string" && typeof y.v === "string"
+          ? x.v.localeCompare(y.v, "es", { sensitivity: "base" })
+          : x.v < y.v
+            ? -1
+            : x.v > y.v
+              ? 1
+              : 0;
+      return orden.direccion === "asc" ? cmp : -cmp;
+    });
+    return conValor.map((x) => x.i);
+  }, [inscripciones, busqueda, orden, edicionVencida]);
+
   const { pagina, setPagina, tamano, setTamano, totalPaginas, paginaItems, totalItems } =
-    usePaginacion(inscripciones);
+    usePaginacion(filtradas);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
           Inscritos ({inscripciones.length})
         </h2>
-        {puedeInscribir && <InscribirDialog edicionId={edicionId} disponibles={disponibles} />}
+        <div className="flex items-center gap-3">
+          <SearchInput
+            className="w-full sm:w-72"
+            placeholder="Buscar por nombre, RUN, estado, vigencia, certificado…"
+            value={busqueda}
+            onChange={setBusqueda}
+          />
+          {puedeInscribir && <InscribirDialog edicionId={edicionId} disponibles={disponibles} />}
+        </div>
       </div>
 
       <div className="border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Trabajador</TableHead>
-              <TableHead>RUN</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Vigente hasta</TableHead>
-              <TableHead>Certificado</TableHead>
+              <SortableHead label="Trabajador" columna="trabajador" orden={orden} onSort={onSort} />
+              <SortableHead label="RUN" columna="run" orden={orden} onSort={onSort} />
+              <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
+              <SortableHead label="Vigente hasta" columna="vigencia" orden={orden} onSort={onSort} />
+              <SortableHead label="Certificado" columna="certificado" orden={orden} onSort={onSort} />
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -105,12 +224,15 @@ export function EdicionView({
             {totalItems === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                  Aún no hay trabajadores inscritos en esta edición.
+                  {inscripciones.length === 0
+                    ? "Aún no hay trabajadores inscritos en esta edición."
+                    : "Ningún inscrito coincide con el filtro."}
                 </TableCell>
               </TableRow>
             )}
             {paginaItems.map((i) => {
-              const estado = ESTADO_LABEL[i.estado] ?? ESTADO_LABEL.inscrito;
+              const estado = estadoEfectivo(i, edicionVencida);
+              const bloqueado = estado.label === "Curso no realizado";
               return (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">
@@ -125,13 +247,23 @@ export function EdicionView({
                     {i.certificados?.numero_certificado ?? "—"}
                   </TableCell>
                   <TableCell>
-                    {puedeGestionarAsistencia && (
+                    {puedeGestionarAsistencia && !bloqueado && (
                       <GestionarSheet
                         edicionId={edicionId}
                         cursoId={cursoId}
                         modulos={modulos}
                         inscripcion={i}
                       />
+                    )}
+                    {puedeGestionarAsistencia && bloqueado && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        title="El plazo de esta edición venció — ya no se puede gestionar."
+                      >
+                        Gestionar
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
