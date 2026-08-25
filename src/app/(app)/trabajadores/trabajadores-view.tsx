@@ -721,6 +721,10 @@ function CargaMasivaDialog({
 
           <div className="border border-border bg-muted/30 p-3 text-xs text-muted-foreground flex flex-col gap-1">
             <p>
+              <span className="font-medium text-foreground">Fecha de nacimiento:</span> AAAA-MM-DD o DD-MM-AAAA
+              (opcional)
+            </p>
+            <p>
               <span className="font-medium text-foreground">Modalidad contractual:</span>{" "}
               {MODALIDADES.map((m) => m.value).join(", ")}
             </p>

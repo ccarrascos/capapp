@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { generarPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
-import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
+import { esFechaNacimientoValida, normalizarFechaNacimiento } from "@/lib/fecha-nacimiento";
 import { normalizarEmail } from "@/lib/normalizar-email";
 import { generarQrDataUrl } from "@/lib/qr";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -567,10 +567,18 @@ export async function cargarTrabajadoresMasivo(input: {
       continue;
     }
 
-    const fechaNacimiento = fila.fechaNacimiento.trim() || null;
-    if (fechaNacimiento && !esFechaNacimientoValida(fechaNacimiento)) {
-      resultados.push({ fila: numeroFila, ok: false, mensaje: "Fecha de nacimiento inválida (usa AAAA-MM-DD)." });
-      continue;
+    let fechaNacimiento: string | null = null;
+    const fechaNacimientoTexto = fila.fechaNacimiento.trim();
+    if (fechaNacimientoTexto) {
+      fechaNacimiento = normalizarFechaNacimiento(fechaNacimientoTexto);
+      if (!fechaNacimiento || !esFechaNacimientoValida(fechaNacimiento)) {
+        resultados.push({
+          fila: numeroFila,
+          ok: false,
+          mensaje: "Fecha de nacimiento inválida (usa AAAA-MM-DD o DD-MM-AAAA).",
+        });
+        continue;
+      }
     }
 
     const modalidad = fila.modalidadContractual.trim().toLowerCase() as ModalidadContractual;
