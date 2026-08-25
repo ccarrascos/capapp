@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Bell, TriangleAlert, CircleX, Check } from "lucide-react";
+import { Bell, TriangleAlert, CircleX, Check, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { obtenerNotificaciones, marcarNotificacionLeida, marcarTodasLeidas } from "@/app/(app)/notificaciones/actions";
@@ -83,6 +83,8 @@ export function NotificacionesBell() {
             >
               {n.tipo === "vencido" ? (
                 <CircleX className="size-4 text-alert mt-0.5 shrink-0" />
+              ) : n.tipo === "nueva_inscripcion" ? (
+                <GraduationCap className="size-4 text-signal mt-0.5 shrink-0" />
               ) : (
                 <TriangleAlert className="size-4 text-hazard-foreground mt-0.5 shrink-0" />
               )}

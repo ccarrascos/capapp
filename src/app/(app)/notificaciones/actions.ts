@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sincronizarNotificacionesVencimiento } from "@/lib/notificaciones";
+import { sincronizarNotificaciones } from "@/lib/notificaciones";
 
 export async function obtenerNotificaciones() {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, notificaciones: [] };
 
   const supabase = await createClient();
-  await sincronizarNotificacionesVencimiento(supabase, sesion);
+  await sincronizarNotificaciones(supabase, sesion);
 
   const { data } = await supabase
     .from("notificaciones")

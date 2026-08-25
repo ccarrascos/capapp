@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getSesion } from "@/lib/auth";
 
 /**
@@ -64,7 +65,7 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
 
   const { data: edicion } = await supabase
     .from("ediciones_curso")
-    .select("organizacion_id")
+    .select("organizacion_id, cursos(nombre)")
     .eq("id", edicionId)
     .maybeSingle();
   if (!edicion) return { ok: false as const, mensaje: "No se encontró la edición." };
@@ -73,15 +74,51 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
     return { ok: false as const, mensaje: "No tienes permiso para inscribir trabajadores en esta edición." };
   }
 
-  const { error } = await supabase.from("inscripciones").insert(
-    personaRuns.map((run) => ({
-      edicion_id: edicionId,
-      persona_run: run,
-      estado: "inscrito" as const,
-    })),
-  );
+  const { data: insertadas, error } = await supabase
+    .from("inscripciones")
+    .insert(
+      personaRuns.map((run) => ({
+        edicion_id: edicionId,
+        persona_run: run,
+        estado: "inscrito" as const,
+      })),
+    )
+    .select("id, persona_run");
 
   if (error) return { ok: false as const, mensaje: error.message };
+
+  // Quien tiene portal propio se entera de que lo inscribieron en un curso.
+  // Se usa el cliente admin porque la notificación queda a nombre del
+  // trabajador, no de quien inscribe — ins_notificaciones sólo permite que
+  // cada quien inserte las suyas.
+  const admin = createAdminClient();
+  const { data: personasConAcceso } = await admin
+    .from("personas")
+    .select("run, usuario_id")
+    .in("run", personaRuns)
+    .not("usuario_id", "is", null);
+
+  const usuarioIdPorRun = new Map(
+    (personasConAcceso ?? [])
+      .filter((p): p is typeof p & { usuario_id: string } => p.usuario_id !== null)
+      .map((p) => [p.run, p.usuario_id]),
+  );
+
+  const notificacionesNuevaInscripcion = (insertadas ?? [])
+    .filter((i) => usuarioIdPorRun.has(i.persona_run))
+    .map((i) => ({
+      usuario_id: usuarioIdPorRun.get(i.persona_run)!,
+      persona_run: i.persona_run,
+      inscripcion_id: i.id,
+      tipo: "nueva_inscripcion" as const,
+      mensaje: `Fuiste inscrito en ${edicion.cursos?.nombre ?? "un curso"}.`,
+    }));
+
+  if (notificacionesNuevaInscripcion.length > 0) {
+    await admin
+      .from("notificaciones")
+      .upsert(notificacionesNuevaInscripcion, { onConflict: "usuario_id,inscripcion_id,tipo", ignoreDuplicates: true });
+  }
 
   revalidatePath(`/ediciones/${edicionId}`);
   return { ok: true as const };
