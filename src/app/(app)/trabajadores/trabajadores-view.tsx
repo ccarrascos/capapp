@@ -16,6 +16,10 @@ import {
   Printer,
   FileSpreadsheet,
   ArrowRight,
+  Upload,
+  Download,
+  CircleCheck,
+  CircleX,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -52,6 +56,9 @@ import {
   actualizarTrabajador,
   obtenerDetalleTrabajador,
   obtenerCredencialQr,
+  cargarTrabajadoresMasivo,
+  type FilaCargaMasiva,
+  type ResultadoFilaCarga,
 } from "./actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
@@ -59,6 +66,7 @@ import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } fro
 import { coincideBusqueda } from "@/lib/busqueda";
 import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
+import { descargarCsv, parsearCsv } from "@/lib/csv";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -360,6 +368,14 @@ export function TrabajadoresView({
             </Button>
           )}
           {puedeGestionar && (
+            <CargaMasivaDialog
+              organizaciones={organizaciones}
+              cargos={cargos}
+              centros={centros}
+              subcontratos={subcontratos}
+            />
+          )}
+          {puedeGestionar && (
             <NuevoTrabajadorDialog
               organizaciones={organizaciones}
               cargos={cargos}
@@ -493,6 +509,295 @@ export function TrabajadoresView({
         />
       </div>
     </div>
+  );
+}
+
+const ENCABEZADOS_CARGA_MASIVA = [
+  "RUN",
+  "DV",
+  "Nombres",
+  "Apellido Paterno",
+  "Apellido Materno",
+  "Fecha Nacimiento",
+  "Email",
+  "Cargo",
+  "Centro de Trabajo",
+  "Unidad",
+  "Modalidad Contractual",
+  "Tipo Vínculo",
+  "Subcontrato",
+] as const;
+
+function normalizarEncabezado(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function descargarPlantillaCargaMasiva() {
+  descargarCsv("plantilla-carga-trabajadores.csv", [
+    [...ENCABEZADOS_CARGA_MASIVA],
+    [
+      "12345678",
+      "9",
+      "Juan",
+      "Pérez",
+      "Soto",
+      "1990-05-20",
+      "juan.perez@ejemplo.cl",
+      "Operario",
+      "Planta Norte",
+      "Producción",
+      "indefinido",
+      "directo",
+      "",
+    ],
+    [
+      "98765432",
+      "1",
+      "María",
+      "González",
+      "",
+      "",
+      "",
+      "Supervisora",
+      "Planta Norte",
+      "",
+      "plazo_fijo",
+      "subcontrato",
+      "Nombre exacto del subcontrato",
+    ],
+  ]);
+}
+
+function CargaMasivaDialog({
+  organizaciones,
+  cargos,
+  centros,
+  subcontratos,
+}: {
+  organizaciones: { id: string; razon_social: string }[];
+  cargos: Cargo[];
+  centros: Centro[];
+  subcontratos: Subcontrato[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [organizacionId, setOrganizacionId] = useState(organizaciones[0]?.id ?? "");
+  const [filas, setFilas] = useState<FilaCargaMasiva[]>([]);
+  const [nombreArchivo, setNombreArchivo] = useState("");
+  const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const [resultados, setResultados] = useState<ResultadoFilaCarga[] | null>(null);
+
+  const cargosDeOrg = cargos.filter((c) => c.organizacion_id === organizacionId).map((c) => c.nombre);
+  const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId).map((c) => c.nombre);
+  const subcontratosDeOrg = subcontratos.filter((s) => s.organizacion_id === organizacionId).map((s) => s.nombre);
+
+  function reiniciar() {
+    setFilas([]);
+    setNombreArchivo("");
+    setErrorArchivo(null);
+    setResultados(null);
+  }
+
+  async function onArchivoSeleccionado(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+
+    setResultados(null);
+    setErrorArchivo(null);
+    setNombreArchivo(archivo.name);
+
+    const texto = await archivo.text();
+    const filasCsv = parsearCsv(texto);
+
+    if (filasCsv.length < 1) {
+      setErrorArchivo("El archivo está vacío.");
+      setFilas([]);
+      return;
+    }
+
+    const [encabezado, ...resto] = filasCsv;
+    const indicePorEncabezado = new Map(encabezado.map((h, i) => [normalizarEncabezado(h), i]));
+    const columnasFaltantes = ENCABEZADOS_CARGA_MASIVA.filter(
+      (h) => !indicePorEncabezado.has(normalizarEncabezado(h)),
+    );
+
+    if (columnasFaltantes.length > 0) {
+      setErrorArchivo(
+        `Faltan columnas en el archivo: ${columnasFaltantes.join(", ")}. Descarga la plantilla y no cambies los nombres de las columnas.`,
+      );
+      setFilas([]);
+      return;
+    }
+
+    const col = (nombre: string, fila: string[]) => fila[indicePorEncabezado.get(normalizarEncabezado(nombre))!] ?? "";
+
+    const filasParseadas: FilaCargaMasiva[] = resto.map((fila) => ({
+      run: col("RUN", fila),
+      dv: col("DV", fila),
+      nombres: col("Nombres", fila),
+      apellidoPaterno: col("Apellido Paterno", fila),
+      apellidoMaterno: col("Apellido Materno", fila),
+      fechaNacimiento: col("Fecha Nacimiento", fila),
+      email: col("Email", fila),
+      cargoNombre: col("Cargo", fila),
+      centroNombre: col("Centro de Trabajo", fila),
+      unidad: col("Unidad", fila),
+      modalidadContractual: col("Modalidad Contractual", fila),
+      tipoVinculo: col("Tipo Vínculo", fila),
+      subcontratoNombre: col("Subcontrato", fila),
+    }));
+
+    setFilas(filasParseadas);
+  }
+
+  function onImportar() {
+    startTransition(async () => {
+      const resultado = await cargarTrabajadoresMasivo({ organizacionId, filas });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setResultados(resultado.resultados);
+      const exitosas = resultado.resultados.filter((r) => r.ok).length;
+      toast.success(`${exitosas} de ${resultado.resultados.length} filas cargadas correctamente.`);
+    });
+  }
+
+  function cerrarYLimpiar() {
+    setOpen(false);
+    reiniciar();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : cerrarYLimpiar())}>
+      <DialogTrigger render={<Button variant="outline" />}>
+        <Upload className="size-4" />
+        Carga masiva
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Carga masiva de trabajadores</DialogTitle>
+          <DialogDescription>
+            Sube un CSV con la nómina completa. Descarga la plantilla, complétala sin cambiar los encabezados y
+            súbela de vuelta — hasta 300 filas por archivo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4">
+          {organizaciones.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Organización</Label>
+              <Select
+                items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
+                value={organizacionId}
+                onValueChange={(v) => {
+                  setOrganizacionId(v ?? "");
+                  reiniciar();
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizaciones.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.razon_social}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <Button type="button" variant="outline" onClick={descargarPlantillaCargaMasiva} className="self-start">
+            <Download className="size-4" />
+            Descargar plantilla CSV
+          </Button>
+
+          <div className="border border-border bg-muted/30 p-3 text-xs text-muted-foreground flex flex-col gap-1">
+            <p>
+              <span className="font-medium text-foreground">Modalidad contractual:</span>{" "}
+              {MODALIDADES.map((m) => m.value).join(", ")}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Tipo de vínculo:</span> directo, subcontrato (si usas
+              «subcontrato», la columna Subcontrato debe coincidir exactamente con uno ya registrado en Subcontratos)
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Cargo / Centro de trabajo:</span> deben coincidir
+              exactamente con uno ya existente en esta organización (puedes crearlos antes en sus respectivos
+              módulos), o dejarse en blanco.
+            </p>
+            {cargosDeOrg.length > 0 && (
+              <p>
+                <span className="font-medium text-foreground">Cargos disponibles:</span> {cargosDeOrg.join(", ")}
+              </p>
+            )}
+            {centrosDeOrg.length > 0 && (
+              <p>
+                <span className="font-medium text-foreground">Centros disponibles:</span> {centrosDeOrg.join(", ")}
+              </p>
+            )}
+            {subcontratosDeOrg.length > 0 && (
+              <p>
+                <span className="font-medium text-foreground">Subcontratos disponibles:</span>{" "}
+                {subcontratosDeOrg.join(", ")}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Archivo CSV</Label>
+            <Input type="file" accept=".csv,text/csv" onChange={onArchivoSeleccionado} />
+            {nombreArchivo && !errorArchivo && (
+              <p className="text-xs text-muted-foreground">
+                {nombreArchivo} — {filas.length} fila{filas.length === 1 ? "" : "s"} detectada
+                {filas.length === 1 ? "" : "s"}.
+              </p>
+            )}
+            {errorArchivo && <p className="text-xs text-alert">{errorArchivo}</p>}
+          </div>
+
+          {resultados && (
+            <div className="border border-border max-h-64 overflow-y-auto">
+              {resultados.map((r) => (
+                <div
+                  key={r.fila}
+                  className={cn(
+                    "flex items-start gap-2 px-3 py-1.5 text-xs border-b border-border last:border-0",
+                    r.ok ? "text-clear" : "text-alert",
+                  )}
+                >
+                  {r.ok ? (
+                    <CircleCheck className="size-3.5 mt-0.5 shrink-0" />
+                  ) : (
+                    <CircleX className="size-3.5 mt-0.5 shrink-0" />
+                  )}
+                  <span className="text-foreground">Fila {r.fila}:</span>
+                  <span>{r.mensaje}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={cerrarYLimpiar}>
+            {resultados ? "Cerrar" : "Cancelar"}
+          </Button>
+          {!resultados && (
+            <Button type="button" disabled={pending || filas.length === 0 || !!errorArchivo} onClick={onImportar}>
+              {pending ? "Importando…" : `Importar ${filas.length || ""} trabajador${filas.length === 1 ? "" : "es"}`}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

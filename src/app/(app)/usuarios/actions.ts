@@ -8,6 +8,7 @@ import { enviarCorreoBienvenida } from "@/lib/email";
 import { esRutValido } from "@/lib/rut";
 import { generarPasswordTemporal } from "@/lib/password";
 import { normalizarEmail } from "@/lib/normalizar-email";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 const ROL_LABEL: Record<RolNombre, string> = {
   super_admin: "Super administrador",
@@ -121,6 +122,14 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   revalidatePath("/usuarios");
 
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: "crear_usuario",
+    tabla: "usuarios",
+    registroId: creado.user.id,
+    datosNuevos: { nombres: input.nombres, apellidos: input.apellidos, rol: input.rol, organizacionId: input.organizacionId },
+  });
+
   const correo = await enviarCorreoBienvenida({
     nombres: input.nombres,
     email,
@@ -142,6 +151,7 @@ export async function actualizarRolUsuario(input: {
   usuarioId: string;
   organizacionId: string;
   nuevoRol: RolNombre;
+  centroTrabajoId?: string | null;
 }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
@@ -174,13 +184,31 @@ export async function actualizarRolUsuario(input: {
   const { data: rolRow } = await supabase.from("roles").select("id").eq("nombre", input.nuevoRol).single();
   if (!rolRow) return { ok: false as const, mensaje: "Rol inválido." };
 
+  const { data: rolAnterior } = await supabase
+    .from("usuario_roles")
+    .select("roles(nombre)")
+    .eq("id", input.usuarioRolId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("usuario_roles")
-    .update({ rol_id: rolRow.id })
+    .update({
+      rol_id: rolRow.id,
+      centro_trabajo_id: input.nuevoRol === "supervisor_centro" ? (input.centroTrabajoId ?? null) : null,
+    })
     .eq("id", input.usuarioRolId)
     .eq("organizacion_id", input.organizacionId);
 
   if (error) return { ok: false as const, mensaje: error.message };
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: "cambiar_rol",
+    tabla: "usuario_roles",
+    registroId: input.usuarioRolId,
+    datosAnteriores: { rol: rolAnterior?.roles?.nombre ?? null },
+    datosNuevos: { rol: input.nuevoRol, centroTrabajoId: input.centroTrabajoId ?? null, usuarioAfectado: input.usuarioId },
+  });
 
   revalidatePath("/usuarios");
   return { ok: true as const };
@@ -232,6 +260,14 @@ export async function actualizarEstadoUsuario(input: {
   const { error } = await admin.from("usuarios").update({ activo: input.activo }).eq("id", input.usuarioId);
 
   if (error) return { ok: false as const, mensaje: error.message };
+
+  await registrarAuditoria(admin, {
+    usuarioId: sesion.usuarioId,
+    accion: input.activo ? "reactivar_usuario" : "desactivar_usuario",
+    tabla: "usuarios",
+    registroId: input.usuarioId,
+    datosNuevos: { activo: input.activo },
+  });
 
   revalidatePath("/usuarios");
   return { ok: true as const };

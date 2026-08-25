@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSesion } from "@/lib/auth";
+import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AnaliticaView } from "./analitica-view";
 
@@ -38,7 +38,11 @@ export default async function AnaliticaPage() {
     .select("*")
     .eq("trabajador_activo", true);
 
-  const filas = matriz ?? [];
+  const filas = (matriz ?? []).filter((f) => {
+    if (sesion.esSuperAdmin || !f.organizacion_id) return true;
+    const cv = centrosVisibles(sesion, f.organizacion_id);
+    return cv === "todos" || (f.centro_trabajo_id != null && cv.includes(f.centro_trabajo_id));
+  });
 
   const runs = [...new Set(filas.map((f) => f.persona_run).filter((r): r is string => !!r))];
   const { data: personas } =

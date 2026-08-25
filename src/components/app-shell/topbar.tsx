@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { createClient } from "@/lib/supabase/client";
 import type { RolNombre } from "@/lib/auth";
 import { navParaRoles } from "./nav-config";
+import { NotificacionesBell } from "./notificaciones-bell";
 import Link from "next/link";
 
 const ROL_LABEL: Record<RolNombre, string> = {
@@ -101,6 +102,8 @@ export function Topbar({
           )
         )}
       </div>
+
+      <NotificacionesBell />
 
       <DropdownMenu>
         <DropdownMenuTrigger

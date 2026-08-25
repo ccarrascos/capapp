@@ -11,6 +11,7 @@ import {
   Landmark,
   Briefcase,
   BarChart3,
+  History,
 } from "lucide-react";
 
 export type NavItem = {
@@ -86,6 +87,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/organizaciones",
     label: "Organizaciones",
     icon: Landmark,
+    roles: ["super_admin"],
+  },
+  {
+    href: "/auditoria",
+    label: "Auditoría",
+    icon: History,
     roles: ["super_admin"],
   },
 ];

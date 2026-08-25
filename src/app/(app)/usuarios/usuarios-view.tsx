@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 type Asignacion = {
   id: string;
   organizacion_id: string | null;
+  centro_trabajo_id: string | null;
   usuarios: {
     id: string;
     nombres: string;
@@ -52,7 +53,10 @@ type Asignacion = {
     activo: boolean;
   } | null;
   roles: { nombre: RolNombre } | null;
+  centros_trabajo: { nombre: string } | null;
 };
+
+type Centro = { id: string; nombre: string; organizacion_id: string };
 
 const ROL_LABEL: Record<RolNombre, string> = {
   super_admin: "Super administrador",
@@ -135,11 +139,13 @@ function SortableHead({
 export function UsuariosView({
   asignaciones,
   organizaciones,
+  centros,
   esSuperAdmin,
   usuarioActualId,
 }: {
   asignaciones: Asignacion[];
   organizaciones: { id: string; razon_social: string }[];
+  centros: Centro[];
   esSuperAdmin: boolean;
   usuarioActualId: string;
 }) {
@@ -196,7 +202,7 @@ export function UsuariosView({
             Cuentas y roles
           </h1>
         </div>
-        <NuevaCuentaDialog organizaciones={organizaciones} esSuperAdmin={esSuperAdmin} />
+        <NuevaCuentaDialog organizaciones={organizaciones} centros={centros} esSuperAdmin={esSuperAdmin} />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -247,15 +253,22 @@ export function UsuariosView({
                 <TableCell className="text-muted-foreground">{a.usuarios?.email ?? "—"}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
-                    <Badge variant="secondary" className="rounded-sm">
-                      {a.roles ? ROL_LABEL[a.roles.nombre] : "—"}
-                    </Badge>
+                    <div className="flex flex-col">
+                      <Badge variant="secondary" className="rounded-sm">
+                        {a.roles ? ROL_LABEL[a.roles.nombre] : "—"}
+                      </Badge>
+                      {a.roles?.nombre === "supervisor_centro" && a.centros_trabajo && (
+                        <span className="text-[10px] text-muted-foreground mt-0.5">{a.centros_trabajo.nombre}</span>
+                      )}
+                    </div>
                     {a.usuarios && a.organizacion_id && a.usuarios.id !== usuarioActualId && (
                       <EditarRolDialog
                         usuarioRolId={a.id}
                         usuarioId={a.usuarios.id}
                         organizacionId={a.organizacion_id}
                         rolActual={a.roles?.nombre ?? null}
+                        centroActual={a.centro_trabajo_id}
+                        centros={centros.filter((c) => c.organizacion_id === a.organizacion_id)}
                         nombreCompleto={`${a.usuarios.nombres} ${a.usuarios.apellidos}`}
                         esSuperAdmin={esSuperAdmin}
                       />
@@ -294,9 +307,11 @@ export function UsuariosView({
 
 function NuevaCuentaDialog({
   organizaciones,
+  centros,
   esSuperAdmin,
 }: {
   organizaciones: { id: string; razon_social: string }[];
+  centros: Centro[];
   esSuperAdmin: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -313,7 +328,9 @@ function NuevaCuentaDialog({
     rut: "",
     rol: rolesDisponibles[0],
     organizacionId: organizaciones[0]?.id ?? "",
+    centroTrabajoId: "",
   });
+  const centrosDeOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -337,7 +354,7 @@ function NuevaCuentaDialog({
         dv: parsed.dv,
         rol: form.rol,
         organizacionId: form.rol === "super_admin" ? null : form.organizacionId,
-        centroTrabajoId: null,
+        centroTrabajoId: form.rol === "supervisor_centro" ? form.centroTrabajoId || null : null,
       });
 
       if (!resultado.ok) {
@@ -351,7 +368,15 @@ function NuevaCuentaDialog({
           ? { email: form.email.trim(), rut: rutFormateado, emailEnviado: true }
           : { email: form.email.trim(), rut: rutFormateado, emailEnviado: false, password: resultado.passwordTemporal },
       );
-      setForm({ nombres: "", apellidos: "", email: "", rut: "", rol: rolesDisponibles[0], organizacionId: organizaciones[0]?.id ?? "" });
+      setForm({
+        nombres: "",
+        apellidos: "",
+        email: "",
+        rut: "",
+        rol: rolesDisponibles[0],
+        organizacionId: organizaciones[0]?.id ?? "",
+        centroTrabajoId: "",
+      });
     });
   }
 
@@ -480,6 +505,30 @@ function NuevaCuentaDialog({
                   </Select>
                 </div>
               )}
+              {form.rol === "supervisor_centro" && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Centro de trabajo</Label>
+                  <Select
+                    items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
+                    value={form.centroTrabajoId}
+                    onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los centros (sin acotar)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {centrosDeOrg.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Si no eliges un centro, verá el cumplimiento de toda la organización.
+                  </p>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={pending}>
                   {pending ? "Creando…" : "Crear cuenta"}
@@ -498,6 +547,8 @@ function EditarRolDialog({
   usuarioId,
   organizacionId,
   rolActual,
+  centroActual,
+  centros,
   nombreCompleto,
   esSuperAdmin,
 }: {
@@ -505,6 +556,8 @@ function EditarRolDialog({
   usuarioId: string;
   organizacionId: string;
   rolActual: RolNombre | null;
+  centroActual: string | null;
+  centros: Centro[];
   nombreCompleto: string;
   esSuperAdmin: boolean;
 }) {
@@ -514,11 +567,18 @@ function EditarRolDialog({
   const [nuevoRol, setNuevoRol] = useState<RolNombre>(
     rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0],
   );
+  const [centroTrabajoId, setCentroTrabajoId] = useState(centroActual ?? "");
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      const resultado = await actualizarRolUsuario({ usuarioRolId, usuarioId, organizacionId, nuevoRol });
+      const resultado = await actualizarRolUsuario({
+        usuarioRolId,
+        usuarioId,
+        organizacionId,
+        nuevoRol,
+        centroTrabajoId: nuevoRol === "supervisor_centro" ? centroTrabajoId || null : null,
+      });
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
         return;
@@ -528,12 +588,17 @@ function EditarRolDialog({
     });
   }
 
+  const sinCambios = nuevoRol === rolActual && (nuevoRol !== "supervisor_centro" || centroTrabajoId === (centroActual ?? ""));
+
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (v) setNuevoRol(rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0]);
+        if (v) {
+          setNuevoRol(rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0]);
+          setCentroTrabajoId(centroActual ?? "");
+        }
       }}
     >
       <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6" title="Cambiar rol" />}>
@@ -564,8 +629,32 @@ function EditarRolDialog({
               </SelectContent>
             </Select>
           </div>
+          {nuevoRol === "supervisor_centro" && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Centro de trabajo</Label>
+              <Select
+                items={Object.fromEntries(centros.map((c) => [c.id, c.nombre]))}
+                value={centroTrabajoId}
+                onValueChange={(v) => setCentroTrabajoId(v ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Todos los centros (sin acotar)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {centros.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Si no eliges un centro, verá el cumplimiento de toda la organización.
+              </p>
+            </div>
+          )}
           <DialogFooter>
-            <Button type="submit" disabled={pending || nuevoRol === rolActual}>
+            <Button type="submit" disabled={pending || sinCambios}>
               {pending ? "Guardando…" : "Guardar"}
             </Button>
           </DialogFooter>

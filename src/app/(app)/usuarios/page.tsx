@@ -16,7 +16,9 @@ export default async function UsuariosPage() {
   const [{ data: asignaciones }, { data: organizaciones }] = await Promise.all([
     supabase
       .from("usuario_roles")
-      .select("id, organizacion_id, usuarios(id, nombres, apellidos, email, run, dv, activo), roles(nombre)")
+      .select(
+        "id, organizacion_id, centro_trabajo_id, usuarios(id, nombres, apellidos, email, run, dv, activo), roles(nombre), centros_trabajo(nombre)",
+      )
       .order("id"),
     sesion.esSuperAdmin
       ? supabase.from("organizaciones").select("id, razon_social").order("razon_social")
@@ -31,10 +33,22 @@ export default async function UsuariosPage() {
         }),
   ]);
 
+  const organizacionIds = (organizaciones ?? []).map((o) => o.id);
+  const { data: centros } =
+    organizacionIds.length > 0
+      ? await supabase
+          .from("centros_trabajo")
+          .select("id, nombre, organizacion_id")
+          .in("organizacion_id", organizacionIds)
+          .eq("activo", true)
+          .order("nombre")
+      : { data: [] };
+
   return (
     <UsuariosView
       asignaciones={asignaciones ?? []}
       organizaciones={organizaciones ?? []}
+      centros={centros ?? []}
       esSuperAdmin={sesion.esSuperAdmin}
       usuarioActualId={sesion.usuarioId}
     />

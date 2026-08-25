@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type CrearOrganizacionInput = {
   rut: string;
@@ -116,6 +117,14 @@ export async function actualizarActivoOrganizacion(input: { organizacionId: stri
     .eq("id", input.organizacionId);
 
   if (error) return { ok: false as const, mensaje: error.message };
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: input.activo ? "reactivar_organizacion" : "desactivar_organizacion",
+    tabla: "organizaciones",
+    registroId: input.organizacionId,
+    datosNuevos: { activo: input.activo },
+  });
 
   revalidatePath("/organizaciones");
   return { ok: true as const };

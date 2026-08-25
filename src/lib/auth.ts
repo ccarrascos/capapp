@@ -83,3 +83,25 @@ export async function getSesion(): Promise<Sesion | null> {
 export function tieneRol(sesion: Sesion, rol: RolNombre) {
   return sesion.esSuperAdmin || sesion.roles.some((r) => r.rol === rol);
 }
+
+/**
+ * Qué centros de trabajo de una organización puede ver `sesion`: "todos" si
+ * tiene un rol de alcance completo en esa organización (admin_organizacion,
+ * prevencionista, auditor o super_admin), o la lista puntual de centros si
+ * sólo tiene el rol supervisor_centro. Una asignación de supervisor_centro
+ * sin centro asignado (legado, o creada sin especificar uno) se trata como
+ * "todos" — no restringe hasta que se le asigne un centro puntual.
+ */
+export function centrosVisibles(sesion: Sesion, organizacionId: string): "todos" | string[] {
+  if (sesion.esSuperAdmin) return "todos";
+
+  const rolesEnOrg = sesion.roles.filter((r) => r.organizacionId === organizacionId);
+  const tieneAccesoCompleto = rolesEnOrg.some(
+    (r) => r.rol === "admin_organizacion" || r.rol === "prevencionista" || r.rol === "auditor",
+  );
+  if (tieneAccesoCompleto) return "todos";
+
+  const centros = rolesEnOrg.filter((r) => r.rol === "supervisor_centro").map((r) => r.centroTrabajoId);
+  if (centros.length === 0 || centros.some((c) => c === null)) return "todos";
+  return centros as string[];
+}

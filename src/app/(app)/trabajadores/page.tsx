@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSesion } from "@/lib/auth";
+import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { TrabajadoresView } from "./trabajadores-view";
 
@@ -54,13 +54,19 @@ export default async function TrabajadoresPage() {
 
   const accesoPorRun = new Map((personasAcceso ?? []).map((p) => [p.run, p]));
   const centroPorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
-  const filas = (matriz ?? []).map((f) => ({
-    ...f,
-    usuarioId: (f.persona_run && accesoPorRun.get(f.persona_run)?.usuario_id) ?? null,
-    personaEmail: (f.persona_run && accesoPorRun.get(f.persona_run)?.email) ?? null,
-    fechaNacimiento: (f.persona_run && accesoPorRun.get(f.persona_run)?.fecha_nacimiento) ?? null,
-    centroNombre: (f.centro_trabajo_id && centroPorId.get(f.centro_trabajo_id)) ?? null,
-  }));
+  const filas = (matriz ?? [])
+    .filter((f) => {
+      if (sesion.esSuperAdmin || !f.organizacion_id) return true;
+      const cv = centrosVisibles(sesion, f.organizacion_id);
+      return cv === "todos" || (f.centro_trabajo_id != null && cv.includes(f.centro_trabajo_id));
+    })
+    .map((f) => ({
+      ...f,
+      usuarioId: (f.persona_run && accesoPorRun.get(f.persona_run)?.usuario_id) ?? null,
+      personaEmail: (f.persona_run && accesoPorRun.get(f.persona_run)?.email) ?? null,
+      fechaNacimiento: (f.persona_run && accesoPorRun.get(f.persona_run)?.fecha_nacimiento) ?? null,
+      centroNombre: (f.centro_trabajo_id && centroPorId.get(f.centro_trabajo_id)) ?? null,
+    }));
 
   const subcontratosPorOrg = (subcontratos ?? []).map((s) => ({
     id: s.id,

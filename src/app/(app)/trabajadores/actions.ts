@@ -10,6 +10,7 @@ import { esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { normalizarEmail } from "@/lib/normalizar-email";
 import { generarQrDataUrl } from "@/lib/qr";
+import { registrarAuditoria } from "@/lib/auditoria";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -423,6 +424,14 @@ export async function crearAccesoTrabajador(input: {
   revalidatePath("/trabajadores");
   revalidatePath("/usuarios");
 
+  await registrarAuditoria(admin, {
+    usuarioId: sesion.usuarioId,
+    accion: "dar_acceso_trabajador",
+    tabla: "usuarios",
+    registroId: creado.user.id,
+    datosNuevos: { personaRun: persona.run, organizacionId: input.organizacionId },
+  });
+
   const correo = await enviarCorreoBienvenida({
     nombres: persona.nombres,
     email,
@@ -465,4 +474,233 @@ export async function obtenerCredencialQr(personaRun: string, organizacionId: st
   const qrDataUrl = await generarQrDataUrl(url);
 
   return { ok: true as const, url, qrDataUrl };
+}
+
+export type FilaCargaMasiva = {
+  run: string;
+  dv: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  fechaNacimiento: string;
+  email: string;
+  cargoNombre: string;
+  centroNombre: string;
+  unidad: string;
+  modalidadContractual: string;
+  tipoVinculo: string;
+  subcontratoNombre: string;
+};
+
+export type ResultadoFilaCarga = { fila: number; ok: boolean; mensaje: string };
+
+const MODALIDADES_VALIDAS = new Set<ModalidadContractual>([
+  "indefinido",
+  "plazo_fijo",
+  "obra_o_faena",
+  "aprendiz",
+  "honorarios",
+  "otro",
+]);
+const TIPOS_VINCULO_VALIDOS = new Set<TipoVinculoLaboral>(["directo", "subcontrato"]);
+const MAX_FILAS_CARGA_MASIVA = 300;
+
+/**
+ * Alta masiva de trabajadores desde un CSV. Procesa las filas de forma
+ * secuencial (no en paralelo) porque el mismo RUT puede repetirse dentro
+ * del propio archivo — así la segunda aparición ve que la primera ya
+ * insertó la persona, en vez de que ambas intenten crearla a la vez.
+ */
+export async function cargarTrabajadoresMasivo(input: {
+  organizacionId: string;
+  filas: FilaCargaMasiva[];
+}): Promise<{ ok: true; resultados: ResultadoFilaCarga[] } | { ok: false; mensaje: string }> {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) =>
+        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
+    );
+  if (!autorizado) {
+    return { ok: false, mensaje: "No tienes permiso para cargar trabajadores en esta organización." };
+  }
+
+  if (input.filas.length === 0) return { ok: false, mensaje: "El archivo no tiene filas para importar." };
+  if (input.filas.length > MAX_FILAS_CARGA_MASIVA) {
+    return {
+      ok: false,
+      mensaje: `Máximo ${MAX_FILAS_CARGA_MASIVA} filas por carga. Divide el archivo en partes más pequeñas.`,
+    };
+  }
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const [{ data: cargos }, { data: centros }, { data: subcontratos }] = await Promise.all([
+    supabase.from("cargos").select("id, nombre").eq("organizacion_id", input.organizacionId),
+    supabase.from("centros_trabajo").select("id, nombre").eq("organizacion_id", input.organizacionId),
+    supabase.from("subcontratos").select("id, nombre").eq("organizacion_id", input.organizacionId),
+  ]);
+
+  const cargoPorNombre = new Map((cargos ?? []).map((c) => [c.nombre.trim().toLowerCase(), c.id]));
+  const centroPorNombre = new Map((centros ?? []).map((c) => [c.nombre.trim().toLowerCase(), c.id]));
+  const subcontratoPorNombre = new Map((subcontratos ?? []).map((s) => [s.nombre.trim().toLowerCase(), s.id]));
+
+  const resultados: ResultadoFilaCarga[] = [];
+
+  for (let idx = 0; idx < input.filas.length; idx++) {
+    const numeroFila = idx + 2; // la fila 1 del archivo es el encabezado
+    const fila = input.filas[idx];
+
+    const run = fila.run.replace(/\./g, "").trim();
+    const dv = fila.dv.trim().toUpperCase();
+
+    if (!esRutValido(run, dv)) {
+      resultados.push({ fila: numeroFila, ok: false, mensaje: "RUT inválido." });
+      continue;
+    }
+    if (!fila.nombres.trim() || !fila.apellidoPaterno.trim()) {
+      resultados.push({ fila: numeroFila, ok: false, mensaje: "Nombres y apellido paterno son obligatorios." });
+      continue;
+    }
+
+    const fechaNacimiento = fila.fechaNacimiento.trim() || null;
+    if (fechaNacimiento && !esFechaNacimientoValida(fechaNacimiento)) {
+      resultados.push({ fila: numeroFila, ok: false, mensaje: "Fecha de nacimiento inválida (usa AAAA-MM-DD)." });
+      continue;
+    }
+
+    const modalidad = fila.modalidadContractual.trim().toLowerCase() as ModalidadContractual;
+    if (!MODALIDADES_VALIDAS.has(modalidad)) {
+      resultados.push({
+        fila: numeroFila,
+        ok: false,
+        mensaje: `Modalidad contractual "${fila.modalidadContractual}" no reconocida.`,
+      });
+      continue;
+    }
+
+    const tipoVinculo = (fila.tipoVinculo.trim().toLowerCase() || "directo") as TipoVinculoLaboral;
+    if (!TIPOS_VINCULO_VALIDOS.has(tipoVinculo)) {
+      resultados.push({
+        fila: numeroFila,
+        ok: false,
+        mensaje: `Tipo de vínculo "${fila.tipoVinculo}" no reconocido.`,
+      });
+      continue;
+    }
+
+    let subcontratoId: string | null = null;
+    if (tipoVinculo === "subcontrato") {
+      subcontratoId = subcontratoPorNombre.get(fila.subcontratoNombre.trim().toLowerCase()) ?? null;
+      if (!subcontratoId) {
+        resultados.push({
+          fila: numeroFila,
+          ok: false,
+          mensaje: `Subcontrato "${fila.subcontratoNombre}" no existe en esta organización.`,
+        });
+        continue;
+      }
+    }
+
+    let cargoId: string | null = null;
+    if (fila.cargoNombre.trim()) {
+      cargoId = cargoPorNombre.get(fila.cargoNombre.trim().toLowerCase()) ?? null;
+      if (!cargoId) {
+        resultados.push({
+          fila: numeroFila,
+          ok: false,
+          mensaje: `Cargo "${fila.cargoNombre}" no existe en esta organización.`,
+        });
+        continue;
+      }
+    }
+
+    let centroId: string | null = null;
+    if (fila.centroNombre.trim()) {
+      centroId = centroPorNombre.get(fila.centroNombre.trim().toLowerCase()) ?? null;
+      if (!centroId) {
+        resultados.push({
+          fila: numeroFila,
+          ok: false,
+          mensaje: `Centro de trabajo "${fila.centroNombre}" no existe en esta organización.`,
+        });
+        continue;
+      }
+    }
+
+    if (tipoVinculo === "subcontrato" && !centroId) {
+      resultados.push({
+        fila: numeroFila,
+        ok: false,
+        mensaje: "El vínculo por subcontrato requiere indicar el centro de trabajo.",
+      });
+      continue;
+    }
+
+    // Misma lógica de portabilidad que crearTrabajador: se busca con el
+    // cliente admin (visibilidad global) y, si ya existe, no se sobrescribe
+    // su identidad — sólo se agrega el vínculo con esta organización.
+    const { data: personaExistente } = await admin.from("personas").select("run").eq("run", run).maybeSingle();
+
+    if (!personaExistente) {
+      const { error: errorPersona } = await supabase.from("personas").insert({
+        run,
+        dv,
+        nombres: fila.nombres.trim(),
+        apellido_paterno: fila.apellidoPaterno.trim(),
+        apellido_materno: fila.apellidoMaterno.trim() || null,
+        email: fila.email.trim() ? normalizarEmail(fila.email.trim()) : null,
+        fecha_nacimiento: fechaNacimiento,
+      });
+      if (errorPersona) {
+        resultados.push({ fila: numeroFila, ok: false, mensaje: errorPersona.message });
+        continue;
+      }
+    }
+
+    const { error: errorVinculo } = await supabase.from("vinculos_laborales").insert({
+      persona_run: run,
+      organizacion_id: input.organizacionId,
+      centro_trabajo_id: centroId,
+      cargo_id: cargoId,
+      unidad: fila.unidad.trim() || null,
+      modalidad_contractual: modalidad,
+      tipo_vinculo: tipoVinculo,
+      subcontrato_id: subcontratoId,
+    });
+
+    if (errorVinculo) {
+      const mensaje = errorVinculo.message.includes("duplicate key")
+        ? "Esta persona ya está registrada en esta organización."
+        : errorVinculo.message;
+      resultados.push({ fila: numeroFila, ok: false, mensaje });
+      continue;
+    }
+
+    resultados.push({
+      fila: numeroFila,
+      ok: true,
+      mensaje: personaExistente ? "Agregado (identidad ya existente, se reutilizó)." : "Agregado.",
+    });
+  }
+
+  revalidatePath("/trabajadores");
+  revalidatePath("/dashboard");
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: "carga_masiva_trabajadores",
+    tabla: "vinculos_laborales",
+    datosNuevos: {
+      organizacionId: input.organizacionId,
+      filas: input.filas.length,
+      exitosas: resultados.filter((r) => r.ok).length,
+    },
+  });
+
+  return { ok: true, resultados };
 }

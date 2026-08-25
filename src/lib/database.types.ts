@@ -837,6 +837,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          inscripcion_id: string | null
           leido: boolean
           mensaje: string
           persona_run: string | null
@@ -846,6 +847,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          inscripcion_id?: string | null
           leido?: boolean
           mensaje: string
           persona_run?: string | null
@@ -855,6 +857,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          inscripcion_id?: string | null
           leido?: boolean
           mensaje?: string
           persona_run?: string | null
@@ -862,6 +865,13 @@ export type Database = {
           usuario_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notificaciones_inscripcion_id_fkey"
+            columns: ["inscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "inscripciones"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notificaciones_persona_run_fkey"
             columns: ["persona_run"]

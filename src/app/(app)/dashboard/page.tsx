@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSesion } from "@/lib/auth";
+import { getSesion, centrosVisibles, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
@@ -29,21 +29,25 @@ export default async function DashboardPage() {
   const esRolOrg = sesion.roles.some((r) => ORG_ROLES.includes(r.rol as (typeof ORG_ROLES)[number]));
   const esFacilitador = sesion.roles.some((r) => r.rol === "facilitador");
 
-  if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} />;
+  if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} sesion={sesion} />;
   if (esFacilitador) return <DashboardFacilitador nombres={sesion.nombres} />;
   // Quien solo tiene el rol trabajador no tiene un panel propio — "Mi capacitación"
   // ya muestra ese mismo resumen más el historial completo, sin duplicar destino.
   redirect("/mi-capacitacion");
 }
 
-async function DashboardOrganizacion({ nombres }: { nombres: string }) {
+async function DashboardOrganizacion({ nombres, sesion }: { nombres: string; sesion: Sesion }) {
   const supabase = await createClient();
   const { data: matriz } = await supabase
     .from("matriz_vigencia_capacitacion")
     .select("*")
     .eq("trabajador_activo", true);
 
-  const filas = matriz ?? [];
+  const filas = (matriz ?? []).filter((f) => {
+    if (sesion.esSuperAdmin || !f.organizacion_id) return true;
+    const cv = centrosVisibles(sesion, f.organizacion_id);
+    return cv === "todos" || (f.centro_trabajo_id != null && cv.includes(f.centro_trabajo_id));
+  });
   const total = filas.length;
   const conteo = (estado: EstadoVigencia) => filas.filter((f) => f.estado_vigencia === estado).length;
   const vigentes = conteo("vigente");
