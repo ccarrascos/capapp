@@ -1533,6 +1533,13 @@ function DarAccesoDialog({
   );
 }
 
+/** El popup de Select no envuelve ni encoge su texto (fuerza whitespace-nowrap),
+ * así que un nombre largo hay que acortarlo aquí — el título completo queda
+ * disponible al pasar el mouse por encima. */
+function truncarTexto(texto: string, maxLargo = 46): string {
+  return texto.length > maxLargo ? `${texto.slice(0, maxLargo - 1).trimEnd()}…` : texto;
+}
+
 function InscribirCursoDialog({
   personaRun,
   organizacionId,
@@ -1611,7 +1618,7 @@ function InscribirCursoDialog({
             <div className="flex flex-col gap-1.5">
               <Label>Curso</Label>
               <Select
-                items={Object.fromEntries(cursos.map((c) => [c.cursoId, c.cursoNombre]))}
+                items={Object.fromEntries(cursos.map((c) => [c.cursoId, truncarTexto(c.cursoNombre)]))}
                 value={cursoId}
                 onValueChange={(v) => {
                   setCursoId(v ?? "");
@@ -1624,8 +1631,8 @@ function InscribirCursoDialog({
                 <SelectContent>
                   {cursos.map((c) => (
                     <SelectItem key={c.cursoId} value={c.cursoId}>
-                      <span className="flex flex-1 items-center justify-between gap-3">
-                        <span>{c.cursoNombre}</span>
+                      <span className="flex items-center justify-between gap-3">
+                        <span title={c.cursoNombre}>{truncarTexto(c.cursoNombre)}</span>
                         {c.cursoHoras != null && (
                           <span className="text-xs text-muted-foreground shrink-0">{c.cursoHoras} h</span>
                         )}
@@ -1657,7 +1664,11 @@ function InscribirCursoDialog({
                         <span>
                           Inicio {e.fechaInicio} · Límite {e.fechaLimite}
                         </span>
-                        {e.centroNombre && <span className="text-xs text-muted-foreground">{e.centroNombre}</span>}
+                        {e.centroNombre && (
+                          <span className="text-xs text-muted-foreground" title={e.centroNombre}>
+                            {truncarTexto(e.centroNombre, 40)}
+                          </span>
+                        )}
                       </span>
                     </SelectItem>
                   ))}
