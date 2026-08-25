@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, FileCheck2, Search } from "lucide-react";
+import { Plus, FileCheck2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -34,6 +34,7 @@ import { CertificadoDialog } from "../../certificados/certificado-dialog";
 import { coincideBusqueda } from "@/lib/busqueda";
 import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
+import { SearchInput } from "@/components/ui/search-input";
 
 type Persona = { run: string; dv: string; nombres: string; apellido_paterno: string };
 
@@ -205,15 +206,7 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
           <DialogTitle>Inscribir trabajadores</DialogTitle>
         </DialogHeader>
         {disponibles.length > 0 && (
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre o RUN…"
-              className="pl-8"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </div>
+          <SearchInput placeholder="Buscar por nombre o RUN…" value={busqueda} onChange={setBusqueda} />
         )}
         <div className="max-h-80 overflow-y-auto border border-border divide-y divide-border">
           {disponibles.length === 0 && (

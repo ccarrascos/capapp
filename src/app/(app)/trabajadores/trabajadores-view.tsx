@@ -3,7 +3,6 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
-  Search,
   Plus,
   Pencil,
   ArrowUp,
@@ -67,6 +66,7 @@ import { coincideBusqueda } from "@/lib/busqueda";
 import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
 import { descargarCsv, parsearCsv } from "@/lib/csv";
+import { SearchInput } from "@/components/ui/search-input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -399,15 +399,12 @@ export function TrabajadoresView({
           </TabsList>
         </Tabs>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cualquier dato: nombre, RUN, cargo, centro, subcontrato…"
-            className="pl-8"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="w-full sm:w-72"
+          placeholder="Buscar por cualquier dato: nombre, RUN, cargo, centro, subcontrato…"
+          value={busqueda}
+          onChange={setBusqueda}
+        />
       </div>
 
       <div className="border border-border bg-card overflow-x-auto">

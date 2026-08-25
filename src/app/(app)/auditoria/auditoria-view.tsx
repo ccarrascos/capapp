@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Table,
   TableBody,
@@ -80,15 +79,12 @@ export function AuditoriaView({ entradas }: { entradas: Entrada[] }) {
         <p className="text-sm text-muted-foreground">
           {totalItems} evento{totalItems === 1 ? "" : "s"} · últimos 300 registrados
         </p>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por acción, persona, tabla…"
-            className="pl-8"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="w-full sm:w-72"
+          placeholder="Buscar por acción, persona, tabla…"
+          value={busqueda}
+          onChange={setBusqueda}
+        />
       </div>
 
       <div className="border border-border bg-card overflow-x-auto">
