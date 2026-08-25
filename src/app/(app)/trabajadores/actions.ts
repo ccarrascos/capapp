@@ -712,3 +712,82 @@ export async function cargarTrabajadoresMasivo(input: {
 
   return { ok: true, resultados };
 }
+
+export type CursoConEdicionesDisponibles = {
+  cursoId: string;
+  cursoNombre: string;
+  ediciones: { id: string; fechaInicio: string; fechaLimite: string; centroNombre: string | null }[];
+};
+
+/** Cursos con ediciones abiertas donde este trabajador aún no está inscrito
+ * ni tiene ese mismo curso vigente — para ofrecerlos desde la Matriz de
+ * vigencia cuando está sin capacitación o vencido. */
+export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string, organizacionId: string) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some(
+      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
+    );
+  if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para inscribir en esta organización." };
+
+  const supabase = await createClient();
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const [{ data: ediciones }, { data: inscripciones }] = await Promise.all([
+    supabase
+      .from("ediciones_curso")
+      .select("id, curso_id, fecha_inicio, fecha_limite, cursos(nombre), centros_trabajo(nombre)")
+      .eq("organizacion_id", organizacionId)
+      .in("estado", ["planificada", "en_curso"])
+      .gte("fecha_limite", hoy)
+      .order("fecha_inicio"),
+    supabase
+      .from("inscripciones")
+      .select(
+        "edicion_id, estado, fecha_aprobacion, vigencia_hasta, ediciones_curso!inner(curso_id, organizacion_id)",
+      )
+      .eq("persona_run", personaRun)
+      .eq("ediciones_curso.organizacion_id", organizacionId),
+  ]);
+
+  const edicionesYaInscrito = new Set((inscripciones ?? []).map((i) => i.edicion_id));
+
+  // Si la aprobación más reciente de un curso sigue vigente, no tiene
+  // sentido ofrecer inscribirlo de nuevo hasta que venza.
+  const vigenciaPorCurso = new Map<string, { fechaAprobacion: string | null; vigenciaHasta: string | null }>();
+  for (const i of inscripciones ?? []) {
+    if (i.estado !== "aprobado") continue;
+    const cursoId = i.ediciones_curso.curso_id;
+    const previa = vigenciaPorCurso.get(cursoId);
+    if (!previa || (i.fecha_aprobacion ?? "") > (previa.fechaAprobacion ?? "")) {
+      vigenciaPorCurso.set(cursoId, { fechaAprobacion: i.fecha_aprobacion, vigenciaHasta: i.vigencia_hasta });
+    }
+  }
+  const cursosVigentes = new Set(
+    [...vigenciaPorCurso.entries()]
+      .filter(([, v]) => v.vigenciaHasta != null && v.vigenciaHasta >= hoy)
+      .map(([cursoId]) => cursoId),
+  );
+
+  const porCurso = new Map<string, CursoConEdicionesDisponibles>();
+  for (const e of ediciones ?? []) {
+    if (edicionesYaInscrito.has(e.id) || cursosVigentes.has(e.curso_id)) continue;
+    const fila = {
+      id: e.id,
+      fechaInicio: e.fecha_inicio,
+      fechaLimite: e.fecha_limite,
+      centroNombre: e.centros_trabajo?.nombre ?? null,
+    };
+    const existente = porCurso.get(e.curso_id);
+    if (existente) existente.ediciones.push(fila);
+    else porCurso.set(e.curso_id, { cursoId: e.curso_id, cursoNombre: e.cursos?.nombre ?? "Curso", ediciones: [fila] });
+  }
+
+  return {
+    ok: true as const,
+    cursos: [...porCurso.values()].sort((a, b) => a.cursoNombre.localeCompare(b.cursoNombre, "es")),
+  };
+}

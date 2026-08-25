@@ -19,6 +19,7 @@ import {
   Download,
   CircleCheck,
   CircleX,
+  GraduationCap,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,12 @@ import {
   obtenerDetalleTrabajador,
   obtenerCredencialQr,
   cargarTrabajadoresMasivo,
+  obtenerCursosDisponiblesParaInscripcion,
   type FilaCargaMasiva,
   type ResultadoFilaCarga,
+  type CursoConEdicionesDisponibles,
 } from "./actions";
+import { inscribirTrabajadores } from "../ediciones/actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
@@ -481,6 +485,16 @@ export function TrabajadoresView({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
+                    {puedeGestionar &&
+                      f.persona_run &&
+                      f.organizacion_id &&
+                      (f.estado_vigencia === "sin_capacitacion" || f.estado_vigencia === "vencido") && (
+                        <InscribirCursoDialog
+                          personaRun={f.persona_run}
+                          organizacionId={f.organizacion_id}
+                          nombreCompleto={`${f.nombres} ${f.apellido_paterno} ${f.apellido_materno ?? ""}`}
+                        />
+                      )}
                     {puedeVerDetalle && f.persona_run && f.organizacion_id && (
                       <CredencialQrDialog
                         personaRun={f.persona_run}
@@ -1513,6 +1527,135 @@ function DarAccesoDialog({
               </DialogFooter>
             </form>
           </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InscribirCursoDialog({
+  personaRun,
+  organizacionId,
+  nombreCompleto,
+}: {
+  personaRun: string;
+  organizacionId: string;
+  nombreCompleto: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [cursos, setCursos] = useState<CursoConEdicionesDisponibles[] | null>(null);
+  const [cursoId, setCursoId] = useState("");
+  const [edicionId, setEdicionId] = useState("");
+
+  function onOpenChange(v: boolean) {
+    setOpen(v);
+    if (v) {
+      setCursos(null);
+      setCursoId("");
+      setEdicionId("");
+      startTransition(async () => {
+        const res = await obtenerCursosDisponiblesParaInscripcion(personaRun, organizacionId);
+        if (!res.ok) {
+          toast.error(res.mensaje);
+          setOpen(false);
+          return;
+        }
+        setCursos(res.cursos);
+      });
+    }
+  }
+
+  const cursoSeleccionado = cursos?.find((c) => c.cursoId === cursoId) ?? null;
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!edicionId) {
+      toast.error("Selecciona una edición.");
+      return;
+    }
+    startTransition(async () => {
+      const resultado = await inscribirTrabajadores(edicionId, [personaRun]);
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success("Trabajador inscrito en el curso.");
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" title="Inscribir en un curso" />}>
+        <GraduationCap className="size-4" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Inscribir en un curso</DialogTitle>
+          <DialogDescription>{nombreCompleto}</DialogDescription>
+        </DialogHeader>
+        {cursos === null ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Cargando ediciones disponibles…</p>
+        ) : cursos.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            No hay ediciones abiertas disponibles para inscribirlo — crea una en el módulo Cursos.
+          </p>
+        ) : (
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>Curso</Label>
+              <Select
+                items={Object.fromEntries(cursos.map((c) => [c.cursoId, c.cursoNombre]))}
+                value={cursoId}
+                onValueChange={(v) => {
+                  setCursoId(v ?? "");
+                  setEdicionId("");
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona un curso" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cursos.map((c) => (
+                    <SelectItem key={c.cursoId} value={c.cursoId}>
+                      {c.cursoNombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Edición</Label>
+              <Select
+                items={Object.fromEntries(
+                  (cursoSeleccionado?.ediciones ?? []).map((e) => [
+                    e.id,
+                    `${e.fechaInicio} — límite ${e.fechaLimite}${e.centroNombre ? ` · ${e.centroNombre}` : ""}`,
+                  ]),
+                )}
+                value={edicionId}
+                onValueChange={(v) => setEdicionId(v ?? "")}
+              >
+                <SelectTrigger className="w-full" disabled={!cursoSeleccionado}>
+                  <SelectValue placeholder={cursoSeleccionado ? "Selecciona una edición" : "Primero elige un curso"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(cursoSeleccionado?.ediciones ?? []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.fechaInicio} — límite {e.fechaLimite}
+                      {e.centroNombre ? ` · ${e.centroNombre}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={pending || !edicionId}>
+                {pending ? "Inscribiendo…" : "Inscribir"}
+              </Button>
+            </DialogFooter>
+          </form>
         )}
       </DialogContent>
     </Dialog>

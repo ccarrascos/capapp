@@ -113,7 +113,18 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
     )
     .select("id, persona_run");
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) {
+    if (error.code === "23505") {
+      return {
+        ok: false as const,
+        mensaje:
+          personaRuns.length === 1
+            ? "Ese trabajador ya está inscrito en esta edición."
+            : "Uno o más de los trabajadores seleccionados ya están inscritos en esta edición.",
+      };
+    }
+    return { ok: false as const, mensaje: error.message };
+  }
 
   // Quien tiene portal propio se entera de que lo inscribieron en un curso.
   // Se usa el cliente admin porque la notificación queda a nombre del
@@ -149,6 +160,7 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
   }
 
   revalidatePath(`/ediciones/${edicionId}`);
+  revalidatePath("/trabajadores");
   return { ok: true as const };
 }
 
