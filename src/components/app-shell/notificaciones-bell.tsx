@@ -79,7 +79,14 @@ export function NotificacionesBell() {
           {notificaciones.map((n) => (
             <div
               key={n.id}
-              className={`flex items-start gap-2.5 border-b border-border px-3 py-2.5 last:border-0 ${n.leido ? "" : "bg-accent/40"}`}
+              role={n.leido ? undefined : "button"}
+              tabIndex={n.leido ? undefined : 0}
+              onClick={() => !n.leido && onMarcarLeida(n.id)}
+              onKeyDown={(e) => {
+                if (!n.leido && (e.key === "Enter" || e.key === " ")) onMarcarLeida(n.id);
+              }}
+              title={n.leido ? undefined : "Marcar como leída"}
+              className={`flex items-start gap-2.5 border-b border-border px-3 py-2.5 last:border-0 ${n.leido ? "" : "bg-accent/40 cursor-pointer hover:bg-accent/60"}`}
             >
               {n.tipo === "vencido" ? (
                 <CircleX className="size-4 text-alert mt-0.5 shrink-0" />
@@ -94,16 +101,7 @@ export function NotificacionesBell() {
                   {new Date(n.created_at).toLocaleDateString("es-CL")}
                 </p>
               </div>
-              {!n.leido && (
-                <button
-                  type="button"
-                  title="Marcar como leída"
-                  onClick={() => onMarcarLeida(n.id)}
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                >
-                  <Check className="size-3.5" />
-                </button>
-              )}
+              {!n.leido && <Check className="size-3.5 shrink-0 text-muted-foreground mt-0.5" />}
             </div>
           ))}
         </div>
