@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { Plus, FileCheck2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -391,13 +391,23 @@ function GestionarSheet({
   const [pendingManual, startManual] = useTransition();
   const [puntaje, setPuntaje] = useState("70");
 
-  const asistenciaPorModulo = new Map(inscripcion.asistencias_modulo.map((a) => [a.modulo_id, a.presente]));
+  const asistenciaGuardada = new Map(inscripcion.asistencias_modulo.map((a) => [a.modulo_id, a.presente]));
+  // Los checkboxes se marcan al instante (sin esperar a que cada llamada al
+  // servidor termine) y sólo se "revierten" si alguna falla — antes había
+  // que esperar a que las 7 solicitudes en paralelo y el refresco de la
+  // página terminaran para ver cualquier cambio, lo que se sentía lento
+  // aunque las llamadas fueran rápidas.
+  const [asistenciaPorModulo, marcarAsistenciaOptimista] = useOptimistic(
+    asistenciaGuardada,
+    (_actual: Map<string, boolean>, nuevo: Map<string, boolean>) => nuevo,
+  );
   const evaluacionFinal = inscripcion.evaluaciones_resultado.find((e) => e.modulo_id === null);
   const yaAprobado = inscripcion.estado === "aprobado";
   const tieneCertificado = inscripcion.certificados !== null;
 
   function onToggleAsistencia(moduloId: string, presente: boolean) {
     startAsistencia(async () => {
+      marcarAsistenciaOptimista(new Map(asistenciaGuardada).set(moduloId, presente));
       const resultado = await registrarAsistenciaModulo({
         inscripcionId: inscripcion.id,
         moduloId,
@@ -411,6 +421,7 @@ function GestionarSheet({
 
   function onMarcarTodaAsistencia() {
     startAsistencia(async () => {
+      marcarAsistenciaOptimista(new Map(modulos.map((m) => [m.id, true])));
       const fecha = new Date().toISOString().slice(0, 10);
       const resultados = await Promise.all(
         modulos.map((m) =>

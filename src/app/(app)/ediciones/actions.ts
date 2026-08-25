@@ -211,19 +211,25 @@ export async function registrarEvaluacionFinal(input: {
   const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
   if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
+  let personaRun: string | null = null;
+  let cursoNombre: string | null = null;
+
   if (input.aprobado) {
     const [{ data: inscripcion }, { data: edicion }] = await Promise.all([
       supabase
         .from("inscripciones")
-        .select("manual_entregado, asistencias_modulo(presente)")
+        .select("persona_run, manual_entregado, asistencias_modulo(presente)")
         .eq("id", input.inscripcionId)
         .single(),
-      supabase.from("ediciones_curso").select("curso_id").eq("id", input.edicionId).single(),
+      supabase.from("ediciones_curso").select("curso_id, cursos(nombre)").eq("id", input.edicionId).single(),
     ]);
 
     if (!inscripcion || !edicion) {
       return { ok: false as const, mensaje: "No se pudo verificar la inscripción." };
     }
+
+    personaRun = inscripcion.persona_run;
+    cursoNombre = edicion.cursos?.nombre ?? null;
 
     const { count: totalModulos } = await supabase
       .from("modulos")
@@ -259,6 +265,31 @@ export async function registrarEvaluacionFinal(input: {
     .eq("id", input.inscripcionId);
 
   if (errorInscripcion) return { ok: false as const, mensaje: errorInscripcion.message };
+
+  // Igual que al inscribir: quien tiene portal propio se entera de que fue
+  // aprobado. Cliente admin porque la notificación es para el trabajador,
+  // no para quien evalúa.
+  if (input.aprobado && personaRun) {
+    const admin = createAdminClient();
+    const { data: persona } = await admin
+      .from("personas")
+      .select("usuario_id")
+      .eq("run", personaRun)
+      .maybeSingle();
+
+    if (persona?.usuario_id) {
+      await admin.from("notificaciones").upsert(
+        {
+          usuario_id: persona.usuario_id,
+          persona_run: personaRun,
+          inscripcion_id: input.inscripcionId,
+          tipo: "curso_finalizado",
+          mensaje: `Fuiste aprobado en ${cursoNombre ?? "tu curso"}.`,
+        },
+        { onConflict: "usuario_id,inscripcion_id,tipo", ignoreDuplicates: true },
+      );
+    }
+  }
 
   revalidatePath(`/ediciones/${input.edicionId}`);
   revalidatePath("/trabajadores");
@@ -307,7 +338,7 @@ export async function emitirCertificado(input: {
 
   const { data: edicion } = await supabase
     .from("ediciones_curso")
-    .select("organizacion_id, facilitadores(tipo_proveedor, oal_id, otec_id)")
+    .select("organizacion_id, cursos(nombre), facilitadores(tipo_proveedor, oal_id, otec_id)")
     .eq("id", input.edicionId)
     .single();
 
@@ -341,6 +372,28 @@ export async function emitirCertificado(input: {
   });
 
   if (error) return { ok: false as const, mensaje: error.message };
+
+  // Le avisamos al trabajador que su certificado ya está disponible —
+  // aparte del aviso de aprobación, porque la emisión suele pasar más tarde.
+  const admin = createAdminClient();
+  const { data: persona } = await admin
+    .from("personas")
+    .select("usuario_id")
+    .eq("run", input.personaRun)
+    .maybeSingle();
+
+  if (persona?.usuario_id) {
+    await admin.from("notificaciones").upsert(
+      {
+        usuario_id: persona.usuario_id,
+        persona_run: input.personaRun,
+        inscripcion_id: input.inscripcionId,
+        tipo: "certificado_emitido",
+        mensaje: `Tu certificado de ${edicion.cursos?.nombre ?? "tu curso"} ya está disponible.`,
+      },
+      { onConflict: "usuario_id,inscripcion_id,tipo", ignoreDuplicates: true },
+    );
+  }
 
   revalidatePath(`/ediciones/${input.edicionId}`);
   return { ok: true as const };

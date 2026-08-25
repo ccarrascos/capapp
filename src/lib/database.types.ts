@@ -1518,6 +1518,7 @@ export type Database = {
         | "vencido"
         | "nueva_inscripcion"
         | "curso_finalizado"
+        | "certificado_emitido"
       tipo_proveedor: "interno" | "oal" | "otec"
       tipo_vinculo_laboral: "directo" | "subcontrato"
     }
@@ -1693,6 +1694,7 @@ export const Constants = {
         "vencido",
         "nueva_inscripcion",
         "curso_finalizado",
+        "certificado_emitido",
       ],
       tipo_proveedor: ["interno", "oal", "otec"],
       tipo_vinculo_laboral: ["directo", "subcontrato"],
