@@ -489,7 +489,9 @@ export function TrabajadoresView({
                     {puedeGestionar &&
                       f.persona_run &&
                       f.organizacion_id &&
-                      (f.estado_vigencia === "sin_capacitacion" || f.estado_vigencia === "vencido") && (
+                      (f.estado_vigencia === "sin_capacitacion" ||
+                        f.estado_vigencia === "vencido" ||
+                        f.estado_vigencia === "por_vencer") && (
                         <InscribirCursoDialog
                           personaRun={f.persona_run}
                           organizacionId={f.organizacion_id}

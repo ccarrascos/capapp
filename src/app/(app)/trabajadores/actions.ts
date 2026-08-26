@@ -11,6 +11,7 @@ import { esFechaNacimientoValida, normalizarFechaNacimiento } from "@/lib/fecha-
 import { normalizarEmail } from "@/lib/normalizar-email";
 import { generarQrDataUrl } from "@/lib/qr";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -762,8 +763,10 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
 
   const edicionesYaInscrito = new Set((inscripciones ?? []).map((i) => i.edicion_id));
 
-  // Si la aprobación más reciente de un curso sigue vigente, no tiene
-  // sentido ofrecer inscribirlo de nuevo hasta que venza.
+  // Si la aprobación más reciente de un curso sigue plenamente vigente (a
+  // más de 60 días de vencer), no tiene sentido ofrecer inscribirlo de
+  // nuevo. Pero si ya está "por vencer", sí se ofrece — es justo el caso de
+  // renovarlo antes de que venza.
   const vigenciaPorCurso = new Map<string, { fechaAprobacion: string | null; vigenciaHasta: string | null }>();
   for (const i of inscripciones ?? []) {
     if (i.estado !== "aprobado") continue;
@@ -775,7 +778,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   }
   const cursosVigentes = new Set(
     [...vigenciaPorCurso.entries()]
-      .filter(([, v]) => v.vigenciaHasta != null && v.vigenciaHasta >= hoy)
+      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta) === "vigente")
       .map(([cursoId]) => cursoId),
   );
 
