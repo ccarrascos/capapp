@@ -61,6 +61,7 @@ import {
   type FilaCargaMasiva,
   type ResultadoFilaCarga,
   type CursoConEdicionesDisponibles,
+  type CursoYaCubierto,
 } from "./actions";
 import { inscribirTrabajadores } from "../ediciones/actions";
 import { formatearRunInput, esRutValido } from "@/lib/rut";
@@ -1552,6 +1553,7 @@ function InscribirCursoDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [cursos, setCursos] = useState<CursoConEdicionesDisponibles[] | null>(null);
+  const [yaCubiertos, setYaCubiertos] = useState<CursoYaCubierto[]>([]);
   const [cursoId, setCursoId] = useState("");
   const [edicionId, setEdicionId] = useState("");
 
@@ -1559,6 +1561,7 @@ function InscribirCursoDialog({
     setOpen(v);
     if (v) {
       setCursos(null);
+      setYaCubiertos([]);
       setCursoId("");
       setEdicionId("");
       startTransition(async () => {
@@ -1569,6 +1572,7 @@ function InscribirCursoDialog({
           return;
         }
         setCursos(res.cursos);
+        setYaCubiertos(res.yaCubiertos);
       });
     }
   }
@@ -1610,9 +1614,35 @@ function InscribirCursoDialog({
         {cursos === null ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Buscando ediciones disponibles…</p>
         ) : cursos.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center max-w-xs mx-auto">
-            No hay ediciones abiertas para ofrecerle — crea una nueva edición en el módulo Cursos.
-          </p>
+          <div className="py-6 flex flex-col gap-3">
+            {yaCubiertos.length > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground text-center">
+                  No hay más ediciones que ofrecerle — ya está cubierta en todos los cursos con ediciones abiertas de
+                  esta organización:
+                </p>
+                <ul className="flex flex-col gap-1.5">
+                  {yaCubiertos.map((c, i) => (
+                    <li key={i} className="flex items-center justify-between gap-3 border border-border px-3 py-2 text-sm">
+                      <span className="font-medium">{c.cursoNombre}</span>
+                      <span
+                        className={cn(
+                          "text-xs shrink-0",
+                          c.motivo === "vigente" ? "text-clear" : "text-muted-foreground",
+                        )}
+                      >
+                        {c.detalle}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center max-w-xs mx-auto">
+                No hay ediciones abiertas para ofrecerle — crea una nueva edición en el módulo Cursos.
+              </p>
+            )}
+          </div>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">

@@ -720,6 +720,12 @@ export type CursoConEdicionesDisponibles = {
   ediciones: { id: string; fechaInicio: string; fechaLimite: string; centroNombre: string | null }[];
 };
 
+export type CursoYaCubierto = {
+  cursoNombre: string;
+  motivo: "inscrito" | "vigente";
+  detalle: string;
+};
+
 /** Cursos con ediciones abiertas donde este trabajador aún no está inscrito
  * ni tiene ese mismo curso vigente — para ofrecerlos desde la Matriz de
  * vigencia cuando está sin capacitación o vencido. */
@@ -774,8 +780,29 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   );
 
   const porCurso = new Map<string, CursoConEdicionesDisponibles>();
+  const yaInscritoPorCurso = new Map<string, { cursoNombre: string; fechas: string[] }>();
+  const yaVigentePorCurso = new Map<string, { cursoNombre: string; vigenciaHasta: string | null }>();
+
   for (const e of ediciones ?? []) {
-    if (edicionesYaInscrito.has(e.id) || cursosVigentes.has(e.curso_id)) continue;
+    const cursoNombre = e.cursos?.nombre ?? "Curso";
+
+    if (cursosVigentes.has(e.curso_id)) {
+      if (!yaVigentePorCurso.has(e.curso_id)) {
+        yaVigentePorCurso.set(e.curso_id, {
+          cursoNombre,
+          vigenciaHasta: vigenciaPorCurso.get(e.curso_id)?.vigenciaHasta ?? null,
+        });
+      }
+      continue;
+    }
+
+    if (edicionesYaInscrito.has(e.id)) {
+      const existenteInscrito = yaInscritoPorCurso.get(e.curso_id);
+      if (existenteInscrito) existenteInscrito.fechas.push(e.fecha_inicio);
+      else yaInscritoPorCurso.set(e.curso_id, { cursoNombre, fechas: [e.fecha_inicio] });
+      continue;
+    }
+
     const fila = {
       id: e.id,
       fechaInicio: e.fecha_inicio,
@@ -787,14 +814,28 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
     else
       porCurso.set(e.curso_id, {
         cursoId: e.curso_id,
-        cursoNombre: e.cursos?.nombre ?? "Curso",
+        cursoNombre,
         cursoHoras: e.cursos?.horas_totales ?? null,
         ediciones: [fila],
       });
   }
 
+  const yaCubiertos: CursoYaCubierto[] = [
+    ...[...yaVigentePorCurso.values()].map((v) => ({
+      cursoNombre: v.cursoNombre,
+      motivo: "vigente" as const,
+      detalle: v.vigenciaHasta ? `vigente hasta ${v.vigenciaHasta}` : "vigente",
+    })),
+    ...[...yaInscritoPorCurso.values()].map((v) => ({
+      cursoNombre: v.cursoNombre,
+      motivo: "inscrito" as const,
+      detalle: `inscripción del ${v.fechas.join(", ")}`,
+    })),
+  ];
+
   return {
     ok: true as const,
     cursos: [...porCurso.values()].sort((a, b) => a.cursoNombre.localeCompare(b.cursoNombre, "es")),
+    yaCubiertos: yaCubiertos.sort((a, b) => a.cursoNombre.localeCompare(b.cursoNombre, "es")),
   };
 }
