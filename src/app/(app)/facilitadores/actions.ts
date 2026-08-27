@@ -45,7 +45,22 @@ async function resolverEntidadExterna(
   return tipoProveedor === "oal" ? { ok: true, oalId: creado.id, otecId: null } : { ok: true, oalId: null, otecId: creado.id };
 }
 
+const ROLES_BUSQUEDA_PERSONA = [
+  "super_admin",
+  "admin_organizacion",
+  "prevencionista",
+  "supervisor_centro",
+  "auditor",
+] as const;
+
 export async function buscarPersonaPorRun(run: string) {
+  const sesion = await getSesion();
+  if (!sesion) return null;
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => ROLES_BUSQUEDA_PERSONA.includes(r.rol as (typeof ROLES_BUSQUEDA_PERSONA)[number]));
+  if (!autorizado) return null;
+
   // Se usa el cliente admin (sólo lectura de nombre, nada sensible) porque
   // esta búsqueda debe encontrar a la persona sin importar en qué
   // organización quedó registrada primero — igual que un facilitador o un

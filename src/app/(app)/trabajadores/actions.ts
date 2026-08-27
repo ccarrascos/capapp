@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSesion } from "@/lib/auth";
+import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
@@ -288,7 +288,7 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
     supabase
       .from("vinculos_laborales")
       .select(
-        "fecha_ingreso, modalidad_contractual, unidad, tipo_vinculo, cargos(nombre), centros_trabajo(nombre), subcontratos(nombre)",
+        "centro_trabajo_id, fecha_ingreso, modalidad_contractual, unidad, tipo_vinculo, cargos(nombre), centros_trabajo(nombre), subcontratos(nombre)",
       )
       .eq("persona_run", personaRun)
       .eq("organizacion_id", organizacionId)
@@ -311,6 +311,15 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
   ]);
 
   if (!persona) return { ok: false as const, mensaje: "No se encontró a esta persona." };
+
+  // Un supervisor_centro sólo debe ver el detalle de trabajadores de su
+  // propio centro — el listado ya filtraba por esto, pero esta acción no
+  // volvía a revisarlo, así que se podía pedir el detalle de cualquiera de
+  // la organización con sólo conocer su RUT.
+  const cv = centrosVisibles(sesion, organizacionId);
+  if (cv !== "todos" && (!vinculo?.centro_trabajo_id || !cv.includes(vinculo.centro_trabajo_id))) {
+    return { ok: false as const, mensaje: "No tienes permiso para ver este detalle." };
+  }
 
   return {
     ok: true as const,
@@ -464,12 +473,17 @@ export async function obtenerCredencialQr(personaRun: string, organizacionId: st
 
   const { data: vinculo } = await supabase
     .from("vinculos_laborales")
-    .select("qr_token")
+    .select("qr_token, centro_trabajo_id")
     .eq("persona_run", personaRun)
     .eq("organizacion_id", organizacionId)
     .maybeSingle();
 
   if (!vinculo) return { ok: false as const, mensaje: "No se encontró el vínculo laboral." };
+
+  const cv = centrosVisibles(sesion, organizacionId);
+  if (cv !== "todos" && (!vinculo.centro_trabajo_id || !cv.includes(vinculo.centro_trabajo_id))) {
+    return { ok: false as const, mensaje: "No tienes permiso para generar esta credencial." };
+  }
 
   const url = `${APP_URL}/credencial/${vinculo.qr_token}`;
   const qrDataUrl = await generarQrDataUrl(url);
