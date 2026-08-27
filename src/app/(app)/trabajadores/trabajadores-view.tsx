@@ -72,6 +72,7 @@ import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
 import { descargarCsv, parsearCsv } from "@/lib/csv";
 import { SearchInput } from "@/components/ui/search-input";
+import { HazardLoader } from "@/components/ui/hazard-loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -1614,7 +1615,7 @@ function InscribirCursoDialog({
           </DialogDescription>
         </DialogHeader>
         {cursos === null ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Buscando ediciones disponibles…</p>
+          <HazardLoader label="Buscando ediciones disponibles…" />
         ) : cursos.length === 0 ? (
           <div className="py-6 flex flex-col gap-3">
             {yaCubiertos.length > 0 ? (
@@ -1764,7 +1765,7 @@ function DetalleTrabajadorDialog({
           <DialogDescription>Vistazo rápido — capacitación, centros y evaluaciones.</DialogDescription>
         </DialogHeader>
         {pending || !detalle ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>
+          <HazardLoader label="Cargando…" />
         ) : (
           (() => {
             // Si el mismo curso se aprobó más de una vez (renovación), la
@@ -1998,7 +1999,7 @@ function CredencialQrDialog({
           </DialogDescription>
         </DialogHeader>
         {pending || !credencial ? (
-          <p className="text-sm text-muted-foreground py-8 text-center no-print">Generando…</p>
+          <HazardLoader label="Generando…" className="no-print" />
         ) : (
           <>
             <div id="credencial-imprimible" className="flex flex-col items-center gap-2 py-2 text-center">

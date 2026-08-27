@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CertificadoCard, CERTIFICADO_PRINT_STYLE, type CertificadoDatos } from "./[certificadoId]/certificado-view";
 import { obtenerCertificado } from "./actions";
+import { HazardLoader } from "@/components/ui/hazard-loader";
 
 export function CertificadoDialog({
   certificadoId,
@@ -45,7 +46,7 @@ export function CertificadoDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogTitle className="sr-only">Certificado</DialogTitle>
         {pending || !datos ? (
-          <p className="text-sm text-muted-foreground py-16 text-center">Cargando…</p>
+          <HazardLoader label="Cargando…" className="py-16" />
         ) : (
           <>
             <CertificadoCard {...datos} />

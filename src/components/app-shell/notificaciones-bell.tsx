@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Bell, TriangleAlert, CircleX, CircleCheck, FileCheck2, Check, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { HazardLoader } from "@/components/ui/hazard-loader";
 import { obtenerNotificaciones, marcarNotificacionLeida, marcarTodasLeidas } from "@/app/(app)/notificaciones/actions";
 
 type Notificacion = {
@@ -70,7 +71,7 @@ export function NotificacionesBell() {
           )}
         </div>
         <div className="max-h-96 overflow-y-auto">
-          {!cargado && <p className="px-3 py-8 text-center text-sm text-muted-foreground">Cargando…</p>}
+          {!cargado && <HazardLoader label="Cargando…" />}
           {cargado && notificaciones.length === 0 && (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">
               No tienes notificaciones. Aquí verás avisos de vencimientos próximos.

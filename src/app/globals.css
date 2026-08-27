@@ -178,4 +178,32 @@
       var(--ink, var(--foreground)) 20px
     );
   }
+
+  /* Misma franja, en movimiento — para estados de carga/búsqueda. */
+  .hazard-stripe-cargando {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--hazard) 0px,
+      var(--hazard) 10px,
+      var(--ink, var(--foreground)) 10px,
+      var(--ink, var(--foreground)) 20px
+    );
+    background-size: 28px 28px;
+    animation: hazard-scroll 0.85s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hazard-stripe-cargando {
+      animation: none;
+    }
+  }
+}
+
+@keyframes hazard-scroll {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28px 0;
+  }
 }
