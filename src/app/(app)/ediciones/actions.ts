@@ -48,27 +48,45 @@ async function autorizadoParaEdicion(
  * edición no haya vencido — se verifica en el servidor y no sólo ocultando
  * el botón en la interfaz, porque de lo contrario cualquiera podría seguir
  * llamando a la acción directamente después del plazo.
+ *
+ * Si se pasa inscripcionId, también confirma que esa inscripción realmente
+ * pertenece a esta edición — sin eso, alguien autorizado en la Edición A
+ * (por ejemplo por ser su facilitador) podía pasar el id de una inscripción
+ * de la Edición B y modificar asistencia/evaluación/manual de otra parte.
  */
 async function verificarGestion(
   sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
   supabase: Awaited<ReturnType<typeof createClient>>,
   edicionId: string,
-): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  inscripcionId?: string,
+): Promise<{ ok: true; cursoId: string } | { ok: false; mensaje: string }> {
   if (!(await autorizadoParaEdicion(sesion, supabase, edicionId))) {
     return { ok: false, mensaje: "No tienes permiso para gestionar esta edición." };
   }
 
   const { data: edicion } = await supabase
     .from("ediciones_curso")
-    .select("fecha_limite")
+    .select("fecha_limite, curso_id")
     .eq("id", edicionId)
     .maybeSingle();
 
-  if (edicion && edicion.fecha_limite < new Date().toISOString().slice(0, 10)) {
+  if (!edicion) return { ok: false, mensaje: "No se encontró la edición." };
+
+  if (edicion.fecha_limite < new Date().toISOString().slice(0, 10)) {
     return { ok: false, mensaje: "El plazo de esta edición venció — ya no se puede gestionar." };
   }
 
-  return { ok: true };
+  if (inscripcionId) {
+    const { data: inscripcion } = await supabase
+      .from("inscripciones")
+      .select("id")
+      .eq("id", inscripcionId)
+      .eq("edicion_id", edicionId)
+      .maybeSingle();
+    if (!inscripcion) return { ok: false, mensaje: "La inscripción no corresponde a esta edición." };
+  }
+
+  return { ok: true, cursoId: edicion.curso_id };
 }
 
 /** Sólo admin/prevencionista deciden quién toma un curso — no el facilitador que lo dicta. */
@@ -100,6 +118,24 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
 
   if (!(await autorizadoParaInscribir(sesion, edicionId, edicion.organizacion_id))) {
     return { ok: false as const, mensaje: "No tienes permiso para inscribir trabajadores en esta edición." };
+  }
+
+  // Las personas son identidades globales (portabilidad DS44) — sin este
+  // chequeo, cualquier RUN conocido podía inscribirse en una edición sin
+  // tener vínculo laboral alguno con la organización que la dicta.
+  const { data: vinculosDeLaOrg } = await supabase
+    .from("vinculos_laborales")
+    .select("persona_run")
+    .eq("organizacion_id", edicion.organizacion_id)
+    .eq("activo", true)
+    .in("persona_run", personaRuns);
+
+  const runsConVinculo = new Set((vinculosDeLaOrg ?? []).map((v) => v.persona_run));
+  if (personaRuns.some((run) => !runsConVinculo.has(run))) {
+    return {
+      ok: false as const,
+      mensaje: "Uno o más de los trabajadores seleccionados no tienen vínculo laboral activo en esta organización.",
+    };
   }
 
   const { data: insertadas, error } = await supabase
@@ -176,8 +212,16 @@ export async function registrarAsistenciaModulo(input: {
 
   const supabase = await createClient();
 
-  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId, input.inscripcionId);
   if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
+
+  const { data: modulo } = await supabase
+    .from("modulos")
+    .select("id")
+    .eq("id", input.moduloId)
+    .eq("curso_id", verificacion.cursoId)
+    .maybeSingle();
+  if (!modulo) return { ok: false as const, mensaje: "El módulo no corresponde a esta edición." };
 
   const { error } = await supabase
     .from("asistencias_modulo")
@@ -220,7 +264,7 @@ export async function registrarEvaluacionFinal(input: {
 
   const supabase = await createClient();
 
-  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId, input.inscripcionId);
   if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
   let personaRun: string | null = null;
@@ -319,7 +363,7 @@ export async function marcarManualEntregado(input: {
 
   const supabase = await createClient();
 
-  const verificacion = await verificarGestion(sesion, supabase, input.edicionId);
+  const verificacion = await verificarGestion(sesion, supabase, input.edicionId, input.inscripcionId);
   if (!verificacion.ok) return { ok: false as const, mensaje: verificacion.mensaje };
 
   const { error } = await supabase
@@ -338,8 +382,6 @@ export async function marcarManualEntregado(input: {
 
 export async function emitirCertificado(input: {
   inscripcionId: string;
-  personaRun: string;
-  cursoId: string;
   edicionId: string;
   vigenciaHasta: string;
 }) {
@@ -350,7 +392,7 @@ export async function emitirCertificado(input: {
 
   const { data: edicion } = await supabase
     .from("ediciones_curso")
-    .select("organizacion_id, cursos(nombre), facilitadores(tipo_proveedor, oal_id, otec_id)")
+    .select("organizacion_id, curso_id, cursos(nombre), facilitadores(tipo_proveedor, oal_id, otec_id)")
     .eq("id", input.edicionId)
     .single();
 
@@ -365,7 +407,19 @@ export async function emitirCertificado(input: {
     return { ok: false as const, mensaje: "No tienes permiso para emitir certificados en esta edición." };
   }
 
-  const numeroCertificado = `DS44-${input.personaRun}-${Date.now().toString(36).toUpperCase()}`;
+  // persona_run y curso_id se derivan de la inscripción real, nunca del
+  // cliente — de lo contrario se podía emitir un certificado válido para
+  // un trabajador o un curso distinto al que efectivamente aprobó.
+  const { data: inscripcion } = await supabase
+    .from("inscripciones")
+    .select("persona_run")
+    .eq("id", input.inscripcionId)
+    .eq("edicion_id", input.edicionId)
+    .maybeSingle();
+
+  if (!inscripcion) return { ok: false as const, mensaje: "La inscripción no corresponde a esta edición." };
+
+  const numeroCertificado = `DS44-${inscripcion.persona_run}-${Date.now().toString(36).toUpperCase()}`;
 
   const facilitador = edicion.facilitadores;
   const entidadEmisoraTipo = facilitador?.tipo_proveedor === "oal" || facilitador?.tipo_proveedor === "otec"
@@ -375,8 +429,8 @@ export async function emitirCertificado(input: {
 
   const { error } = await supabase.from("certificados").insert({
     inscripcion_id: input.inscripcionId,
-    persona_run: input.personaRun,
-    curso_id: input.cursoId,
+    persona_run: inscripcion.persona_run,
+    curso_id: edicion.curso_id,
     numero_certificado: numeroCertificado,
     fecha_vigencia_hasta: input.vigenciaHasta,
     entidad_emisora_tipo: entidadEmisoraTipo,
@@ -391,14 +445,14 @@ export async function emitirCertificado(input: {
   const { data: persona } = await admin
     .from("personas")
     .select("usuario_id")
-    .eq("run", input.personaRun)
+    .eq("run", inscripcion.persona_run)
     .maybeSingle();
 
   if (persona?.usuario_id) {
     await admin.from("notificaciones").upsert(
       {
         usuario_id: persona.usuario_id,
-        persona_run: input.personaRun,
+        persona_run: inscripcion.persona_run,
         inscripcion_id: input.inscripcionId,
         tipo: "certificado_emitido",
         mensaje: `Tu certificado de ${edicion.cursos?.nombre ?? "tu curso"} ya está disponible.`,

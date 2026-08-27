@@ -367,7 +367,7 @@ export async function crearAccesoTrabajador(input: {
 
   const { data: persona } = await admin
     .from("personas")
-    .select("nombres, apellido_paterno, apellido_materno, run, dv, usuario_id")
+    .select("nombres, apellido_paterno, apellido_materno, run, dv, usuario_id, email")
     .eq("run", input.personaRun)
     .maybeSingle();
 
@@ -434,12 +434,18 @@ export async function crearAccesoTrabajador(input: {
   revalidatePath("/trabajadores");
   revalidatePath("/usuarios");
 
+  // Se deja registro explícito de a qué correo se enviaron las
+  // credenciales (y del correo que tenía la persona antes, si difiere) —
+  // ese correo lo escribe quien da el acceso, no necesariamente coincide
+  // con el que la persona tenía registrado, y sin este rastro no quedaba
+  // forma de auditar a dónde terminó yendo la contraseña temporal.
   await registrarAuditoria(admin, {
     usuarioId: sesion.usuarioId,
     accion: "dar_acceso_trabajador",
     tabla: "usuarios",
     registroId: creado.user.id,
-    datosNuevos: { personaRun: persona.run, organizacionId: input.organizacionId },
+    datosAnteriores: persona.email && persona.email !== email ? { email: persona.email } : undefined,
+    datosNuevos: { personaRun: persona.run, organizacionId: input.organizacionId, email },
   });
 
   const correo = await enviarCorreoBienvenida({

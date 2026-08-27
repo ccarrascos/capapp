@@ -131,7 +131,6 @@ function SortableHead({
 
 export function EdicionView({
   edicionId,
-  cursoId,
   modulos,
   inscripciones,
   disponibles,
@@ -140,7 +139,6 @@ export function EdicionView({
   edicionVencida,
 }: {
   edicionId: string;
-  cursoId: string;
   modulos: { id: string; orden: number; nombre: string }[];
   inscripciones: Inscripcion[];
   disponibles: Persona[];
@@ -250,7 +248,6 @@ export function EdicionView({
                     {puedeGestionarAsistencia && !bloqueado && (
                       <GestionarSheet
                         edicionId={edicionId}
-                        cursoId={cursoId}
                         modulos={modulos}
                         inscripcion={i}
                       />
@@ -375,12 +372,10 @@ function InscribirDialog({ edicionId, disponibles }: { edicionId: string; dispon
 
 function GestionarSheet({
   edicionId,
-  cursoId,
   modulos,
   inscripcion,
 }: {
   edicionId: string;
-  cursoId: string;
   modulos: { id: string; orden: number; nombre: string }[];
   inscripcion: Inscripcion;
 }) {
@@ -489,8 +484,6 @@ function GestionarSheet({
     startCert(async () => {
       const resultado = await emitirCertificado({
         inscripcionId: inscripcion.id,
-        personaRun: inscripcion.personas!.run,
-        cursoId,
         edicionId,
         vigenciaHasta: inscripcion.vigencia_hasta!,
       });

@@ -112,6 +112,16 @@ export async function crearEdicion(input: {
 
   const supabase = await createClient();
 
+  // Sin este chequeo se podía crear una edición en la Organización A que
+  // apuntara a un curso de la Organización B, si se conocía/adivinaba su id.
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("id", input.cursoId)
+    .eq("organizacion_id", input.organizacionId)
+    .maybeSingle();
+  if (!curso) return { ok: false as const, mensaje: "El curso no pertenece a esta organización." };
+
   const fechaInicio = new Date(input.fechaInicio + "T00:00:00");
   const fechaLimite = new Date(fechaInicio);
   fechaLimite.setMonth(fechaLimite.getMonth() + 3);

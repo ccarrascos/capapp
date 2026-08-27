@@ -47,12 +47,19 @@ export async function guardarMaterialModulo(input: { moduloId: string; cursoId: 
     return { ok: false as const, mensaje: "No tienes permiso para editar este curso." };
   }
 
-  const { error } = await supabase
+  // Sin el .eq("curso_id", ...) esto actualizaba cualquier módulo por id,
+  // sin importar a qué curso perteneciera realmente.
+  const { data, error } = await supabase
     .from("modulos")
     .update({ material_path: input.path })
-    .eq("id", input.moduloId);
+    .eq("id", input.moduloId)
+    .eq("curso_id", input.cursoId)
+    .select("id");
 
   if (error) return { ok: false as const, mensaje: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false as const, mensaje: "El módulo no corresponde a este curso." };
+  }
 
   revalidatePath(`/cursos/${input.cursoId}`);
   return { ok: true as const };

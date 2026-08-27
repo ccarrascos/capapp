@@ -127,7 +127,6 @@ export default async function EdicionDetallePage({
 
       <EdicionView
         edicionId={edicionId}
-        cursoId={edicion.curso_id}
         modulos={modulos ?? []}
         inscripciones={inscripciones ?? []}
         disponibles={disponibles}
