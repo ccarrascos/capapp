@@ -1611,7 +1611,9 @@ function InscribirCursoDialog({
             Inscribir en un curso
           </DialogTitle>
           <DialogDescription>
-            Selecciona un curso y una edición abierta para inscribir a <strong className="font-medium text-foreground">{nombreCompleto}</strong>.
+            Selecciona un curso y una edición abierta para inscribir a
+            <br />
+            <strong className="font-medium text-foreground">{nombreCompleto}</strong>.
           </DialogDescription>
         </DialogHeader>
         {cursos === null ? (
