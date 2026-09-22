@@ -117,6 +117,7 @@ async function buscarTrabajador(sesion: Sesion, consulta: string) {
 async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, estado: string | null) {
   const filas = await filasVisibles(sesion);
   const nombreCentroPorId = await mapaCentros(filas);
+  const nombreCursoPorId = await mapaCursos(filas);
   const centroDe = (f: FilaMatriz) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
 
   const centroBuscado = centro ? sinAcentos(centro.trim()) : null;
@@ -138,6 +139,7 @@ async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, esta
       run: f.run && f.dv ? `${f.run}-${f.dv}` : null,
       cargo: f.cargo ?? null,
       centro: centroDe(f),
+      curso: (f.curso_id && nombreCursoPorId.get(f.curso_id)) ?? "Sin curso aprobado",
       estadoVigencia: f.estado_vigencia,
       vigenciaHasta: f.vigencia_hasta,
     })),
@@ -339,7 +341,7 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     function: {
       name: "trabajadores_por_vencer",
       description:
-        "Lista, con nombre y RUN, los trabajadores con capacitación vencida o por vencer (dentro de los próximos 60 días), ordenados por fecha de vencimiento más próxima. Úsala también cuando pregunten quiénes son los vencidos/por vencer de un centro en particular.",
+        "Lista, con nombre, RUN, centro y el curso correspondiente, los trabajadores con capacitación vencida o por vencer (dentro de los próximos 60 días), ordenados por fecha de vencimiento más próxima. Úsala también cuando pregunten quiénes son los vencidos/por vencer de un centro en particular, o qué curso tienen vencido.",
       parameters: {
         type: "object",
         properties: {

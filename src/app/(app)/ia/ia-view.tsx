@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Sparkles, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { enviarMensaje, type MensajeChat } from "./actions";
@@ -20,10 +19,18 @@ export function IaView() {
   const [texto, setTexto] = useState("");
   const [pending, startTransition] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes, pending]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [texto]);
 
   function enviar(pregunta: string) {
     const preguntaLimpia = pregunta.trim();
@@ -47,6 +54,13 @@ export function IaView() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     enviar(texto);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      enviar(texto);
+    }
   }
 
   return (
@@ -114,13 +128,17 @@ export function IaView() {
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2">
-        <Input
+      <form onSubmit={onSubmit} className="flex gap-2 items-end">
+        <textarea
+          ref={textareaRef}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Escribe tu pregunta…"
+          onKeyDown={onKeyDown}
+          placeholder="Escribe tu pregunta… (Shift+Enter para bajar de línea)"
           disabled={pending}
           autoFocus
+          rows={1}
+          className="h-8 max-h-40 w-full min-w-0 resize-none rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80"
         />
         <Button type="submit" disabled={pending || !texto.trim()}>
           <Send className="size-4" />
