@@ -205,6 +205,55 @@ async function demografiaTrabajadores(sesion: Sesion) {
   };
 }
 
+/**
+ * Tablas que el asistente puede consultar libremente más allá del dominio
+ * de trabajadores. Se restringe a tablas cuyo RLS ya alcanza por sí solo
+ * (organizacion_id = any(app_organizaciones_usuario()), sin excepciones) —
+ * quedan afuera inscripciones, certificados, asistencias_modulo,
+ * evaluaciones_resultado y la propia matriz de trabajadores porque su
+ * visibilidad real depende ADEMÁS de centrosVisibles() a nivel de
+ * aplicación (un supervisor_centro ve solo su centro en esas pantallas,
+ * pero el RLS de esas tablas permite ver toda la organización) — exponerlas
+ * aquí sin ese filtro extra sería una fuga entre centros de la misma
+ * empresa. También quedan afuera personas/usuarios/auditoria_log por ser
+ * datos personales o administrativos que no vienen al caso en este chat.
+ */
+const TABLAS_PERMITIDAS = [
+  "cursos",
+  "modulos",
+  "ediciones_curso",
+  "facilitadores",
+  "cargos",
+  "centros_trabajo",
+  "subcontratos",
+  "programas_trabajo_preventivo",
+  "organizaciones",
+] as const;
+
+const LIMITE_TABLA = 100;
+
+async function consultarTabla(tabla: string, filtros: { columna: string; valor: string; contiene?: boolean }[]) {
+  if (!(TABLAS_PERMITIDAS as readonly string[]).includes(tabla)) {
+    return {
+      error: `Tabla "${tabla}" no disponible. Tablas permitidas: ${TABLAS_PERMITIDAS.join(", ")}. Para trabajadores, usa las herramientas de trabajadores en su lugar.`,
+    };
+  }
+
+  const supabase = await createClient(); // cliente con RLS de la sesión — nunca el admin client
+  // `tabla` ya se validó arriba contra TABLAS_PERMITIDAS; el cast solo evita que
+  // TypeScript exija una unión literal para un nombre de tabla que llega en runtime.
+  let query = supabase.from(tabla as (typeof TABLAS_PERMITIDAS)[number]).select("*").limit(LIMITE_TABLA);
+  for (const f of filtros.slice(0, 5)) {
+    if (!f.columna) continue;
+    query = f.contiene ? query.ilike(f.columna, `%${f.valor}%`) : query.eq(f.columna, f.valor);
+  }
+
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+
+  return { tabla, cantidad: data?.length ?? 0, limite: LIMITE_TABLA, filas: data ?? [] };
+}
+
 const LIMITE_CONSULTA_COMPLETA = 250;
 
 /**
@@ -354,6 +403,36 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_tabla",
+      description:
+        `Consulta directa a otras tablas del sistema, para preguntas fuera del dominio de trabajadores: ${TABLAS_PERMITIDAS.join(", ")}. ` +
+        "Úsala para cursos y sus módulos, ediciones/fechas de curso, facilitadores, cargos, centros de trabajo, subcontratos, programas de trabajo preventivo u organizaciones. " +
+        "Para cualquier pregunta sobre trabajadores usa siempre las herramientas de trabajadores, nunca esta.",
+      parameters: {
+        type: "object",
+        properties: {
+          tabla: { type: "string", enum: [...TABLAS_PERMITIDAS], description: "Nombre exacto de la tabla a consultar." },
+          filtros: {
+            type: "array",
+            description: "Filtros opcionales, se combinan con Y.",
+            items: {
+              type: "object",
+              properties: {
+                columna: { type: "string", description: "Nombre exacto de la columna." },
+                valor: { type: "string" },
+                contiene: { type: "boolean", description: "true para coincidencia parcial (texto); false/omitir para igualdad exacta." },
+              },
+              required: ["columna", "valor"],
+            },
+          },
+        },
+        required: ["tabla"],
+      },
+    },
+  },
 ];
 
 export async function ejecutarHerramienta(
@@ -384,6 +463,14 @@ export async function ejecutarHerramienta(
         cargo: argumentos.cargo ? String(argumentos.cargo) : undefined,
         estado: argumentos.estado ? String(argumentos.estado) : undefined,
       });
+    case "consultar_tabla": {
+      const filtros = Array.isArray(argumentos.filtros)
+        ? (argumentos.filtros as { columna?: unknown; valor?: unknown; contiene?: unknown }[])
+            .filter((f) => typeof f.columna === "string" && typeof f.valor === "string")
+            .map((f) => ({ columna: f.columna as string, valor: f.valor as string, contiene: f.contiene === true }))
+        : [];
+      return consultarTabla(String(argumentos.tabla ?? ""), filtros);
+    }
     default:
       return { error: `Herramienta desconocida: ${nombre}` };
   }
