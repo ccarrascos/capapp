@@ -49,7 +49,7 @@ export default async function TrabajadoresPage() {
   const runs = [...new Set((matriz ?? []).map((f) => f.persona_run).filter((r): r is string => !!r))];
   const { data: personasAcceso } =
     runs.length > 0
-      ? await supabase.from("personas").select("run, usuario_id, email, fecha_nacimiento").in("run", runs)
+      ? await supabase.from("personas").select("run, usuario_id, email, fecha_nacimiento, sexo").in("run", runs)
       : { data: [] };
 
   const accesoPorRun = new Map((personasAcceso ?? []).map((p) => [p.run, p]));
@@ -65,6 +65,7 @@ export default async function TrabajadoresPage() {
       usuarioId: (f.persona_run && accesoPorRun.get(f.persona_run)?.usuario_id) ?? null,
       personaEmail: (f.persona_run && accesoPorRun.get(f.persona_run)?.email) ?? null,
       fechaNacimiento: (f.persona_run && accesoPorRun.get(f.persona_run)?.fecha_nacimiento) ?? null,
+      sexo: (f.persona_run ? accesoPorRun.get(f.persona_run)?.sexo : null) ?? null,
       centroNombre: (f.centro_trabajo_id && centroPorId.get(f.centro_trabajo_id)) ?? null,
     }));
 

@@ -16,6 +16,7 @@ import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
 type TipoVinculoLaboral = Database["public"]["Enums"]["tipo_vinculo_laboral"];
+type SexoPersona = Database["public"]["Enums"]["sexo_persona"];
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -53,6 +54,7 @@ export type CrearTrabajadorInput = {
   modalidadContractual: ModalidadContractual;
   email: string | null;
   fechaNacimiento: string | null;
+  sexo: SexoPersona | null;
   tipoVinculo: TipoVinculoLaboral;
   subcontratoId: string | null;
 };
@@ -125,6 +127,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
       apellido_materno: input.apellidoMaterno,
       email: input.email ? normalizarEmail(input.email) : null,
       fecha_nacimiento: input.fechaNacimiento,
+      sexo: input.sexo,
     });
 
     if (errorPersona) {
@@ -169,6 +172,7 @@ export async function actualizarTrabajador(input: {
   apellidoMaterno: string | null;
   email: string | null;
   fechaNacimiento: string | null;
+  sexo: SexoPersona | null;
   cargoId: string | null;
   centroTrabajoId: string | null;
   unidad: string | null;
@@ -215,6 +219,7 @@ export async function actualizarTrabajador(input: {
       apellido_materno: input.apellidoMaterno,
       email: input.email ? normalizarEmail(input.email) : null,
       fecha_nacimiento: input.fechaNacimiento,
+      sexo: input.sexo,
     })
     .eq("run", input.personaRun);
 
@@ -504,6 +509,7 @@ export type FilaCargaMasiva = {
   apellidoPaterno: string;
   apellidoMaterno: string;
   fechaNacimiento: string;
+  sexo: string;
   email: string;
   cargoNombre: string;
   centroNombre: string;
@@ -524,6 +530,7 @@ const MODALIDADES_VALIDAS = new Set<ModalidadContractual>([
   "otro",
 ]);
 const TIPOS_VINCULO_VALIDOS = new Set<TipoVinculoLaboral>(["directo", "subcontrato"]);
+const SEXOS_VALIDOS = new Set<SexoPersona>(["masculino", "femenino", "otro"]);
 const MAX_FILAS_CARGA_MASIVA = 300;
 
 /**
@@ -600,6 +607,20 @@ export async function cargarTrabajadoresMasivo(input: {
         });
         continue;
       }
+    }
+
+    let sexo: SexoPersona | null = null;
+    const sexoTexto = fila.sexo.trim().toLowerCase();
+    if (sexoTexto) {
+      if (!SEXOS_VALIDOS.has(sexoTexto as SexoPersona)) {
+        resultados.push({
+          fila: numeroFila,
+          ok: false,
+          mensaje: `Sexo "${fila.sexo}" no reconocido (usa masculino, femenino u otro).`,
+        });
+        continue;
+      }
+      sexo = sexoTexto as SexoPersona;
     }
 
     const modalidad = fila.modalidadContractual.trim().toLowerCase() as ModalidadContractual;
@@ -684,6 +705,7 @@ export async function cargarTrabajadoresMasivo(input: {
         apellido_materno: fila.apellidoMaterno.trim() || null,
         email: fila.email.trim() ? normalizarEmail(fila.email.trim()) : null,
         fecha_nacimiento: fechaNacimiento,
+        sexo,
       });
       if (errorPersona) {
         resultados.push({ fila: numeroFila, ok: false, mensaje: errorPersona.message });

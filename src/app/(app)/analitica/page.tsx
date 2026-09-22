@@ -46,8 +46,11 @@ export default async function AnaliticaPage() {
 
   const runs = [...new Set(filas.map((f) => f.persona_run).filter((r): r is string => !!r))];
   const { data: personas } =
-    runs.length > 0 ? await supabase.from("personas").select("run, fecha_nacimiento").in("run", runs) : { data: [] };
+    runs.length > 0
+      ? await supabase.from("personas").select("run, fecha_nacimiento, sexo").in("run", runs)
+      : { data: [] };
   const fechaNacimientoPorRun = new Map((personas ?? []).map((p) => [p.run, p.fecha_nacimiento]));
+  const sexoPorRun = new Map((personas ?? []).map((p) => [p.run, p.sexo]));
 
   const centroIds = [...new Set(filas.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
   const { data: centros } =
@@ -61,6 +64,7 @@ export default async function AnaliticaPage() {
     return {
       centro: (f.centro_trabajo_id ? nombreCentroPorId.get(f.centro_trabajo_id) : null) ?? "Sin asignar",
       edad: fecha ? calcularEdad(fecha) : null,
+      sexo: (f.persona_run ? sexoPorRun.get(f.persona_run) : null) ?? null,
       estado: (f.estado_vigencia ?? "sin_capacitacion") as (typeof ESTADOS)[number]["estado"],
       tipoVinculo: (f.tipo_vinculo ?? "directo") as "directo" | "subcontrato",
       subcontrato: f.subcontrato_nombre ?? null,

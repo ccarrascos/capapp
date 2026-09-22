@@ -81,9 +81,17 @@ type FilaMatriz = Database["public"]["Views"]["matriz_vigencia_capacitacion"]["R
   usuarioId: string | null;
   personaEmail: string | null;
   fechaNacimiento: string | null;
+  sexo: SexoPersona | null;
   centroNombre: string | null;
 };
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
+type SexoPersona = Database["public"]["Enums"]["sexo_persona"];
+
+const SEXO_LABEL: Record<SexoPersona, string> = {
+  masculino: "Masculino",
+  femenino: "Femenino",
+  otro: "Otro",
+};
 
 const FECHA_MAXIMA_NACIMIENTO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -230,6 +238,7 @@ function exportarCsv(filas: FilaMatriz[]) {
     "Vínculo",
     "Subcontrato",
     "Edad",
+    "Sexo",
     "Vence",
     "Estado",
     "Unidad",
@@ -245,6 +254,7 @@ function exportarCsv(filas: FilaMatriz[]) {
     f.tipo_vinculo === "subcontrato" ? "Subcontrato" : "Directo",
     f.subcontrato_nombre ?? "",
     calcularEdad(f.fechaNacimiento)?.toString() ?? "",
+    f.sexo ? SEXO_LABEL[f.sexo] : "",
     f.vigencia_hasta ?? "",
     ESTADO_LABEL_POR_CODIGO[f.estado_vigencia ?? ""] ?? "",
     f.unidad ?? "",
@@ -537,6 +547,7 @@ const ENCABEZADOS_CARGA_MASIVA = [
   "Apellido Paterno",
   "Apellido Materno",
   "Fecha Nacimiento",
+  "Sexo",
   "Email",
   "Cargo",
   "Centro de Trabajo",
@@ -564,6 +575,7 @@ function descargarPlantillaCargaMasiva() {
       "Pérez",
       "Soto",
       "1990-05-20",
+      "masculino",
       "juan.perez@ejemplo.cl",
       "Operario",
       "Planta Norte",
@@ -577,6 +589,7 @@ function descargarPlantillaCargaMasiva() {
       "1",
       "María",
       "González",
+      "",
       "",
       "",
       "",
@@ -661,6 +674,7 @@ function CargaMasivaDialog({
       apellidoPaterno: col("Apellido Paterno", fila),
       apellidoMaterno: col("Apellido Materno", fila),
       fechaNacimiento: col("Fecha Nacimiento", fila),
+      sexo: col("Sexo", fila),
       email: col("Email", fila),
       cargoNombre: col("Cargo", fila),
       centroNombre: col("Centro de Trabajo", fila),
@@ -741,6 +755,9 @@ function CargaMasivaDialog({
             <p>
               <span className="font-medium text-foreground">Fecha de nacimiento:</span> AAAA-MM-DD o DD-MM-AAAA
               (opcional)
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Sexo:</span> masculino, femenino u otro (opcional)
             </p>
             <p>
               <span className="font-medium text-foreground">Modalidad contractual:</span>{" "}
@@ -849,6 +866,7 @@ function NuevoTrabajadorDialog({
     modalidadContractual: "indefinido" as ModalidadContractual,
     email: "",
     fechaNacimiento: "",
+    sexo: "" as SexoPersona | "",
     tipoVinculo: "directo" as TipoVinculoLaboral,
     subcontratoId: "",
   });
@@ -897,6 +915,7 @@ function NuevoTrabajadorDialog({
         modalidadContractual: form.modalidadContractual,
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
+        sexo: form.sexo || null,
         tipoVinculo: form.tipoVinculo,
         subcontratoId: form.tipoVinculo === "subcontrato" ? form.subcontratoId : null,
       });
@@ -925,6 +944,7 @@ function NuevoTrabajadorDialog({
         centroTrabajoId: "",
         email: "",
         fechaNacimiento: "",
+        sexo: "",
         tipoVinculo: "directo",
         subcontratoId: "",
       }));
@@ -1130,7 +1150,7 @@ function NuevoTrabajadorDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Correo (opcional)</Label>
               <Input id="email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
@@ -1144,6 +1164,28 @@ function NuevoTrabajadorDialog({
                 value={form.fechaNacimiento}
                 onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Sexo (opcional)</Label>
+              <Select
+                items={{ sin_indicar: "Sin indicar", ...SEXO_LABEL }}
+                value={form.sexo || "sin_indicar"}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, sexo: (!v || v === "sin_indicar" ? "" : v) as SexoPersona | "" }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sin_indicar">Sin indicar</SelectItem>
+                  {(Object.keys(SEXO_LABEL) as SexoPersona[]).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SEXO_LABEL[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -1178,6 +1220,7 @@ function EditarTrabajadorDialog({
     apellidoMaterno: fila.apellido_materno ?? "",
     email: fila.personaEmail ?? "",
     fechaNacimiento: fila.fechaNacimiento ?? "",
+    sexo: (fila.sexo ?? "") as SexoPersona | "",
     cargoId: cargoActual?.id ?? "",
     centroTrabajoId: fila.centro_trabajo_id ?? "",
     unidad: fila.unidad ?? "",
@@ -1214,6 +1257,7 @@ function EditarTrabajadorDialog({
         apellidoMaterno: form.apellidoMaterno.trim() || null,
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
+        sexo: form.sexo || null,
         cargoId: form.cargoId || null,
         centroTrabajoId: form.centroTrabajoId || null,
         unidad: form.unidad.trim() || null,
@@ -1410,14 +1454,38 @@ function EditarTrabajadorDialog({
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="emailEdit">Correo</Label>
-            <Input
-              id="emailEdit"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emailEdit">Correo</Label>
+              <Input
+                id="emailEdit"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Sexo</Label>
+              <Select
+                items={{ sin_indicar: "Sin indicar", ...SEXO_LABEL }}
+                value={form.sexo || "sin_indicar"}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, sexo: (!v || v === "sin_indicar" ? "" : v) as SexoPersona | "" }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sin_indicar">Sin indicar</SelectItem>
+                  {(Object.keys(SEXO_LABEL) as SexoPersona[]).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SEXO_LABEL[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>

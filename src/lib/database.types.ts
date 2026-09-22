@@ -1013,6 +1013,7 @@ export type Database = {
           fecha_nacimiento: string | null
           nombres: string
           run: string
+          sexo: Database["public"]["Enums"]["sexo_persona"] | null
           telefono: string | null
           updated_at: string
           usuario_id: string | null
@@ -1026,6 +1027,7 @@ export type Database = {
           fecha_nacimiento?: string | null
           nombres: string
           run: string
+          sexo?: Database["public"]["Enums"]["sexo_persona"] | null
           telefono?: string | null
           updated_at?: string
           usuario_id?: string | null
@@ -1039,6 +1041,7 @@ export type Database = {
           fecha_nacimiento?: string | null
           nombres?: string
           run?: string
+          sexo?: Database["public"]["Enums"]["sexo_persona"] | null
           telefono?: string | null
           updated_at?: string
           usuario_id?: string | null
@@ -1505,6 +1508,7 @@ export type Database = {
         | "supervisor_centro"
         | "trabajador"
         | "auditor"
+      sexo_persona: "masculino" | "femenino" | "otro"
       tema_modulo:
         | "introduccion"
         | "marco_general_sst"
@@ -1680,6 +1684,7 @@ export const Constants = {
         "trabajador",
         "auditor",
       ],
+      sexo_persona: ["masculino", "femenino", "otro"],
       tema_modulo: [
         "introduccion",
         "marco_general_sst",

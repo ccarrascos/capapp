@@ -26,9 +26,11 @@ import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableC
 import { toast } from "sonner";
 
 type EstadoConfig = { estado: string; label: string; color: string };
+type Sexo = "masculino" | "femenino" | "otro";
 type FilaAnalitica = {
   centro: string;
   edad: number | null;
+  sexo: Sexo | null;
   estado: string;
   tipoVinculo: "directo" | "subcontrato";
   subcontrato: string | null;
@@ -37,6 +39,18 @@ type FilaAnalitica = {
 const TIPO_VINCULO_LABEL: Record<"directo" | "subcontrato", string> = {
   directo: "Directo",
   subcontrato: "Subcontrato",
+};
+
+const SEXO_LABEL: Record<Sexo, string> = {
+  masculino: "Masculino",
+  femenino: "Femenino",
+  otro: "Otro",
+};
+
+const SEXO_COLOR: Record<Sexo, string> = {
+  masculino: "var(--chart-2)",
+  femenino: "var(--chart-3)",
+  otro: "var(--chart-5)",
 };
 
 const ESTADO_ICONOS: Record<string, LucideIcon> = {
@@ -76,6 +90,7 @@ type Filtros = {
   centro: string | null;
   estado: string | null;
   rango: string | null;
+  sexo: Sexo | null;
   tipoVinculo: "directo" | "subcontrato" | null;
   subcontrato: string | null;
 };
@@ -87,6 +102,7 @@ function aplicarFiltros(
     excluirCentro?: boolean;
     excluirEstado?: boolean;
     excluirRango?: boolean;
+    excluirSexo?: boolean;
     excluirTipoVinculo?: boolean;
     excluirSubcontrato?: boolean;
   } = {},
@@ -96,6 +112,7 @@ function aplicarFiltros(
       (opts.excluirCentro || !filtros.centro || f.centro === filtros.centro) &&
       (opts.excluirEstado || !filtros.estado || f.estado === filtros.estado) &&
       (opts.excluirRango || !filtros.rango || rangoDeEdad(f.edad) === filtros.rango) &&
+      (opts.excluirSexo || !filtros.sexo || f.sexo === filtros.sexo) &&
       (opts.excluirTipoVinculo || !filtros.tipoVinculo || f.tipoVinculo === filtros.tipoVinculo) &&
       (opts.excluirSubcontrato || !filtros.subcontrato || f.subcontrato === filtros.subcontrato),
   );
@@ -298,6 +315,78 @@ function TarjetaVinculo({
   );
 }
 
+function TarjetaSexo({
+  datos,
+  filtroSexo,
+  toggleSexo,
+}: {
+  datos: { sexo: Sexo; label: string; cantidad: number; color: string }[];
+  filtroSexo: Sexo | null;
+  toggleSexo: (s: Sexo) => void;
+}) {
+  const total = datos.reduce((s, d) => s + d.cantidad, 0);
+  return (
+    <TarjetaGrafico titulo="Distribución por sexo" subtitulo="Clic en la leyenda para filtrar" height={186}>
+      <div className="flex h-full items-center gap-4">
+        <div className="relative shrink-0" style={{ height: "100%", width: 120 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={datos}
+                dataKey="cantidad"
+                nameKey="label"
+                cx="50%"
+                cy="50%"
+                innerRadius={38}
+                outerRadius={55}
+                paddingAngle={3}
+                stroke="none"
+                cursor="pointer"
+                isAnimationActive={false}
+              >
+                {datos.map((d) => (
+                  <Cell
+                    key={d.sexo}
+                    fill={d.color}
+                    fillOpacity={opacidad(!!filtroSexo, filtroSexo === d.sexo)}
+                    onClick={() => toggleSexo(d.sexo)}
+                  />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="font-heading text-xl font-bold tabular-nums">{total}</span>
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Con dato</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          {datos.map((d) => (
+            <button
+              key={d.sexo}
+              type="button"
+              onClick={() => toggleSexo(d.sexo)}
+              className={cn(
+                "flex flex-col gap-0.5 text-xs text-left px-1 py-0.5 -mx-1",
+                filtroSexo && filtroSexo !== d.sexo && "opacity-40",
+              )}
+            >
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span className="size-2 rounded-full shrink-0" style={{ background: d.color }} />
+                <span>{d.label}</span>
+              </span>
+              <span className="font-mono tabular-nums text-muted-foreground pl-3.5">
+                {d.cantidad} ({total > 0 ? Math.round((d.cantidad / total) * 100) : 0}%)
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </TarjetaGrafico>
+  );
+}
+
 export function AnaliticaView({
   filas,
   estadosConfig,
@@ -314,6 +403,7 @@ export function AnaliticaView({
   const [filtroCentro, setFiltroCentro] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
   const [filtroRango, setFiltroRango] = useState<string | null>(null);
+  const [filtroSexo, setFiltroSexo] = useState<Sexo | null>(null);
   const [filtroTipoVinculo, setFiltroTipoVinculo] = useState<"directo" | "subcontrato" | null>(null);
   const [filtroSubcontrato, setFiltroSubcontrato] = useState<string | null>(null);
 
@@ -351,6 +441,9 @@ export function AnaliticaView({
   function toggleRango(r: string) {
     setFiltroRango((prev) => (prev === r ? null : r));
   }
+  function toggleSexo(s: Sexo) {
+    setFiltroSexo((prev) => (prev === s ? null : s));
+  }
   function toggleTipoVinculo(t: "directo" | "subcontrato") {
     setFiltroTipoVinculo((prev) => (prev === t ? null : t));
     if (t === "directo") setFiltroSubcontrato(null);
@@ -365,17 +458,26 @@ export function AnaliticaView({
       centro: filtroCentro,
       estado: filtroEstado,
       rango: filtroRango,
+      sexo: filtroSexo,
       tipoVinculo: filtroTipoVinculo,
       subcontrato: filtroSubcontrato,
     }),
-    [filtroCentro, filtroEstado, filtroRango, filtroTipoVinculo, filtroSubcontrato],
+    [filtroCentro, filtroEstado, filtroRango, filtroSexo, filtroTipoVinculo, filtroSubcontrato],
   );
-  const hayFiltros = !!(filtroCentro || filtroEstado || filtroRango || filtroTipoVinculo || filtroSubcontrato);
+  const hayFiltros = !!(
+    filtroCentro ||
+    filtroEstado ||
+    filtroRango ||
+    filtroSexo ||
+    filtroTipoVinculo ||
+    filtroSubcontrato
+  );
 
   function limpiarFiltros() {
     setFiltroCentro(null);
     setFiltroEstado(null);
     setFiltroRango(null);
+    setFiltroSexo(null);
     setFiltroTipoVinculo(null);
     setFiltroSubcontrato(null);
   }
@@ -394,6 +496,20 @@ export function AnaliticaView({
       })),
     [baseEdad],
   );
+  const baseSexo = useMemo(() => aplicarFiltros(filas, filtros, { excluirSexo: true }), [filas, filtros]);
+  const distribucionSexo = useMemo(
+    () =>
+      (Object.keys(SEXO_LABEL) as Sexo[])
+        .map((s) => ({
+          sexo: s,
+          label: SEXO_LABEL[s],
+          color: SEXO_COLOR[s],
+          cantidad: baseSexo.filter((f) => f.sexo === s).length,
+        }))
+        .filter((d) => d.cantidad > 0),
+    [baseSexo],
+  );
+
   const baseEstado = useMemo(() => aplicarFiltros(filas, filtros, { excluirEstado: true }), [filas, filtros]);
   const totalBaseEstado = baseEstado.length;
   const estadoCapacitacion = useMemo(
@@ -573,6 +689,14 @@ export function AnaliticaView({
               Edad: {filtroRango} <X className="size-3" />
             </button>
           )}
+          {filtroSexo && (
+            <button
+              onClick={() => setFiltroSexo(null)}
+              className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs hover:bg-secondary/70"
+            >
+              Sexo: {SEXO_LABEL[filtroSexo]} <X className="size-3" />
+            </button>
+          )}
           {filtroTipoVinculo && (
             <button
               onClick={() => {
@@ -624,27 +748,39 @@ export function AnaliticaView({
       {/* Detalle por dimensión: edad, subcontrato, centro y una tabla rankeada */}
       <div className="grid lg:grid-cols-12 gap-4 items-stretch">
         <div className="lg:col-span-5 flex flex-col gap-4">
-          <TarjetaGrafico titulo="Distribución etaria" subtitulo="Clic en una barra para filtrar por rango" height={186}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={histogramaEdad} margin={{ top: 20, right: 8, left: 4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="rango" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
-                <YAxis hide domain={[0, "dataMax + 4"]} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
-                <Bar dataKey="cantidad" name="Trabajadores" radius={[3, 3, 0, 0]} cursor="pointer" isAnimationActive={false}>
-                  <LabelList dataKey="cantidad" position="top" style={ETIQUETA_STYLE} />
-                  {histogramaEdad.map((entry) => (
-                    <Cell
-                      key={entry.rango}
-                      fill="var(--chart-1)"
-                      fillOpacity={opacidad(!!filtroRango, filtroRango === entry.rango)}
-                      onClick={() => toggleRango(entry.rango)}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </TarjetaGrafico>
+          <div className="grid grid-cols-2 gap-4">
+            <TarjetaGrafico titulo="Distribución etaria" subtitulo="Clic en una barra para filtrar por rango" height={186}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={histogramaEdad} margin={{ top: 20, right: 8, left: 4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="rango" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                  <YAxis hide domain={[0, "dataMax + 4"]} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--accent)" }} />
+                  <Bar dataKey="cantidad" name="Trabajadores" radius={[3, 3, 0, 0]} cursor="pointer" isAnimationActive={false}>
+                    <LabelList dataKey="cantidad" position="top" style={ETIQUETA_STYLE} />
+                    {histogramaEdad.map((entry) => (
+                      <Cell
+                        key={entry.rango}
+                        fill="var(--chart-1)"
+                        fillOpacity={opacidad(!!filtroRango, filtroRango === entry.rango)}
+                        onClick={() => toggleRango(entry.rango)}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </TarjetaGrafico>
+
+            {distribucionSexo.length === 0 ? (
+              <TarjetaGrafico titulo="Distribución por sexo" subtitulo="Clic en la leyenda para filtrar" height={186}>
+                <p className="h-full flex items-center justify-center text-sm text-muted-foreground text-center px-4">
+                  Sin datos de sexo registrados con los filtros actuales.
+                </p>
+              </TarjetaGrafico>
+            ) : (
+              <TarjetaSexo datos={distribucionSexo} filtroSexo={filtroSexo} toggleSexo={toggleSexo} />
+            )}
+          </div>
 
           <TarjetaGrafico
             titulo="Trabajadores por subcontrato"
