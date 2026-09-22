@@ -116,16 +116,25 @@ async function distribucionPorCentro(sesion: Sesion) {
       : { data: [] };
   const nombrePorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
 
-  const conteos = new Map<string, number>();
+  const porCentro = new Map<
+    string,
+    { total: number; vigentes: number; porVencer: number; vencidos: number; sinCapacitacion: number }
+  >();
   for (const f of filas) {
     const nombre = (f.centro_trabajo_id && nombrePorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
-    conteos.set(nombre, (conteos.get(nombre) ?? 0) + 1);
+    const actual = porCentro.get(nombre) ?? { total: 0, vigentes: 0, porVencer: 0, vencidos: 0, sinCapacitacion: 0 };
+    actual.total += 1;
+    if (f.estado_vigencia === "vigente") actual.vigentes += 1;
+    else if (f.estado_vigencia === "por_vencer") actual.porVencer += 1;
+    else if (f.estado_vigencia === "vencido") actual.vencidos += 1;
+    else if (f.estado_vigencia === "sin_capacitacion") actual.sinCapacitacion += 1;
+    porCentro.set(nombre, actual);
   }
 
   return {
-    centros: [...conteos.entries()]
-      .map(([centro, cantidad]) => ({ centro, cantidad }))
-      .sort((a, b) => b.cantidad - a.cantidad),
+    centros: [...porCentro.entries()]
+      .map(([centro, c]) => ({ centro, ...c }))
+      .sort((a, b) => b.total - a.total),
   };
 }
 
@@ -208,7 +217,8 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     type: "function",
     function: {
       name: "distribucion_por_centro",
-      description: "Cuenta cuántos trabajadores hay en cada centro de trabajo.",
+      description:
+        "Cuenta cuántos trabajadores hay en cada centro de trabajo, desglosados por estado de capacitación (vigentes, por vencer, vencidos, sin capacitación). Úsala para cualquier pregunta que compare centros entre sí, incluyendo cuántos están vencidos/vigentes/sin capacitación por centro.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
