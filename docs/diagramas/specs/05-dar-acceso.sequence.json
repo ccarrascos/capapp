@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Dar acceso a un trabajador",
+    "output": "05-dar-acceso.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "gestor", "type": "external", "label": "Gestor" },
+    { "id": "dialogo", "type": "frontend", "label": "Diálogo", "sublabel": "Dar acceso" },
+    { "id": "accion", "type": "backend", "label": "Server Action", "sublabel": "crearAccesoTrabajador" },
+    { "id": "auth", "type": "security", "label": "Supabase Auth" },
+    { "id": "db", "type": "database", "label": "usuarios", "sublabel": "+ usuario_roles" },
+    { "id": "resend", "type": "external", "label": "Resend", "sublabel": "correo" }
+  ],
+  "segments": [
+    { "from": 150, "to": 310, "label": "Crear la cuenta" },
+    { "from": 328, "to": 530, "label": "Vincular y avisar" }
+  ],
+  "messages": [
+    { "from": "gestor", "to": "dialogo", "y": 180, "label": "correo del trabajador" },
+    { "from": "dialogo", "to": "accion", "y": 222, "label": "crearAccesoTrabajador(run, org, email)", "variant": "emphasis" },
+    { "from": "accion", "to": "auth", "y": 264, "label": "createUser(email, password temporal)", "variant": "emphasis" },
+    { "from": "auth", "to": "accion", "y": 296, "label": "usuario creado", "variant": "return" },
+    { "from": "accion", "to": "db", "y": 348, "label": "insert usuarios (perfil)" },
+    { "from": "accion", "to": "db", "y": 390, "label": "insert usuario_roles: trabajador" },
+    { "from": "accion", "to": "db", "y": 432, "label": "personas.usuario_id = nuevo usuario", "note": "si algo falla desde aquí, se revierte createUser" },
+    { "from": "accion", "to": "resend", "y": 474, "label": "enviarCorreoBienvenida(password temporal)", "variant": "dashed" },
+    { "from": "resend", "to": "accion", "y": 506, "label": "enviado / falló", "variant": "return" },
+    { "from": "accion", "to": "dialogo", "y": 558, "label": "{ ok, emailEnviado }", "variant": "return" },
+    { "from": "dialogo", "to": "gestor", "y": 600, "label": "confirma o muestra la contraseña para copiar" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 584, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Todo o nada", "items": ["Si falla el perfil, el rol o el vínculo con la persona, se borra el usuario de Auth ya creado — no queda una cuenta a medio configurar"] },
+    { "dot": "amber", "title": "Si el correo no llega", "items": ["emailEnviado: false no bloquea el alta — el gestor recibe la contraseña temporal en pantalla para entregarla por otro medio"] }
+  ]
+}

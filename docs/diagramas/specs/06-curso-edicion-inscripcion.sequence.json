@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Curso, edición e inscripción",
+    "output": "06-curso-edicion-inscripcion.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "gestor", "type": "external", "label": "Gestor" },
+    { "id": "vista", "type": "frontend", "label": "Cursos", "sublabel": "/cursos" },
+    { "id": "accion", "type": "backend", "label": "Acción" },
+    { "id": "db", "type": "database", "label": "Cursos", "sublabel": "y ediciones" },
+    { "id": "admin", "type": "database", "label": "personas", "sublabel": "cliente admin" }
+  ],
+  "segments": [
+    { "from": 150, "to": 272, "label": "Definir el curso" },
+    { "from": 284, "to": 402, "label": "Programar una edición" },
+    { "from": 414, "to": 664, "label": "Inscribir trabajadores" }
+  ],
+  "messages": [
+    { "from": "gestor", "to": "vista", "y": 180, "label": "nombre, horas, módulos por tema" },
+    { "from": "vista", "to": "accion", "y": 222, "label": "crearCurso() + agregarModulo()", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 254, "label": "insert cursos + modulos" },
+    { "from": "gestor", "to": "vista", "y": 298, "label": "fecha inicio/límite, facilitador, centro" },
+    { "from": "vista", "to": "accion", "y": 340, "label": "crearEdicion()", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 372, "label": "insert ediciones_curso" },
+    { "from": "gestor", "to": "vista", "y": 438, "label": "selecciona trabajadores a inscribir" },
+    { "from": "vista", "to": "accion", "y": 480, "label": "inscribirTrabajadores(edicionId, runs[])", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 512, "label": "¿tienen vínculo laboral activo en esta org?" },
+    { "from": "db", "to": "accion", "y": 544, "label": "confirmado o rechazado", "variant": "return" },
+    { "from": "accion", "to": "db", "y": 576, "label": "insert inscripciones (estado: inscrito)" },
+    { "from": "accion", "to": "admin", "y": 608, "label": "notifica \"nueva_inscripcion\" a quien tiene portal", "variant": "dashed" },
+    { "from": "accion", "to": "vista", "y": 650, "label": "{ ok }", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 664, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Sin vínculo, no hay inscripción", "items": ["inscribirTrabajadores exige un vínculo laboral activo con la organización que dicta el curso — sin este chequeo, cualquier RUN conocido podía inscribirse sin trabajar ahí"] },
+    { "dot": "violet", "title": "Portabilidad al revés", "items": ["La notificación de nueva inscripción es para el trabajador, no para quien inscribe — se usa el cliente admin porque la política de notificaciones solo permite insertar las propias"] }
+  ]
+}

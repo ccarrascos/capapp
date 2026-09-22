@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Alta de un trabajador",
+    "output": "03-alta-trabajador.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "gestor", "type": "external", "label": "Gestor", "sublabel": "admin/prevenc." },
+    { "id": "form", "type": "frontend", "label": "Diálogo", "sublabel": "Nuevo trabajador" },
+    { "id": "accion", "type": "backend", "label": "Server Action", "sublabel": "crearTrabajador" },
+    { "id": "admin", "type": "database", "label": "personas", "sublabel": "cliente admin" },
+    { "id": "db", "type": "database", "label": "Vínculos", "sublabel": "laborales" }
+  ],
+  "segments": [
+    { "from": 150, "to": 380, "label": "Validar" },
+    { "from": 398, "to": 548, "label": "Portabilidad (identidad global por RUT)" },
+    { "from": 566, "to": 700, "label": "Vínculo con esta organización" }
+  ],
+  "messages": [
+    { "from": "gestor", "to": "form", "y": 180, "label": "RUN, nombres, cargo, centro, sexo…" },
+    { "from": "form", "to": "accion", "y": 222, "label": "crearTrabajador(input)", "variant": "emphasis", "note": "valida RUT y fecha de nacimiento antes de continuar" },
+    { "from": "accion", "to": "admin", "y": 284, "label": "¿existe esta persona? (bypassa RLS)" },
+    { "from": "admin", "to": "accion", "y": 358, "label": "persona existente o null", "variant": "return" },
+    { "from": "accion", "to": "admin", "y": 410, "label": "insert personas (solo si no existía)", "variant": "dashed" },
+    { "from": "accion", "to": "db", "y": 462, "label": "insert vinculos_laborales", "variant": "emphasis" },
+    { "from": "db", "to": "accion", "y": 514, "label": "ok o duplicate key", "variant": "return" },
+    { "from": "accion", "to": "form", "y": 578, "label": "{ ok, personaYaExistia }", "variant": "return" },
+    { "from": "form", "to": "gestor", "y": 620, "label": "toast: trabajador agregado" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 602, "type": "backend" },
+    { "participant": "admin", "from": 302, "to": 372, "type": "database" },
+    { "participant": "db", "from": 448, "to": 528, "type": "database" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Persona ≠ vínculo", "items": ["\"Persona\" (identidad por RUT) es global; \"vínculo laboral\" es la relación con esta organización", "Si la persona ya existía (trabajó en otra empresa), no se sobrescribe su identidad — solo se agrega el vínculo nuevo"] },
+    { "dot": "amber", "title": "Por qué el cliente admin", "items": ["La búsqueda de portabilidad usa el cliente admin porque sel_personas de RLS sólo deja ver a alguien con quien ya se comparte organización — la primera vez, sin admin, se vería como inexistente"] }
+  ]
+}

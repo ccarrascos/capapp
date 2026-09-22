@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Capapp — Despliegue",
+    "output": "01-despliegue.html",
+    "quality_profile": "showcase",
+    "viewBox": [1060, 600],
+    "views": [
+      { "id": "ci-cd", "label": "Integración y despliegue", "focus": ["github", "vercel"], "note": "Cada push a master reconstruye y publica el sitio en Vercel." },
+      { "id": "runtime", "label": "Servicios en tiempo de ejecución", "focus": ["vercel", "supabase", "groq", "resend"], "note": "Las funciones serverless de Vercel llaman a estos tres servicios externos por HTTPS." }
+    ]
+  },
+  "components": [
+    { "id": "dev", "type": "external", "label": "Desarrollador", "sublabel": "git push", "pos": [40, 40], "size": [140, 60] },
+    { "id": "github", "type": "external", "label": "GitHub", "sublabel": "ccarrascos/capapp", "pos": [40, 260], "size": [140, 64] },
+    { "id": "vercel", "type": "cloud", "label": "Vercel", "sublabel": "build + funciones serverless", "pos": [340, 220], "size": [190, 84] },
+    { "id": "users", "type": "external", "label": "Usuarios", "sublabel": "navegador", "pos": [340, 40], "size": [140, 60] },
+    { "id": "supabase", "type": "database", "label": "Supabase Cloud", "sublabel": "Auth + Postgres (RLS)", "pos": [720, 40], "size": [190, 74] },
+    { "id": "groq", "type": "cloud", "label": "Groq Cloud", "sublabel": "LLM API", "pos": [720, 250], "size": [190, 64] },
+    { "id": "resend", "type": "external", "label": "Resend", "sublabel": "correo transaccional", "pos": [720, 450], "size": [190, 60] }
+  ],
+  "connections": [
+    { "id": "dev-github", "from": "dev", "to": "github", "label": "push a master", "labelDy": 24 },
+    { "id": "github-vercel", "from": "github", "to": "vercel", "label": "webhook: build + deploy", "variant": "emphasis" },
+    { "id": "users-vercel", "from": "users", "to": "vercel", "label": "HTTPS", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "id": "vercel-supabase", "from": "vercel", "to": "supabase", "label": "SQL + sesión (RLS)", "fromSide": "top", "toSide": "left" },
+    { "id": "vercel-groq", "from": "vercel", "to": "groq", "label": "tool calling (Asistente IA)", "fromSide": "right", "toSide": "left" },
+    { "id": "vercel-resend", "from": "vercel", "to": "resend", "label": "enviar correo", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entrega continua", "items": ["Cada push a master en GitHub dispara un build y deploy automático en Vercel", "El deploy a producción también puede lanzarse manual vía Vercel CLI (usado en este proyecto)"] },
+    { "dot": "emerald", "title": "Servicios administrados", "items": ["Supabase Cloud aloja Postgres y Auth — no hay base de datos propia que operar", "Groq y Resend son APIs externas llamadas desde las funciones serverless de Vercel"] }
+  ]
+}

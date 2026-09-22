@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Capapp — Arquitectura de componentes",
+    "output": "00-arquitectura-componentes.html",
+    "quality_profile": "showcase",
+    "viewBox": [1060, 560],
+    "repository": { "url": "https://github.com/ccarrascos/capapp", "provider": "github", "revision": "25e195c7a3542a4998e5661600ebe1cd024d853e" },
+    "views": [
+      { "id": "app-y-datos", "label": "Aplicación y datos", "focus": ["browser", "nextjs", "supabase"], "note": "Toda la lógica de negocio vive en Server Actions; cada consulta pasa por RLS." },
+      { "id": "asistente-ia", "label": "Asistente IA", "focus": ["nextjs", "groq", "supabase"], "note": "El asistente llama herramientas que reusan las mismas consultas con alcance de sesión — nunca una consulta libre." },
+      { "id": "correo", "label": "Correo transaccional", "focus": ["nextjs", "resend"], "note": "Bienvenida al dar acceso a un trabajador y avisos de vencimiento por correo." }
+    ]
+  },
+  "components": [
+    { "id": "browser", "type": "external", "label": "Navegador", "sublabel": "usuario autenticado", "pos": [40, 250], "size": [140, 64] },
+    {
+      "id": "nextjs",
+      "type": "backend",
+      "label": "Next.js App Router",
+      "sublabel": "Server Actions · Vercel",
+      "pos": [280, 244],
+      "size": [170, 76],
+      "sources": [{ "path": "src/app/(app)/layout.tsx", "label": "app router" }]
+    },
+    {
+      "id": "supabase",
+      "type": "database",
+      "label": "Supabase",
+      "sublabel": "Auth + Postgres (RLS)",
+      "pos": [620, 40],
+      "size": [180, 74],
+      "sources": [{ "path": "src/lib/auth.ts", "label": "getSesion" }]
+    },
+    {
+      "id": "groq",
+      "type": "cloud",
+      "label": "Groq API",
+      "sublabel": "LLM · tool calling",
+      "pos": [620, 244],
+      "size": [180, 74],
+      "sources": [{ "path": "src/lib/groq.ts" }]
+    },
+    {
+      "id": "resend",
+      "type": "external",
+      "label": "Resend API",
+      "sublabel": "correo transaccional",
+      "pos": [620, 448],
+      "size": [180, 64],
+      "sources": [{ "path": "src/lib/email.ts" }]
+    }
+  ],
+  "connections": [
+    { "id": "browser-nextjs", "from": "browser", "to": "nextjs", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "nextjs-supabase", "from": "nextjs", "to": "supabase", "label": "SQL + sesión (RLS)", "fromSide": "top", "toSide": "left" },
+    { "id": "nextjs-groq", "from": "nextjs", "to": "groq", "label": "tool calling (Asistente IA)", "fromSide": "right", "toSide": "left", "labelDy": 54 },
+    { "id": "nextjs-resend", "from": "nextjs", "to": "resend", "label": "enviar correo", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Aplicación", "items": ["Next.js App Router en Vercel — todo corre en Server Actions, no hay API REST propia", "El cliente de Supabase usado en cada acción respeta RLS con la sesión de quien pide"] },
+    { "dot": "emerald", "title": "Datos", "items": ["RLS activo en cada tabla — el rol y la organización del usuario deciden qué fila ve", "matriz_vigencia_capacitacion es una vista con security_invoker=true, no bypassa RLS"] },
+    { "dot": "violet", "title": "Asistente IA", "items": ["Groq decide qué herramienta llamar; las herramientas son las mismas consultas ya scopeadas por sesión", "El modelo nunca ejecuta SQL libre ni ve tablas fuera de una lista permitida"] }
+  ]
+}

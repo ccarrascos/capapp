@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Carga masiva de trabajadores",
+    "output": "04-carga-masiva.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "gestor", "type": "external", "label": "Gestor" },
+    { "id": "dialogo", "type": "frontend", "label": "Diálogo", "sublabel": "Carga masiva" },
+    { "id": "accion", "type": "backend", "label": "Server Action", "sublabel": "cargarTrabajadores…" },
+    { "id": "admin", "type": "database", "label": "personas", "sublabel": "cliente admin" },
+    { "id": "db", "type": "database", "label": "Vínculos", "sublabel": "laborales" }
+  ],
+  "segments": [
+    { "from": 150, "to": 208, "label": "En el navegador" },
+    { "from": 220, "to": 610, "label": "Por cada fila del CSV, en orden (no en paralelo)" }
+  ],
+  "messages": [
+    { "from": "gestor", "to": "dialogo", "y": 180, "label": "sube el CSV completado", "note": "el navegador ya parseó filas y encabezados" },
+    { "from": "dialogo", "to": "accion", "y": 232, "label": "cargarTrabajadoresMasivo(filas)", "variant": "emphasis", "note": "valida RUT, fecha, modalidad y vínculo por fila" },
+    { "from": "accion", "to": "admin", "y": 294, "label": "¿existe esta persona? (por RUT)" },
+    { "from": "admin", "to": "accion", "y": 336, "label": "existente o null", "variant": "return" },
+    { "from": "accion", "to": "admin", "y": 388, "label": "insert personas (si no existía)", "variant": "dashed" },
+    { "from": "accion", "to": "db", "y": 440, "label": "insert vínculo con esta organización", "variant": "emphasis" },
+    { "from": "db", "to": "accion", "y": 492, "label": "ok o ya inscrito", "variant": "return" },
+    { "from": "accion", "to": "dialogo", "y": 554, "label": "resultados[] — fila, ok, mensaje", "variant": "return" },
+    { "from": "dialogo", "to": "gestor", "y": 596, "label": "\"X de Y filas cargadas correctamente\"" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 218, "to": 578, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Fila por fila, no en lote", "items": ["Se procesa secuencialmente porque un mismo RUT puede repetirse dentro del propio archivo — la segunda aparición debe ver que la primera ya insertó la persona"] },
+    { "dot": "amber", "title": "Cargo, centro y subcontrato son texto", "items": ["El CSV los referencia por nombre exacto, no por id — si no existe ya en la organización, esa fila falla con un mensaje puntual sin abortar el resto"] }
+  ]
+}

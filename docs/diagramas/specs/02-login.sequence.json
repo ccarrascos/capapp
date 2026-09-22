@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Iniciar sesión",
+    "output": "02-login.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "usuario", "type": "external", "label": "Usuario" },
+    { "id": "pagina", "type": "frontend", "label": "Login", "sublabel": "/login" },
+    { "id": "accion", "type": "backend", "label": "Server Action", "sublabel": "iniciarSesionConRut" },
+    { "id": "db", "type": "database", "label": "usuarios", "sublabel": "tabla" },
+    { "id": "auth", "type": "security", "label": "Supabase Auth" }
+  ],
+  "messages": [
+    { "from": "usuario", "to": "pagina", "y": 180, "label": "ingresa RUT + contraseña" },
+    { "from": "pagina", "to": "accion", "y": 232, "label": "iniciarSesionConRut(run, dv, password)", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 284, "label": "buscar email por RUN + DV" },
+    { "from": "db", "to": "accion", "y": 336, "label": "email, activo", "variant": "return" },
+    { "from": "accion", "to": "auth", "y": 388, "label": "signInWithPassword(email, password)", "variant": "emphasis" },
+    { "from": "auth", "to": "accion", "y": 440, "label": "sesión válida o error", "variant": "return" },
+    { "from": "accion", "to": "pagina", "y": 492, "label": "{ ok } o mensaje genérico", "variant": "return" },
+    { "from": "pagina", "to": "usuario", "y": 544, "label": "redirige a /dashboard" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 516, "type": "backend" },
+    { "participant": "db", "from": 260, "to": 312, "type": "database" },
+    { "participant": "auth", "from": 364, "to": 416, "type": "security" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "RUT, no email", "items": ["La persona ingresa RUT, no correo — el servidor resuelve el email real buscando en la tabla usuarios por RUN + DV", "iniciarSesionConRut usa el cliente admin sólo para esa búsqueda; el inicio de sesión en sí lo hace Supabase Auth"] },
+    { "dot": "amber", "title": "Mensaje genérico", "items": ["\"RUT o contraseña incorrectos\" cubre RUT inexistente, cuenta inactiva y contraseña errónea por igual — no revela cuál de los tres falló"] }
+  ]
+}

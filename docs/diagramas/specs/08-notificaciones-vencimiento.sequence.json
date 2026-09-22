@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Notificaciones de vencimiento",
+    "output": "08-notificaciones-vencimiento.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "usuario", "type": "external", "label": "Usuario" },
+    { "id": "campana", "type": "frontend", "label": "Campana", "sublabel": "topbar" },
+    { "id": "accion", "type": "backend", "label": "Acción", "sublabel": "obtenerNotif…" },
+    { "id": "matriz", "type": "database", "label": "Matriz", "sublabel": "vigencia" },
+    { "id": "db", "type": "database", "label": "Notific.", "sublabel": "tabla" }
+  ],
+  "segments": [
+    { "from": 150, "to": 320, "label": "Sincronizar (idempotente, con índice único)" },
+    { "from": 332, "to": 530, "label": "Mostrar" }
+  ],
+  "messages": [
+    { "from": "usuario", "to": "campana", "y": 180, "label": "abre cualquier página autenticada" },
+    { "from": "campana", "to": "accion", "y": 222, "label": "obtenerNotificaciones()", "variant": "emphasis", "note": "se llama en cada carga — no depende de un cron" },
+    { "from": "accion", "to": "matriz", "y": 264, "label": "trabajadores por_vencer o vencidos que puede ver" },
+    { "from": "matriz", "to": "accion", "y": 296, "label": "filas visibles según rol/centro", "variant": "return" },
+    { "from": "accion", "to": "db", "y": 348, "label": "upsert (usuario_id, inscripcion_id, tipo) — ignora duplicados" },
+    { "from": "accion", "to": "db", "y": 390, "label": "select últimas 30, más nuevas primero" },
+    { "from": "db", "to": "accion", "y": 432, "label": "lista de notificaciones", "variant": "return" },
+    { "from": "accion", "to": "campana", "y": 474, "label": "{ ok, notificaciones }", "variant": "return" },
+    { "from": "campana", "to": "usuario", "y": 516, "label": "badge con el conteo de no leídas" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 488, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Sin cron", "items": ["No hay un job programado — la sincronización corre cada vez que alguien abre la app, y el índice único (usuario_id, inscripcion_id, tipo) evita duplicar la misma alerta en cada visita"] },
+    { "dot": "amber", "title": "Dos alcances distintos", "items": ["admin_organizacion y prevencionista ven todo su organización; supervisor_centro solo su centro asignado; quien tiene portal propio se entera además de sus propios vencimientos"] }
+  ]
+}

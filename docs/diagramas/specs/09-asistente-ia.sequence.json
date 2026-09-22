@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Consulta al Asistente IA",
+    "output": "09-asistente-ia.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "usuario", "type": "external", "label": "Usuario" },
+    { "id": "chat", "type": "frontend", "label": "Chat", "sublabel": "/ia" },
+    { "id": "accion", "type": "backend", "label": "Acción", "sublabel": "enviarMensaje" },
+    { "id": "groq", "type": "cloud", "label": "Groq", "sublabel": "LLM" },
+    { "id": "herr", "type": "backend", "label": "Herramientas", "sublabel": "sesión + RLS" }
+  ],
+  "segments": [
+    { "from": 150, "to": 260, "label": "Autorización" },
+    { "from": 272, "to": 480, "label": "El modelo decide qué herramienta llamar (se repite hasta 6 veces)" },
+    { "from": 492, "to": 622, "label": "Respuesta final" }
+  ],
+  "messages": [
+    { "from": "usuario", "to": "chat", "y": 180, "label": "escribe una pregunta en español" },
+    { "from": "chat", "to": "accion", "y": 222, "label": "enviarMensaje(historial)", "variant": "emphasis", "note": "verifica rol de gestión antes de continuar" },
+    { "from": "accion", "to": "groq", "y": 284, "label": "chat.completions.create(mensajes, tools)", "variant": "emphasis" },
+    { "from": "groq", "to": "accion", "y": 326, "label": "tool_calls: qué herramienta y con qué argumentos", "variant": "return" },
+    { "from": "accion", "to": "herr", "y": 368, "label": "ejecutarHerramienta(sesión, nombre, args)" },
+    { "from": "herr", "to": "accion", "y": 410, "label": "datos ya filtrados por sesión/RLS", "variant": "return" },
+    { "from": "accion", "to": "groq", "y": 452, "label": "resultado de la herramienta (role: tool)", "variant": "dashed" },
+    { "from": "groq", "to": "accion", "y": 524, "label": "respuesta en texto (sin más tool_calls)", "variant": "return", "note": "registra auditoría: consulta_asistente_ia" },
+    { "from": "accion", "to": "chat", "y": 566, "label": "{ ok, respuesta }", "variant": "return" },
+    { "from": "chat", "to": "usuario", "y": 608, "label": "muestra la respuesta en el chat" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 594, "type": "backend" },
+    { "participant": "groq", "from": 270, "to": 340, "type": "cloud" },
+    { "participant": "herr", "from": 354, "to": 424, "type": "backend" },
+    { "participant": "groq", "from": 438, "to": 538, "type": "cloud" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Sin SQL libre", "items": ["Groq solo puede llamar un set fijo de herramientas — nunca redacta una consulta propia; cada herramienta reusa las mismas reglas de visibilidad que Panel, Matriz y Analítica"] },
+    { "dot": "amber", "title": "Nunca ve más que el usuario", "items": ["Cada herramienta corre con la sesión de quien pregunta — un supervisor_centro solo obtiene datos de su propio centro, igual que en el resto de la app"] },
+    { "dot": "violet", "title": "consultar_trabajadores y consultar_tabla", "items": ["Si ninguna herramienta específica responde la pregunta, el modelo pide el listado completo (acotado) y calcula la respuesta él mismo, en vez de rendirse"] }
+  ]
+}

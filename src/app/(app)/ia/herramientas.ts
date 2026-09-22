@@ -3,6 +3,7 @@ import type Groq from "groq-sdk";
 import { centrosVisibles, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
+import { buscarAyuda, temasDeAyudaDisponibles } from "./ayuda";
 
 type FilaMatriz = Database["public"]["Views"]["matriz_vigencia_capacitacion"]["Row"];
 type Sexo = "masculino" | "femenino" | "otro";
@@ -441,6 +442,21 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "buscar_ayuda",
+      description:
+        `Explica CÓMO usar la plataforma (en qué pantalla, qué botón) — no datos, sino instrucciones de uso. Temas cubiertos: ${temasDeAyudaDisponibles().join("; ")}.`,
+      parameters: {
+        type: "object",
+        properties: {
+          consulta: { type: "string", description: "Qué acción de la plataforma quiere hacer el usuario, en sus propias palabras." },
+        },
+        required: ["consulta"],
+      },
+    },
+  },
 ];
 
 export async function ejecutarHerramienta(
@@ -479,6 +495,8 @@ export async function ejecutarHerramienta(
         : [];
       return consultarTabla(String(argumentos.tabla ?? ""), filtros);
     }
+    case "buscar_ayuda":
+      return buscarAyuda(String(argumentos.consulta ?? ""));
     default:
       return { error: `Herramienta desconocida: ${nombre}` };
   }

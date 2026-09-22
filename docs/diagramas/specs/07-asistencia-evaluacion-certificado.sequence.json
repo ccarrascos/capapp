@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Capapp — Asistencia, evaluación y certificado",
+    "output": "07-asistencia-evaluacion-certificado.html",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "facilitador", "type": "external", "label": "Facilitador" },
+    { "id": "vista", "type": "frontend", "label": "Edición", "sublabel": "/ediciones/:id" },
+    { "id": "accion", "type": "backend", "label": "Acción" },
+    { "id": "db", "type": "database", "label": "Inscripción", "sublabel": "+ certificados" },
+    { "id": "admin", "type": "database", "label": "personas", "sublabel": "cliente admin" }
+  ],
+  "segments": [
+    { "from": 150, "to": 260, "label": "Por cada módulo" },
+    { "from": 272, "to": 500, "label": "Evaluación final (requiere asistencia completa + manual entregado)" },
+    { "from": 512, "to": 700, "label": "Emitir certificado (acción separada)" }
+  ],
+  "messages": [
+    { "from": "facilitador", "to": "vista", "y": 180, "label": "marca presente/ausente por módulo" },
+    { "from": "vista", "to": "accion", "y": 222, "label": "registrarAsistenciaModulo()", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 254, "label": "upsert asistencias_modulo" },
+    { "from": "facilitador", "to": "vista", "y": 306, "label": "puntaje, aprobado, manual entregado" },
+    { "from": "vista", "to": "accion", "y": 348, "label": "registrarEvaluacionFinal()", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 380, "label": "¿asistencia 100% y manual entregado?" },
+    { "from": "db", "to": "accion", "y": 412, "label": "cumple o falta un requisito", "variant": "return" },
+    { "from": "accion", "to": "db", "y": 444, "label": "insert evaluaciones_resultado + estado: aprobado" },
+    { "from": "accion", "to": "admin", "y": 476, "label": "notifica \"curso_finalizado\" al trabajador", "variant": "dashed" },
+    { "from": "facilitador", "to": "vista", "y": 528, "label": "define vigencia y emite" },
+    { "from": "vista", "to": "accion", "y": 570, "label": "emitirCertificado()", "variant": "emphasis" },
+    { "from": "accion", "to": "db", "y": 602, "label": "insert certificados (número correlativo)" },
+    { "from": "accion", "to": "admin", "y": 634, "label": "notifica \"certificado_emitido\"", "variant": "dashed" },
+    { "from": "accion", "to": "vista", "y": 676, "label": "{ ok }", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "accion", "from": 208, "to": 690, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Requisitos antes de aprobar", "items": ["No se puede aprobar sin asistencia registrada en todos los módulos ni sin el manual del participante entregado — son chequeos del servidor, no solo del formulario"] },
+    { "dot": "amber", "title": "Certificado ≠ aprobación", "items": ["Aprobar la evaluación y emitir el certificado son dos acciones separadas — el certificado puede emitirse más tarde, por eso avisa aparte"] },
+    { "dot": "violet", "title": "El cliente nunca elige a quién", "items": ["persona_run y curso_id del certificado se derivan de la inscripción real en el servidor, nunca de lo que envía el formulario — evita emitir para el trabajador o curso equivocado"] }
+  ]
+}
