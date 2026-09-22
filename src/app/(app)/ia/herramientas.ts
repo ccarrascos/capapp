@@ -84,12 +84,27 @@ async function buscarTrabajador(sesion: Sesion, consulta: string) {
   };
 }
 
-async function trabajadoresPorVencer(sesion: Sesion) {
+async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, estado: string | null) {
   const filas = await filasVisibles(sesion);
+
+  const centroIds = [...new Set(filas.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
+  const supabase = await createClient();
+  const { data: centros } =
+    centroIds.length > 0
+      ? await supabase.from("centros_trabajo").select("id, nombre").in("id", centroIds)
+      : { data: [] };
+  const nombreCentroPorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+  const centroDe = (f: FilaMatriz) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
+
+  const centroBuscado = centro ? sinAcentos(centro.trim().toLowerCase()) : null;
+  const estadosValidos = new Set(["vencido", "por_vencer"]);
+  const estadoBuscado = estado && estadosValidos.has(estado) ? estado : null;
+
   const relevantes = filas
-    .filter((f) => f.estado_vigencia === "vencido" || f.estado_vigencia === "por_vencer")
+    .filter((f) => (estadoBuscado ? f.estado_vigencia === estadoBuscado : f.estado_vigencia === "vencido" || f.estado_vigencia === "por_vencer"))
+    .filter((f) => !centroBuscado || sinAcentos(centroDe(f).toLowerCase()).includes(centroBuscado))
     .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
-    .slice(0, 20);
+    .slice(0, 30);
 
   return {
     // La ventana "por vencer" es fija en 60 días — la misma que usa la Matriz de vigencia.
@@ -99,6 +114,7 @@ async function trabajadoresPorVencer(sesion: Sesion) {
       nombre: nombreCompleto(f),
       run: f.run && f.dv ? `${f.run}-${f.dv}` : null,
       cargo: f.cargo ?? null,
+      centro: centroDe(f),
       estadoVigencia: f.estado_vigencia,
       vigenciaHasta: f.vigencia_hasta,
     })),
@@ -209,8 +225,19 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     function: {
       name: "trabajadores_por_vencer",
       description:
-        "Lista los trabajadores con capacitación vencida o por vencer (dentro de los próximos 60 días), ordenados por fecha de vencimiento más próxima.",
-      parameters: { type: "object", properties: {}, required: [] },
+        "Lista, con nombre y RUN, los trabajadores con capacitación vencida o por vencer (dentro de los próximos 60 días), ordenados por fecha de vencimiento más próxima. Úsala también cuando pregunten quiénes son los vencidos/por vencer de un centro en particular.",
+      parameters: {
+        type: "object",
+        properties: {
+          centro: { type: "string", description: "Nombre (o parte de él) del centro de trabajo para filtrar. Omitir para todos los centros." },
+          estado: {
+            type: "string",
+            enum: ["vencido", "por_vencer"],
+            description: "Filtra solo por este estado. Omitir para incluir ambos (vencido y por_vencer).",
+          },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -244,7 +271,11 @@ export async function ejecutarHerramienta(
     case "buscar_trabajador":
       return buscarTrabajador(sesion, String(argumentos.consulta ?? ""));
     case "trabajadores_por_vencer":
-      return trabajadoresPorVencer(sesion);
+      return trabajadoresPorVencer(
+        sesion,
+        argumentos.centro ? String(argumentos.centro) : null,
+        argumentos.estado ? String(argumentos.estado) : null,
+      );
     case "distribucion_por_centro":
       return distribucionPorCentro(sesion);
     case "demografia_trabajadores":
