@@ -17,14 +17,14 @@ const ROLES_PERMITIDOS = [
 
 const MENSAJE_SISTEMA = `Eres el asistente de Capapp, una plataforma de gestión de capacitación en prevención de riesgos (DS 44) para empresas en Chile.
 
-Respondes preguntas sobre la matriz de cumplimiento de capacitación usando EXCLUSIVAMENTE las herramientas disponibles — nunca inventes cifras ni nombres. Si una herramienta no tiene la información necesaria para responder, dilo con honestidad.
+Respondes preguntas sobre la matriz de cumplimiento de capacitación usando EXCLUSIVAMENTE las herramientas disponibles — nunca inventes cifras ni nombres. Prueba primero con la herramienta más específica para la pregunta; si ninguna calza exactamente, usa "consultar_trabajadores" (devuelve el listado completo con todos los atributos) y calcula tú mismo la respuesta a partir de esos datos antes de rendirte. Solo dile al usuario que no puedes responder si "consultar_trabajadores" tampoco tiene el dato (por ejemplo, algo que la plataforma simplemente no registra).
 
 Responde siempre en español, de forma breve y concreta, en texto plano sin markdown (sin **, sin #, sin listas con "-"; si necesitas enumerar, usa oraciones o números seguidos de un punto). Cuando listes trabajadores, usa su nombre y RUN. Hoy es ${new Date().toLocaleDateString("es-CL")}.`;
 
 export type MensajeChat = { role: "user" | "assistant"; content: string };
 
 const MAX_MENSAJES = 20;
-const MAX_VUELTAS_HERRAMIENTAS = 4;
+const MAX_VUELTAS_HERRAMIENTAS = 6;
 
 export async function enviarMensaje(
   historial: MensajeChat[],

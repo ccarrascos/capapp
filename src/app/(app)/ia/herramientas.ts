@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
 
 type FilaMatriz = Database["public"]["Views"]["matriz_vigencia_capacitacion"]["Row"];
+type Sexo = "masculino" | "femenino" | "otro";
 
 /**
  * Mismo filtro de visibilidad que usan Panel, Matriz de vigencia y Analítica
@@ -21,13 +22,40 @@ async function filasVisibles(sesion: Sesion): Promise<FilaMatriz[]> {
   });
 }
 
+async function mapaCentros(filas: FilaMatriz[]): Promise<Map<string, string>> {
+  const centroIds = [...new Set(filas.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
+  if (centroIds.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data: centros } = await supabase.from("centros_trabajo").select("id, nombre").in("id", centroIds);
+  return new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+}
+
+async function mapaPersonas(filas: FilaMatriz[]): Promise<Map<string, { fecha_nacimiento: string | null; sexo: Sexo | null }>> {
+  const runs = [...new Set(filas.map((f) => f.persona_run).filter((r): r is string => !!r))];
+  if (runs.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data: personas } = await supabase.from("personas").select("run, fecha_nacimiento, sexo").in("run", runs);
+  return new Map((personas ?? []).map((p) => [p.run, p]));
+}
+
 function nombreCompleto(f: FilaMatriz): string {
   return `${f.nombres ?? ""} ${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.replace(/\s+/g, " ").trim();
 }
 
-/** El LLM extrae nombres de una conversación libre y no siempre respeta tildes — se compara sin acentos. */
+/** El LLM extrae texto de una conversación libre y no siempre respeta tildes — se compara sin acentos. */
 function sinAcentos(texto: string): string {
-  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function calcularEdad(fechaNacimiento: string): number {
+  const nacimiento = new Date(fechaNacimiento);
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const aunNoCumple =
+    hoy.getMonth() < nacimiento.getMonth() ||
+    (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+  if (aunNoCumple) edad -= 1;
+  return edad;
 }
 
 async function resumenCumplimiento(sesion: Sesion) {
@@ -47,13 +75,13 @@ async function resumenCumplimiento(sesion: Sesion) {
 
 async function buscarTrabajador(sesion: Sesion, consulta: string) {
   const filas = await filasVisibles(sesion);
-  const q = sinAcentos(consulta.trim().toLowerCase());
+  const q = sinAcentos(consulta.trim());
   const runBuscado = q.replace(/[^0-9k]/gi, "");
 
   const encontrados = filas
     .filter((f) => {
       if (!q) return false;
-      if (sinAcentos(nombreCompleto(f).toLowerCase()).includes(q)) return true;
+      if (sinAcentos(nombreCompleto(f)).includes(q)) return true;
       return runBuscado.length >= 4 && (f.run ?? "").includes(runBuscado);
     })
     .slice(0, 10);
@@ -62,13 +90,7 @@ async function buscarTrabajador(sesion: Sesion, consulta: string) {
     return { encontrados: 0, mensaje: "No se encontró ningún trabajador que coincida con esa búsqueda." };
   }
 
-  const centroIds = [...new Set(encontrados.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
-  const supabase = await createClient();
-  const { data: centros } =
-    centroIds.length > 0
-      ? await supabase.from("centros_trabajo").select("id, nombre").in("id", centroIds)
-      : { data: [] };
-  const nombreCentroPorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+  const nombreCentroPorId = await mapaCentros(encontrados);
 
   return {
     encontrados: encontrados.length,
@@ -86,25 +108,18 @@ async function buscarTrabajador(sesion: Sesion, consulta: string) {
 
 async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, estado: string | null) {
   const filas = await filasVisibles(sesion);
-
-  const centroIds = [...new Set(filas.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
-  const supabase = await createClient();
-  const { data: centros } =
-    centroIds.length > 0
-      ? await supabase.from("centros_trabajo").select("id, nombre").in("id", centroIds)
-      : { data: [] };
-  const nombreCentroPorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+  const nombreCentroPorId = await mapaCentros(filas);
   const centroDe = (f: FilaMatriz) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
 
-  const centroBuscado = centro ? sinAcentos(centro.trim().toLowerCase()) : null;
+  const centroBuscado = centro ? sinAcentos(centro.trim()) : null;
   const estadosValidos = new Set(["vencido", "por_vencer"]);
   const estadoBuscado = estado && estadosValidos.has(estado) ? estado : null;
 
   const relevantes = filas
     .filter((f) => (estadoBuscado ? f.estado_vigencia === estadoBuscado : f.estado_vigencia === "vencido" || f.estado_vigencia === "por_vencer"))
-    .filter((f) => !centroBuscado || sinAcentos(centroDe(f).toLowerCase()).includes(centroBuscado))
+    .filter((f) => !centroBuscado || sinAcentos(centroDe(f)).includes(centroBuscado))
     .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
-    .slice(0, 30);
+    .slice(0, 50);
 
   return {
     // La ventana "por vencer" es fija en 60 días — la misma que usa la Matriz de vigencia.
@@ -123,21 +138,14 @@ async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, esta
 
 async function distribucionPorCentro(sesion: Sesion) {
   const filas = await filasVisibles(sesion);
-  const centroIds = [...new Set(filas.map((f) => f.centro_trabajo_id).filter((id): id is string => !!id))];
-
-  const supabase = await createClient();
-  const { data: centros } =
-    centroIds.length > 0
-      ? await supabase.from("centros_trabajo").select("id, nombre").in("id", centroIds)
-      : { data: [] };
-  const nombrePorId = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+  const nombreCentroPorId = await mapaCentros(filas);
 
   const porCentro = new Map<
     string,
     { total: number; vigentes: number; porVencer: number; vencidos: number; sinCapacitacion: number }
   >();
   for (const f of filas) {
-    const nombre = (f.centro_trabajo_id && nombrePorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
+    const nombre = (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
     const actual = porCentro.get(nombre) ?? { total: 0, vigentes: 0, porVencer: 0, vencidos: 0, sinCapacitacion: 0 };
     actual.total += 1;
     if (f.estado_vigencia === "vigente") actual.vigentes += 1;
@@ -154,35 +162,17 @@ async function distribucionPorCentro(sesion: Sesion) {
   };
 }
 
-function calcularEdad(fechaNacimiento: string): number {
-  const nacimiento = new Date(fechaNacimiento);
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const aunNoCumple =
-    hoy.getMonth() < nacimiento.getMonth() ||
-    (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
-  if (aunNoCumple) edad -= 1;
-  return edad;
-}
-
 async function demografiaTrabajadores(sesion: Sesion) {
   const filas = await filasVisibles(sesion);
   const runs = [...new Set(filas.map((f) => f.persona_run).filter((r): r is string => !!r))];
+  const porRun = await mapaPersonas(filas);
 
-  const supabase = await createClient();
-  const { data: personas } =
-    runs.length > 0
-      ? await supabase.from("personas").select("run, fecha_nacimiento, sexo").in("run", runs)
-      : { data: [] };
-
-  const porRun = new Map((personas ?? []).map((p) => [p.run, p]));
   const edades = runs
     .map((r) => porRun.get(r)?.fecha_nacimiento)
     .filter((f): f is string => !!f)
     .map(calcularEdad);
-  const sexos = runs.map((r) => porRun.get(r)?.sexo).filter((s): s is "masculino" | "femenino" | "otro" => !!s);
-
-  const conteoSexo = (s: string) => sexos.filter((x) => x === s).length;
+  const sexos = runs.map((r) => porRun.get(r)?.sexo).filter((s): s is Sexo => !!s);
+  const conteoSexo = (s: Sexo) => sexos.filter((x) => x === s).length;
 
   return {
     trabajadoresConFechaNacimiento: edades.length,
@@ -193,6 +183,60 @@ async function demografiaTrabajadores(sesion: Sesion) {
     masculino: conteoSexo("masculino"),
     femenino: conteoSexo("femenino"),
     otro: conteoSexo("otro"),
+  };
+}
+
+const LIMITE_CONSULTA_COMPLETA = 250;
+
+/**
+ * Catch-all: vuelca la lista completa (acotada) de trabajadores visibles con
+ * todos sus atributos, para que el asistente pueda responder preguntas que
+ * ninguna herramienta específica cubre — cruces, conteos ad hoc, listados
+ * por cargo/vínculo/modalidad, etc. — razonando sobre los datos crudos en
+ * vez de fallar por falta de una herramienta a medida.
+ */
+async function consultarTrabajadores(
+  sesion: Sesion,
+  filtros: { centro?: string; estado?: string; cargo?: string },
+) {
+  const filas = await filasVisibles(sesion);
+  const nombreCentroPorId = await mapaCentros(filas);
+  const personaPorRun = await mapaPersonas(filas);
+  const centroDe = (f: FilaMatriz) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
+
+  const centroBuscado = filtros.centro ? sinAcentos(filtros.centro.trim()) : null;
+  const cargoBuscado = filtros.cargo ? sinAcentos(filtros.cargo.trim()) : null;
+  const estadoBuscado = filtros.estado ? filtros.estado.trim() : null;
+
+  const filtradas = filas
+    .filter((f) => !centroBuscado || sinAcentos(centroDe(f)).includes(centroBuscado))
+    .filter((f) => !cargoBuscado || sinAcentos(f.cargo ?? "").includes(cargoBuscado))
+    .filter((f) => !estadoBuscado || f.estado_vigencia === estadoBuscado);
+
+  const truncado = filtradas.length > LIMITE_CONSULTA_COMPLETA;
+
+  return {
+    totalCoincidencias: filtradas.length,
+    truncado,
+    ...(truncado
+      ? { nota: `Se muestran solo los primeros ${LIMITE_CONSULTA_COMPLETA} de ${filtradas.length} — pide un filtro más específico (centro, cargo o estado) si necesitas ver el resto.` }
+      : {}),
+    trabajadores: filtradas.slice(0, LIMITE_CONSULTA_COMPLETA).map((f) => {
+      const persona = f.persona_run ? personaPorRun.get(f.persona_run) : null;
+      return {
+        nombre: nombreCompleto(f),
+        run: f.run && f.dv ? `${f.run}-${f.dv}` : null,
+        cargo: f.cargo ?? null,
+        centro: centroDe(f),
+        unidad: f.unidad ?? null,
+        vinculo: f.tipo_vinculo === "subcontrato" ? `Subcontrato (${f.subcontrato_nombre ?? "?"})` : "Directo",
+        modalidadContractual: f.modalidad_contractual ?? null,
+        edad: persona?.fecha_nacimiento ? calcularEdad(persona.fecha_nacimiento) : null,
+        sexo: persona?.sexo ?? null,
+        estadoVigencia: f.estado_vigencia,
+        vigenciaHasta: f.vigencia_hasta,
+      };
+    }),
   };
 }
 
@@ -245,7 +289,7 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     function: {
       name: "distribucion_por_centro",
       description:
-        "Cuenta cuántos trabajadores hay en cada centro de trabajo, desglosados por estado de capacitación (vigentes, por vencer, vencidos, sin capacitación). Úsala para cualquier pregunta que compare centros entre sí, incluyendo cuántos están vencidos/vigentes/sin capacitación por centro.",
+        "Cuenta cuántos trabajadores hay en cada centro de trabajo, desglosados por estado de capacitación (vigentes, por vencer, vencidos, sin capacitación). Úsala para cualquier pregunta que compare centros entre sí.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
@@ -256,6 +300,28 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       description:
         "Estadísticas demográficas: edad promedio/mínima/máxima y distribución por sexo (masculino/femenino/otro) de los trabajadores.",
       parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_trabajadores",
+      description:
+        "Herramienta general: devuelve la lista completa de trabajadores visibles (nombre, RUN, cargo, centro, unidad, vínculo, modalidad contractual, edad, sexo, estado y fecha de vencimiento), opcionalmente filtrada. " +
+        "Úsala SIEMPRE que ninguna otra herramienta responda directamente la pregunta — por ejemplo listados por cargo, cruces entre varias dimensiones, o cualquier cálculo que debas hacer tú mismo sobre los datos crudos.",
+      parameters: {
+        type: "object",
+        properties: {
+          centro: { type: "string", description: "Filtra por nombre (o parte de él) del centro de trabajo." },
+          cargo: { type: "string", description: "Filtra por nombre (o parte de él) del cargo." },
+          estado: {
+            type: "string",
+            enum: ["vigente", "por_vencer", "vencido", "sin_capacitacion"],
+            description: "Filtra por estado de vigencia exacto.",
+          },
+        },
+        required: [],
+      },
     },
   },
 ];
@@ -280,6 +346,12 @@ export async function ejecutarHerramienta(
       return distribucionPorCentro(sesion);
     case "demografia_trabajadores":
       return demografiaTrabajadores(sesion);
+    case "consultar_trabajadores":
+      return consultarTrabajadores(sesion, {
+        centro: argumentos.centro ? String(argumentos.centro) : undefined,
+        cargo: argumentos.cargo ? String(argumentos.cargo) : undefined,
+        estado: argumentos.estado ? String(argumentos.estado) : undefined,
+      });
     default:
       return { error: `Herramienta desconocida: ${nombre}` };
   }
