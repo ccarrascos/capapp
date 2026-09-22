@@ -345,11 +345,14 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       parameters: {
         type: "object",
         properties: {
-          centro: { type: "string", description: "Nombre (o parte de él) del centro de trabajo para filtrar. Omitir para todos los centros." },
+          centro: {
+            type: ["string", "null"],
+            description: "Nombre (o parte de él) del centro de trabajo para filtrar. null para todos los centros.",
+          },
           estado: {
-            type: "string",
-            enum: ["vencido", "por_vencer"],
-            description: "Filtra solo por este estado. Omitir para incluir ambos (vencido y por_vencer).",
+            type: ["string", "null"],
+            enum: ["vencido", "por_vencer", null],
+            description: "Filtra solo por este estado. null para incluir ambos (vencido y por_vencer).",
           },
         },
         required: [],
@@ -393,12 +396,12 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       parameters: {
         type: "object",
         properties: {
-          centro: { type: "string", description: "Filtra por nombre (o parte de él) del centro de trabajo." },
-          cargo: { type: "string", description: "Filtra por nombre (o parte de él) del cargo." },
+          centro: { type: ["string", "null"], description: "Filtra por nombre (o parte de él) del centro de trabajo. null para no filtrar." },
+          cargo: { type: ["string", "null"], description: "Filtra por nombre (o parte de él) del cargo. null para no filtrar." },
           estado: {
-            type: "string",
-            enum: ["vigente", "por_vencer", "vencido", "sin_capacitacion"],
-            description: "Filtra por estado de vigencia exacto.",
+            type: ["string", "null"],
+            enum: ["vigente", "por_vencer", "vencido", "sin_capacitacion", null],
+            description: "Filtra por estado de vigencia exacto. null para no filtrar.",
           },
         },
         required: [],
@@ -418,14 +421,17 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
         properties: {
           tabla: { type: "string", enum: [...TABLAS_PERMITIDAS], description: "Nombre exacto de la tabla a consultar." },
           filtros: {
-            type: "array",
-            description: "Filtros opcionales, se combinan con Y.",
+            type: ["array", "null"],
+            description: "Filtros opcionales, se combinan con Y. null si no hay filtros.",
             items: {
               type: "object",
               properties: {
                 columna: { type: "string", description: "Nombre exacto de la columna." },
                 valor: { type: "string" },
-                contiene: { type: "boolean", description: "true para coincidencia parcial (texto); false/omitir para igualdad exacta." },
+                contiene: {
+                  type: ["boolean", "null"],
+                  description: "true para coincidencia parcial (texto); false/null para igualdad exacta.",
+                },
               },
               required: ["columna", "valor"],
             },
