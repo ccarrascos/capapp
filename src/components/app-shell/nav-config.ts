@@ -12,6 +12,7 @@ import {
   Briefcase,
   BarChart3,
   History,
+  Sparkles,
 } from "lucide-react";
 
 export type NavItem = {
@@ -33,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/analitica",
     label: "Analítica",
     icon: BarChart3,
+    roles: ["super_admin", "admin_organizacion", "prevencionista", "supervisor_centro", "auditor"],
+  },
+  {
+    href: "/ia",
+    label: "Asistente IA",
+    icon: Sparkles,
     roles: ["super_admin", "admin_organizacion", "prevencionista", "supervisor_centro", "auditor"],
   },
   {
