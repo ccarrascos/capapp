@@ -38,6 +38,14 @@ async function mapaPersonas(filas: FilaMatriz[]): Promise<Map<string, { fecha_na
   return new Map((personas ?? []).map((p) => [p.run, p]));
 }
 
+async function mapaCursos(filas: FilaMatriz[]): Promise<Map<string, string>> {
+  const cursoIds = [...new Set(filas.map((f) => f.curso_id).filter((id): id is string => !!id))];
+  if (cursoIds.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data: cursos } = await supabase.from("cursos").select("id, nombre").in("id", cursoIds);
+  return new Map((cursos ?? []).map((c) => [c.id, c.nombre]));
+}
+
 function nombreCompleto(f: FilaMatriz): string {
   return `${f.nombres ?? ""} ${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.replace(/\s+/g, " ").trim();
 }
@@ -136,30 +144,41 @@ async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, esta
   };
 }
 
-async function distribucionPorCentro(sesion: Sesion) {
-  const filas = await filasVisibles(sesion);
-  const nombreCentroPorId = await mapaCentros(filas);
+type ConteoPorEstado = { total: number; vigentes: number; porVencer: number; vencidos: number; sinCapacitacion: number };
 
-  const porCentro = new Map<
-    string,
-    { total: number; vigentes: number; porVencer: number; vencidos: number; sinCapacitacion: number }
-  >();
+function agruparPorEstado(filas: FilaMatriz[], claveDe: (f: FilaMatriz) => string): (ConteoPorEstado & { clave: string })[] {
+  const mapa = new Map<string, ConteoPorEstado>();
   for (const f of filas) {
-    const nombre = (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
-    const actual = porCentro.get(nombre) ?? { total: 0, vigentes: 0, porVencer: 0, vencidos: 0, sinCapacitacion: 0 };
+    const clave = claveDe(f);
+    const actual = mapa.get(clave) ?? { total: 0, vigentes: 0, porVencer: 0, vencidos: 0, sinCapacitacion: 0 };
     actual.total += 1;
     if (f.estado_vigencia === "vigente") actual.vigentes += 1;
     else if (f.estado_vigencia === "por_vencer") actual.porVencer += 1;
     else if (f.estado_vigencia === "vencido") actual.vencidos += 1;
     else if (f.estado_vigencia === "sin_capacitacion") actual.sinCapacitacion += 1;
-    porCentro.set(nombre, actual);
+    mapa.set(clave, actual);
   }
+  return [...mapa.entries()].map(([clave, c]) => ({ clave, ...c })).sort((a, b) => b.total - a.total);
+}
 
-  return {
-    centros: [...porCentro.entries()]
-      .map(([centro, c]) => ({ centro, ...c }))
-      .sort((a, b) => b.total - a.total),
-  };
+async function distribucionPorCentro(sesion: Sesion) {
+  const filas = await filasVisibles(sesion);
+  const nombreCentroPorId = await mapaCentros(filas);
+  const agrupado = agruparPorEstado(filas, (f) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar");
+  return { centros: agrupado.map(({ clave, ...c }) => ({ centro: clave, ...c })) };
+}
+
+/**
+ * curso_id en la matriz es el último curso APROBADO de cada persona (o null
+ * si nunca aprobó uno) — así que esto agrupa por "el curso cuya vigencia
+ * está corriendo/vencida para cada trabajador", que es lo que alguien
+ * pregunta con "qué cursos tienen gente vencida".
+ */
+async function distribucionPorCurso(sesion: Sesion) {
+  const filas = await filasVisibles(sesion);
+  const nombreCursoPorId = await mapaCursos(filas);
+  const agrupado = agruparPorEstado(filas, (f) => (f.curso_id && nombreCursoPorId.get(f.curso_id)) ?? "Sin curso aprobado");
+  return { cursos: agrupado.map(({ clave, ...c }) => ({ curso: clave, ...c })) };
 }
 
 async function demografiaTrabajadores(sesion: Sesion) {
@@ -202,6 +221,7 @@ async function consultarTrabajadores(
   const filas = await filasVisibles(sesion);
   const nombreCentroPorId = await mapaCentros(filas);
   const personaPorRun = await mapaPersonas(filas);
+  const nombreCursoPorId = await mapaCursos(filas);
   const centroDe = (f: FilaMatriz) => (f.centro_trabajo_id && nombreCentroPorId.get(f.centro_trabajo_id)) ?? "Sin asignar";
 
   const centroBuscado = filtros.centro ? sinAcentos(filtros.centro.trim()) : null;
@@ -233,6 +253,7 @@ async function consultarTrabajadores(
         modalidadContractual: f.modalidad_contractual ?? null,
         edad: persona?.fecha_nacimiento ? calcularEdad(persona.fecha_nacimiento) : null,
         sexo: persona?.sexo ?? null,
+        curso: (f.curso_id && nombreCursoPorId.get(f.curso_id)) ?? "Sin curso aprobado",
         estadoVigencia: f.estado_vigencia,
         vigenciaHasta: f.vigencia_hasta,
       };
@@ -296,6 +317,15 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
   {
     type: "function",
     function: {
+      name: "distribucion_por_curso",
+      description:
+        "Cuenta, por cada curso, cuántos trabajadores tienen ese curso vigente/por vencer/vencido (es el último curso que aprobaron). Úsala para preguntas como qué cursos tienen gente vencida o vigente.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "demografia_trabajadores",
       description:
         "Estadísticas demográficas: edad promedio/mínima/máxima y distribución por sexo (masculino/femenino/otro) de los trabajadores.",
@@ -344,6 +374,8 @@ export async function ejecutarHerramienta(
       );
     case "distribucion_por_centro":
       return distribucionPorCentro(sesion);
+    case "distribucion_por_curso":
+      return distribucionPorCurso(sesion);
     case "demografia_trabajadores":
       return demografiaTrabajadores(sesion);
     case "consultar_trabajadores":
