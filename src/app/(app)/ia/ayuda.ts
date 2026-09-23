@@ -18,7 +18,7 @@ export const GUIAS_AYUDA: GuiaAyuda[] = [
     pasos: [
       "Ve a Matriz de vigencia en el menú lateral.",
       "Clic en \"Nuevo trabajador\" (arriba a la derecha).",
-      "Completa RUN, nombres, apellidos, cargo, centro de trabajo y modalidad contractual. Sexo y fecha de nacimiento son opcionales, pero alimentan los gráficos de Analítica.",
+      "Completa RUN, nombres, apellidos, cargo, centro de trabajo, modalidad contractual y sexo (obligatorio). La fecha de nacimiento es opcional, pero alimenta el gráfico de edad en Analítica.",
       "Si la persona ya trabajó antes en otra organización de la plataforma, se reutiliza su identidad — su capacitación previa se reconoce automáticamente, no hace falta reingresarla.",
       "Clic en \"Agregar trabajador\".",
     ],
@@ -29,6 +29,7 @@ export const GUIAS_AYUDA: GuiaAyuda[] = [
     pasos: [
       "Ve a Matriz de vigencia y clic en \"Carga masiva\".",
       "Clic en \"Descargar plantilla CSV\" y complétala sin cambiar los nombres de las columnas (hasta 300 filas por archivo).",
+      "La columna Sexo es obligatoria (masculino, femenino u otro) — una fila sin ese dato se rechaza.",
       "Cargo, Centro de trabajo y Subcontrato deben coincidir exactamente con uno ya creado en sus respectivos módulos — si no existen aún, créalos primero.",
       "Sube el archivo completado y revisa el resumen antes de importar.",
       "Clic en \"Importar\" — el resultado muestra fila por fila cuáles se cargaron y cuáles fallaron, con el motivo.",

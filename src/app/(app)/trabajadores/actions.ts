@@ -54,7 +54,7 @@ export type CrearTrabajadorInput = {
   modalidadContractual: ModalidadContractual;
   email: string | null;
   fechaNacimiento: string | null;
-  sexo: SexoPersona | null;
+  sexo: SexoPersona;
   tipoVinculo: TipoVinculoLaboral;
   subcontratoId: string | null;
 };
@@ -76,6 +76,10 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
 
   if (!esRutValido(input.run, input.dv)) {
     return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
+  }
+
+  if (!SEXOS_VALIDOS.has(input.sexo)) {
+    return { ok: false as const, mensaje: "Selecciona el sexo." };
   }
 
   if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
@@ -172,7 +176,7 @@ export async function actualizarTrabajador(input: {
   apellidoMaterno: string | null;
   email: string | null;
   fechaNacimiento: string | null;
-  sexo: SexoPersona | null;
+  sexo: SexoPersona;
   cargoId: string | null;
   centroTrabajoId: string | null;
   unidad: string | null;
@@ -192,6 +196,10 @@ export async function actualizarTrabajador(input: {
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para editar a este trabajador." };
+  }
+
+  if (!SEXOS_VALIDOS.has(input.sexo)) {
+    return { ok: false as const, mensaje: "Selecciona el sexo." };
   }
 
   if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
@@ -609,19 +617,20 @@ export async function cargarTrabajadoresMasivo(input: {
       }
     }
 
-    let sexo: SexoPersona | null = null;
     const sexoTexto = fila.sexo.trim().toLowerCase();
-    if (sexoTexto) {
-      if (!SEXOS_VALIDOS.has(sexoTexto as SexoPersona)) {
-        resultados.push({
-          fila: numeroFila,
-          ok: false,
-          mensaje: `Sexo "${fila.sexo}" no reconocido (usa masculino, femenino u otro).`,
-        });
-        continue;
-      }
-      sexo = sexoTexto as SexoPersona;
+    if (!sexoTexto) {
+      resultados.push({ fila: numeroFila, ok: false, mensaje: "Falta el sexo (usa masculino, femenino u otro)." });
+      continue;
     }
+    if (!SEXOS_VALIDOS.has(sexoTexto as SexoPersona)) {
+      resultados.push({
+        fila: numeroFila,
+        ok: false,
+        mensaje: `Sexo "${fila.sexo}" no reconocido (usa masculino, femenino u otro).`,
+      });
+      continue;
+    }
+    const sexo = sexoTexto as SexoPersona;
 
     const modalidad = fila.modalidadContractual.trim().toLowerCase() as ModalidadContractual;
     if (!MODALIDADES_VALIDAS.has(modalidad)) {

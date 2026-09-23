@@ -757,7 +757,7 @@ function CargaMasivaDialog({
               (opcional)
             </p>
             <p>
-              <span className="font-medium text-foreground">Sexo:</span> masculino, femenino u otro (opcional)
+              <span className="font-medium text-foreground">Sexo:</span> masculino, femenino u otro (obligatorio)
             </p>
             <p>
               <span className="font-medium text-foreground">Modalidad contractual:</span>{" "}
@@ -901,6 +901,12 @@ function NuevoTrabajadorDialog({
       return;
     }
 
+    const sexo = form.sexo;
+    if (!sexo) {
+      toast.error("Selecciona el sexo.");
+      return;
+    }
+
     startTransition(async () => {
       const resultado = await crearTrabajador({
         organizacionId: form.organizacionId,
@@ -915,7 +921,7 @@ function NuevoTrabajadorDialog({
         modalidadContractual: form.modalidadContractual,
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
-        sexo: form.sexo || null,
+        sexo,
         tipoVinculo: form.tipoVinculo,
         subcontratoId: form.tipoVinculo === "subcontrato" ? form.subcontratoId : null,
       });
@@ -1166,19 +1172,16 @@ function NuevoTrabajadorDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Sexo (opcional)</Label>
+              <Label>Sexo</Label>
               <Select
-                items={{ sin_indicar: "Sin indicar", ...SEXO_LABEL }}
-                value={form.sexo || "sin_indicar"}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, sexo: (!v || v === "sin_indicar" ? "" : v) as SexoPersona | "" }))
-                }
+                items={SEXO_LABEL}
+                value={form.sexo}
+                onValueChange={(v) => setForm((f) => ({ ...f, sexo: (v ?? "") as SexoPersona | "" }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sin_indicar">Sin indicar</SelectItem>
                   {(Object.keys(SEXO_LABEL) as SexoPersona[]).map((s) => (
                     <SelectItem key={s} value={s}>
                       {SEXO_LABEL[s]}
@@ -1248,6 +1251,12 @@ function EditarTrabajadorDialog({
       return;
     }
 
+    const sexo = form.sexo;
+    if (!sexo) {
+      toast.error("Selecciona el sexo.");
+      return;
+    }
+
     startTransition(async () => {
       const resultado = await actualizarTrabajador({
         personaRun: fila.persona_run!,
@@ -1257,7 +1266,7 @@ function EditarTrabajadorDialog({
         apellidoMaterno: form.apellidoMaterno.trim() || null,
         email: form.email.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
-        sexo: form.sexo || null,
+        sexo,
         cargoId: form.cargoId || null,
         centroTrabajoId: form.centroTrabajoId || null,
         unidad: form.unidad.trim() || null,
@@ -1467,17 +1476,14 @@ function EditarTrabajadorDialog({
             <div className="flex flex-col gap-1.5">
               <Label>Sexo</Label>
               <Select
-                items={{ sin_indicar: "Sin indicar", ...SEXO_LABEL }}
-                value={form.sexo || "sin_indicar"}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, sexo: (!v || v === "sin_indicar" ? "" : v) as SexoPersona | "" }))
-                }
+                items={SEXO_LABEL}
+                value={form.sexo}
+                onValueChange={(v) => setForm((f) => ({ ...f, sexo: (v ?? "") as SexoPersona | "" }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sin_indicar">Sin indicar</SelectItem>
                   {(Object.keys(SEXO_LABEL) as SexoPersona[]).map((s) => (
                     <SelectItem key={s} value={s}>
                       {SEXO_LABEL[s]}
