@@ -5,7 +5,7 @@ export default function PoliticaPrivacidadPage() {
     <div className="min-h-dvh bg-background px-6 py-12">
       <div className="mx-auto max-w-2xl flex flex-col gap-8">
         <Link href="/login" className="flex items-center gap-2.5 w-fit">
-          <span className="flex size-8 items-center justify-center rounded-sm bg-white overflow-hidden">
+          <span className="flex size-8 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
             <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>

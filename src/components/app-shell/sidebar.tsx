@@ -19,7 +19,7 @@ export function Sidebar({
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border">
-        <span className="flex size-8 items-center justify-center rounded-sm bg-white overflow-hidden">
+        <span className="flex size-8 items-center justify-center rounded-sm overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
           <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
         </span>

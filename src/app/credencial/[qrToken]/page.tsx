@@ -53,7 +53,7 @@ export default async function CredencialPage({
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <span className="flex size-9 items-center justify-center rounded-sm bg-white overflow-hidden">
+          <span className="flex size-9 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
             <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>

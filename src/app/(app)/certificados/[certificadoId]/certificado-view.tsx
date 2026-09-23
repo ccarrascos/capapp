@@ -34,7 +34,7 @@ export function CertificadoCard({
     <div id="certificado-imprimible" className="border-2 border-primary bg-card p-10 sm:p-14 mx-auto w-full max-w-3xl">
       <div className="flex items-center justify-between border-b border-border pb-6 mb-8">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-sm bg-white overflow-hidden">
+          <span className="flex size-10 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
             <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>

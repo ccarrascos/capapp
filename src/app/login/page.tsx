@@ -45,7 +45,7 @@ function LoginForm() {
     <div className="min-h-dvh flex bg-background">
       <div className="hidden lg:flex flex-1 flex-col justify-between bg-sidebar text-sidebar-foreground p-12 relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-sm bg-white overflow-hidden">
+          <span className="flex size-10 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
             <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
@@ -75,7 +75,7 @@ function LoginForm() {
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
-            <span className="flex size-9 items-center justify-center rounded-sm bg-white overflow-hidden">
+            <span className="flex size-9 items-center justify-center rounded-sm overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
               <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
             </span>
