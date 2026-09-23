@@ -870,6 +870,9 @@ function NuevoTrabajadorDialog({
     tipoVinculo: "directo" as TipoVinculoLaboral,
     subcontratoId: "",
   });
+  const [darAccesoInmediato, setDarAccesoInmediato] = useState(false);
+  const [accesoPendiente, setAccesoPendiente] = useState<{ password: string } | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === form.organizacionId);
   const centrosDeLaOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
@@ -907,6 +910,12 @@ function NuevoTrabajadorDialog({
       return;
     }
 
+    const email = form.email.trim();
+    if (darAccesoInmediato && !email) {
+      toast.error("Ingresa un correo para dar acceso de inmediato.");
+      return;
+    }
+
     startTransition(async () => {
       const resultado = await crearTrabajador({
         organizacionId: form.organizacionId,
@@ -919,7 +928,7 @@ function NuevoTrabajadorDialog({
         cargoId: form.cargoId || null,
         unidad: form.unidad.trim() || null,
         modalidadContractual: form.modalidadContractual,
-        email: form.email.trim() || null,
+        email: email || null,
         fechaNacimiento: form.fechaNacimiento || null,
         sexo,
         tipoVinculo: form.tipoVinculo,
@@ -931,39 +940,104 @@ function NuevoTrabajadorDialog({
         return;
       }
 
-      if (resultado.personaYaExistia) {
-        toast.success(
-          `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) — se usaron sus datos actuales.`,
-        );
-      } else {
-        toast.success("Trabajador agregado a la matriz.");
+      const mensajeBase = resultado.personaYaExistia
+        ? `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) — se usaron sus datos actuales.`
+        : "Trabajador agregado a la matriz.";
+
+      if (!darAccesoInmediato || resultado.personaYaExistia) {
+        // Si la persona ya existía, puede ya tener cuenta — dar acceso queda para el flujo normal de la fila.
+        toast.success(mensajeBase);
+        setOpen(false);
+        reiniciarFormulario();
+        return;
       }
-      setOpen(false);
-      setForm((f) => ({
-        ...f,
-        run: "",
-        dv: "",
-        nombres: "",
-        apellidoPaterno: "",
-        apellidoMaterno: "",
-        cargoId: "",
-        centroTrabajoId: "",
-        email: "",
-        fechaNacimiento: "",
-        sexo: "",
-        tipoVinculo: "directo",
-        subcontratoId: "",
-      }));
+
+      const resultadoAcceso = await crearAccesoTrabajador({
+        personaRun: run,
+        organizacionId: form.organizacionId,
+        email,
+      });
+
+      if (!resultadoAcceso.ok) {
+        toast.error(`${mensajeBase} No se pudo dar acceso: ${resultadoAcceso.mensaje}`);
+        setOpen(false);
+        reiniciarFormulario();
+        return;
+      }
+
+      if (resultadoAcceso.emailEnviado) {
+        toast.success(`${mensajeBase} Le enviamos las credenciales a ${email}.`);
+        setOpen(false);
+        reiniciarFormulario();
+      } else {
+        // El correo no salió — se muestra la contraseña temporal antes de cerrar, igual que en "Dar acceso".
+        setAccesoPendiente({ password: resultadoAcceso.passwordTemporal });
+      }
     });
   }
 
+  function reiniciarFormulario() {
+    setForm((f) => ({
+      ...f,
+      run: "",
+      dv: "",
+      nombres: "",
+      apellidoPaterno: "",
+      apellidoMaterno: "",
+      cargoId: "",
+      centroTrabajoId: "",
+      email: "",
+      fechaNacimiento: "",
+      sexo: "",
+      tipoVinculo: "directo",
+      subcontratoId: "",
+    }));
+    setDarAccesoInmediato(false);
+  }
+
+  function cerrarYLimpiar() {
+    setOpen(false);
+    reiniciarFormulario();
+    setAccesoPendiente(null);
+    setCopiado(false);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : cerrarYLimpiar())}>
       <DialogTrigger render={<Button />}>
         <Plus className="size-4" />
         Nuevo trabajador
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
+        {accesoPendiente ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Trabajador agregado — correo no enviado</DialogTitle>
+              <DialogDescription>
+                Se creó su acceso, pero no se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal
+                de forma segura — no volverá a mostrarse.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="border border-border bg-muted p-4 font-mono text-sm flex items-center justify-between gap-2">
+              <span>{accesoPendiente.password}</span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  navigator.clipboard.writeText(accesoPendiente.password);
+                  setCopiado(true);
+                }}
+              >
+                {copiado ? <Check className="size-4 text-clear" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button onClick={cerrarYLimpiar}>Listo</Button>
+            </DialogFooter>
+          </>
+        ) : (
+        <>
         <DialogHeader>
           <DialogTitle>Agregar trabajador a la matriz</DialogTitle>
         </DialogHeader>
@@ -1158,7 +1232,7 @@ function NuevoTrabajadorDialog({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Correo (opcional)</Label>
+              <Label htmlFor="email">Correo{darAccesoInmediato ? "" : " (opcional)"}</Label>
               <Input id="email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -1192,12 +1266,29 @@ function NuevoTrabajadorDialog({
             </div>
           </div>
 
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 mt-0.5"
+              checked={darAccesoInmediato}
+              onChange={(e) => setDarAccesoInmediato(e.target.checked)}
+            />
+            <span>
+              Dar acceso al portal de inmediato
+              <span className="block text-xs text-muted-foreground">
+                Se creará su cuenta y se le enviarán las credenciales al correo indicado arriba.
+              </span>
+            </span>
+          </label>
+
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Guardando…" : "Agregar trabajador"}
             </Button>
           </DialogFooter>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

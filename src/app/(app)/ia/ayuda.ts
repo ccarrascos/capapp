@@ -20,6 +20,7 @@ export const GUIAS_AYUDA: GuiaAyuda[] = [
       "Clic en \"Nuevo trabajador\" (arriba a la derecha).",
       "Completa RUN, nombres, apellidos, cargo, centro de trabajo, modalidad contractual y sexo (obligatorio). La fecha de nacimiento es opcional, pero alimenta el gráfico de edad en Analítica.",
       "Si la persona ya trabajó antes en otra organización de la plataforma, se reutiliza su identidad — su capacitación previa se reconoce automáticamente, no hace falta reingresarla.",
+      "Opcional: marca \"Dar acceso al portal de inmediato\" para crearle la cuenta y enviarle las credenciales en el mismo paso, sin tener que ir después a \"Dar acceso\" — requiere haber ingresado su correo.",
       "Clic en \"Agregar trabajador\".",
     ],
   },
