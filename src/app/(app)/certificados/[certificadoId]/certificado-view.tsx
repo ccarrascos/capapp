@@ -1,6 +1,6 @@
 "use client";
 
-import { Printer, ShieldHalf } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export type CertificadoDatos = {
@@ -34,8 +34,9 @@ export function CertificadoCard({
     <div id="certificado-imprimible" className="border-2 border-primary bg-card p-10 sm:p-14 mx-auto w-full max-w-3xl">
       <div className="flex items-center justify-between border-b border-border pb-6 mb-8">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <ShieldHalf className="size-6" strokeWidth={2.4} />
+          <span className="flex size-10 items-center justify-center rounded-sm bg-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
           <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
         </div>

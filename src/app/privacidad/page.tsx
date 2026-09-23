@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { ShieldHalf } from "lucide-react";
 
 export default function PoliticaPrivacidadPage() {
   return (
     <div className="min-h-dvh bg-background px-6 py-12">
       <div className="mx-auto max-w-2xl flex flex-col gap-8">
         <Link href="/login" className="flex items-center gap-2.5 w-fit">
-          <span className="flex size-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <ShieldHalf className="size-4.5" strokeWidth={2.4} />
+          <span className="flex size-8 items-center justify-center rounded-sm bg-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
           <span className="font-heading text-lg tracking-wide uppercase">Capapp</span>
         </Link>

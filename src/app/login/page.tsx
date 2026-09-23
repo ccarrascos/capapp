@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldHalf, TriangleAlert, Eye, EyeOff } from "lucide-react";
+import { TriangleAlert, Eye, EyeOff } from "lucide-react";
 import { parsearRut, formatearRutInput } from "@/lib/rut";
 import { iniciarSesionConRut } from "./actions";
 
@@ -45,8 +45,9 @@ function LoginForm() {
     <div className="min-h-dvh flex bg-background">
       <div className="hidden lg:flex flex-1 flex-col justify-between bg-sidebar text-sidebar-foreground p-12 relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-sm bg-sidebar-primary text-sidebar-primary-foreground">
-            <ShieldHalf className="size-6" strokeWidth={2.4} />
+          <span className="flex size-10 items-center justify-center rounded-sm bg-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
           <span className="font-heading text-2xl tracking-wide uppercase">Capapp</span>
         </div>
@@ -74,8 +75,9 @@ function LoginForm() {
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
-            <span className="flex size-9 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-              <ShieldHalf className="size-5" strokeWidth={2.4} />
+            <span className="flex size-9 items-center justify-center rounded-sm bg-white overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+              <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
             </span>
             <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
           </div>

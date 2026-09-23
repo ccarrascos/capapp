@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldHalf, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,8 +23,9 @@ export function CuentaSuspendida() {
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <span className="flex size-9 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <ShieldHalf className="size-5" strokeWidth={2.4} />
+          <span className="flex size-9 items-center justify-center rounded-sm bg-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
           <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
         </div>

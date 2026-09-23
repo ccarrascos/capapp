@@ -1,4 +1,4 @@
-import { ShieldHalf, CircleX, UserX } from "lucide-react";
+import { CircleX, UserX } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
@@ -53,8 +53,9 @@ export default async function CredencialPage({
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <span className="flex size-9 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <ShieldHalf className="size-5" strokeWidth={2.4} />
+          <span className="flex size-9 items-center justify-center rounded-sm bg-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
           </span>
           <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
         </div>
