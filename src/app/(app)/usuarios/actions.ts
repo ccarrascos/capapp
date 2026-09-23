@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { esRutValido } from "@/lib/rut";
-import { generarPasswordTemporal } from "@/lib/password";
+import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/lib/password";
 import { normalizarEmail } from "@/lib/normalizar-email";
 import { registrarAuditoria } from "@/lib/auditoria";
 
@@ -74,6 +74,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   }
 
   const passwordTemporal = generarPasswordTemporal();
+  const expiraEn = calcularExpiracionPasswordTemporal();
 
   const { data: creado, error: errorAuth } = await admin.auth.admin.createUser({
     email,
@@ -94,6 +95,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     email,
     run,
     dv,
+    password_temporal_expira_en: expiraEn.toISOString(),
   });
 
   if (errorPerfil) {
@@ -136,11 +138,12 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     password: passwordTemporal,
     rolLabel: ROL_LABEL[input.rol],
     rut: `${run}-${dv}`,
+    expiraEn,
   });
 
   if (!correo.ok) {
     // La cuenta ya existe; si el correo falla, entregamos la clave para respaldo manual.
-    return { ok: true as const, emailEnviado: false as const, passwordTemporal, mensajeCorreo: correo.mensaje };
+    return { ok: true as const, emailEnviado: false as const, passwordTemporal, expiraEn, mensajeCorreo: correo.mensaje };
   }
 
   return { ok: true as const, emailEnviado: true as const };

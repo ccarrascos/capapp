@@ -5,7 +5,7 @@ import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
-import { generarPasswordTemporal } from "@/lib/password";
+import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
 import { esFechaNacimientoValida, normalizarFechaNacimiento } from "@/lib/fecha-nacimiento";
 import { normalizarEmail } from "@/lib/normalizar-email";
@@ -388,6 +388,7 @@ export async function crearAccesoTrabajador(input: {
   if (persona.usuario_id) return { ok: false as const, mensaje: "Esta persona ya tiene una cuenta de acceso." };
 
   const passwordTemporal = generarPasswordTemporal();
+  const expiraEn = calcularExpiracionPasswordTemporal();
 
   const { data: creado, error: errorAuth } = await admin.auth.admin.createUser({
     email,
@@ -408,6 +409,7 @@ export async function crearAccesoTrabajador(input: {
     email,
     run: persona.run,
     dv: persona.dv,
+    password_temporal_expira_en: expiraEn.toISOString(),
   });
 
   if (errorPerfil) {
@@ -467,10 +469,11 @@ export async function crearAccesoTrabajador(input: {
     password: passwordTemporal,
     rolLabel: "Trabajador",
     rut: `${persona.run}-${persona.dv}`,
+    expiraEn,
   });
 
   if (!correo.ok) {
-    return { ok: true as const, emailEnviado: false as const, passwordTemporal, mensajeCorreo: correo.mensaje };
+    return { ok: true as const, emailEnviado: false as const, passwordTemporal, expiraEn, mensajeCorreo: correo.mensaje };
   }
 
   return { ok: true as const, emailEnviado: true as const };

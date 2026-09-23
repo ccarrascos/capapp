@@ -6,9 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TriangleAlert, Eye, EyeOff } from "lucide-react";
+import { TriangleAlert, Eye, EyeOff, MailCheck } from "lucide-react";
 import { parsearRut, formatearRutInput } from "@/lib/rut";
-import { iniciarSesionConRut } from "./actions";
+import { iniciarSesionConRut, solicitarNuevoAcceso } from "./actions";
 
 function LoginForm() {
   const router = useRouter();
@@ -18,6 +18,11 @@ function LoginForm() {
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [mostrarRecuperar, setMostrarRecuperar] = useState(false);
+  const [runRecuperar, setRunRecuperar] = useState("");
+  const [mensajeRecuperar, setMensajeRecuperar] = useState<string | null>(null);
+  const [pendingRecuperar, startTransitionRecuperar] = useTransition();
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,11 +38,31 @@ function LoginForm() {
       const resultado = await iniciarSesionConRut({ run: parsed.run, dv: parsed.dv, password });
       if (!resultado.ok) {
         setError(resultado.mensaje);
+        if ("expirada" in resultado && resultado.expirada) {
+          setMostrarRecuperar(true);
+          setRunRecuperar(rut);
+        }
         return;
       }
       const next = searchParams.get("next") || "/dashboard";
       router.replace(next);
       router.refresh();
+    });
+  }
+
+  function onSubmitRecuperar(e: React.FormEvent) {
+    e.preventDefault();
+    setMensajeRecuperar(null);
+
+    const parsed = parsearRut(runRecuperar);
+    if (!parsed) {
+      setMensajeRecuperar("Ingresa un RUT válido, por ejemplo 12.345.678-9.");
+      return;
+    }
+
+    startTransitionRecuperar(async () => {
+      const resultado = await solicitarNuevoAcceso({ run: parsed.run, dv: parsed.dv });
+      setMensajeRecuperar(resultado.mensaje);
     });
   }
 
@@ -137,7 +162,51 @@ function LoginForm() {
             </Button>
           </form>
 
-          <p className="text-xs text-muted-foreground text-center mt-6">
+          {mostrarRecuperar ? (
+            <div className="mt-6 border border-border bg-muted/40 p-4">
+              {mensajeRecuperar ? (
+                <p className="flex items-start gap-2 text-sm text-foreground">
+                  <MailCheck className="size-4 shrink-0 mt-0.5 text-clear" />
+                  {mensajeRecuperar}
+                </p>
+              ) : (
+                <form onSubmit={onSubmitRecuperar} className="flex flex-col gap-2.5">
+                  <Label htmlFor="rutRecuperar" className="text-xs">
+                    RUT de tu cuenta
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="rutRecuperar"
+                      required
+                      value={runRecuperar}
+                      onChange={(e) => setRunRecuperar(formatearRutInput(e.target.value))}
+                      placeholder="12.345.678-9"
+                      className="font-mono"
+                    />
+                    <Button type="submit" variant="outline" disabled={pendingRecuperar}>
+                      {pendingRecuperar ? "Enviando…" : "Enviar"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Te enviaremos una nueva contraseña temporal al correo que tengamos registrado, ya
+                    sea que la olvidaste o que caducó.
+                  </p>
+                </form>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center mt-6">
+              <button
+                type="button"
+                onClick={() => setMostrarRecuperar(true)}
+                className="hover:text-foreground hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </p>
+          )}
+
+          <p className="text-xs text-muted-foreground text-center mt-3">
             <Link href="/privacidad" className="hover:text-foreground hover:underline">
               Política de privacidad
             </Link>

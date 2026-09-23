@@ -315,7 +315,7 @@ function NuevaCuentaDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [resultado, setResultado] = useState<
-    { email: string; rut: string; emailEnviado: boolean; password?: string } | null
+    { email: string; rut: string; emailEnviado: boolean; password?: string; expiraEn?: Date } | null
   >(null);
   const [copiado, setCopiado] = useState(false);
   const rolesDisponibles = esSuperAdmin ? (["super_admin", ...ROLES_ASIGNABLES] as RolNombre[]) : ROLES_ASIGNABLES;
@@ -364,7 +364,13 @@ function NuevaCuentaDialog({
       setResultado(
         resultado.emailEnviado
           ? { email: form.email.trim(), rut: rutFormateado, emailEnviado: true }
-          : { email: form.email.trim(), rut: rutFormateado, emailEnviado: false, password: resultado.passwordTemporal },
+          : {
+              email: form.email.trim(),
+              rut: rutFormateado,
+              emailEnviado: false,
+              password: resultado.passwordTemporal,
+              expiraEn: resultado.expiraEn,
+            },
       );
       setForm({
         nombres: "",
@@ -398,7 +404,11 @@ function NuevaCuentaDialog({
               <DialogDescription>
                 {resultado.emailEnviado
                   ? `Enviamos las credenciales de acceso directamente a ${resultado.email}.`
-                  : "No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura — no volverá a mostrarse."}
+                  : `No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura — no volverá a mostrarse.${
+                      resultado.expiraEn
+                        ? ` Caduca el ${resultado.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.`
+                        : ""
+                    }`}
               </DialogDescription>
             </DialogHeader>
             {!resultado.emailEnviado && resultado.password && (

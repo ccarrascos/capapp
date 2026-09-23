@@ -871,7 +871,7 @@ function NuevoTrabajadorDialog({
     subcontratoId: "",
   });
   const [darAccesoInmediato, setDarAccesoInmediato] = useState(false);
-  const [accesoPendiente, setAccesoPendiente] = useState<{ password: string } | null>(null);
+  const [accesoPendiente, setAccesoPendiente] = useState<{ password: string; expiraEn: Date } | null>(null);
   const [copiado, setCopiado] = useState(false);
 
   const cargosDeLaOrg = cargos.filter((c) => c.organizacion_id === form.organizacionId);
@@ -971,7 +971,7 @@ function NuevoTrabajadorDialog({
         reiniciarFormulario();
       } else {
         // El correo no salió — se muestra la contraseña temporal antes de cerrar, igual que en "Dar acceso".
-        setAccesoPendiente({ password: resultadoAcceso.passwordTemporal });
+        setAccesoPendiente({ password: resultadoAcceso.passwordTemporal, expiraEn: resultadoAcceso.expiraEn });
       }
     });
   }
@@ -1015,7 +1015,8 @@ function NuevoTrabajadorDialog({
               <DialogTitle>Trabajador agregado — correo no enviado</DialogTitle>
               <DialogDescription>
                 Se creó su acceso, pero no se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal
-                de forma segura — no volverá a mostrarse.
+                de forma segura — no volverá a mostrarse. Caduca el{" "}
+                {accesoPendiente.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.
               </DialogDescription>
             </DialogHeader>
             <div className="border border-border bg-muted p-4 font-mono text-sm flex items-center justify-between gap-2">
@@ -1607,7 +1608,9 @@ function DarAccesoDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState(emailSugerido);
-  const [resultado, setResultado] = useState<{ emailEnviado: boolean; password?: string } | null>(null);
+  const [resultado, setResultado] = useState<{ emailEnviado: boolean; password?: string; expiraEn?: Date } | null>(
+    null,
+  );
   const [copiado, setCopiado] = useState(false);
 
   function onSubmit(e: React.FormEvent) {
@@ -1622,7 +1625,7 @@ function DarAccesoDialog({
         toast.success(`Enviamos las credenciales a ${email.trim()}.`);
         setOpen(false);
       } else {
-        setResultado({ emailEnviado: false, password: res.passwordTemporal });
+        setResultado({ emailEnviado: false, password: res.passwordTemporal, expiraEn: res.expiraEn });
       }
     });
   }
@@ -1647,6 +1650,9 @@ function DarAccesoDialog({
               <DialogDescription>
                 No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura — no
                 volverá a mostrarse.
+                {resultado.expiraEn && (
+                  <> Caduca el {resultado.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.</>
+                )}
               </DialogDescription>
             </DialogHeader>
             {resultado.password && (

@@ -1265,6 +1265,7 @@ export type Database = {
           email: string
           id: string
           nombres: string
+          password_temporal_expira_en: string | null
           run: string | null
           telefono: string | null
           ultimo_acceso: string | null
@@ -1279,6 +1280,7 @@ export type Database = {
           email: string
           id: string
           nombres: string
+          password_temporal_expira_en?: string | null
           run?: string | null
           telefono?: string | null
           ultimo_acceso?: string | null
@@ -1293,6 +1295,7 @@ export type Database = {
           email?: string
           id?: string
           nombres?: string
+          password_temporal_expira_en?: string | null
           run?: string | null
           telefono?: string | null
           ultimo_acceso?: string | null
