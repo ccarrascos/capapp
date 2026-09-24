@@ -124,6 +124,17 @@ export async function crearFacilitador(input: {
   tipoProveedor: TipoProveedor;
   entidadNombre: string | null;
 }) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  const autorizado =
+    sesion.esSuperAdmin ||
+    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+
+  if (!autorizado) {
+    return { ok: false as const, mensaje: "No tienes permiso para crear facilitadores en esta organización." };
+  }
+
   if (!esRutValido(input.run, input.dv)) {
     return { ok: false as const, mensaje: "El RUT ingresado no es válido." };
   }
