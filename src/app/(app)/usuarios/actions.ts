@@ -213,8 +213,10 @@ export async function agregarRolUsuario(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  if (input.usuarioId === sesion.usuarioId) {
-    return { ok: false as const, mensaje: "No puedes cambiar tus propios roles desde aquí." };
+  // Sobre la propia cuenta sólo se permite facilitador: no da ningún permiso
+  // de gestión, así que no sirve para saltarse una revocación en Permisos.
+  if (input.usuarioId === sesion.usuarioId && input.rol !== "facilitador") {
+    return { ok: false as const, mensaje: "En tu propia cuenta sólo puedes agregarte el rol de facilitador." };
   }
 
   if (input.rol === "super_admin") {
@@ -296,10 +298,6 @@ export async function quitarRolUsuario(input: { usuarioRolId: string; usuarioId:
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  if (input.usuarioId === sesion.usuarioId) {
-    return { ok: false as const, mensaje: "No puedes cambiar tus propios roles desde aquí." };
-  }
-
   const admin = createAdminClient();
   const { data: asignacion } = await admin
     .from("usuario_roles")
@@ -310,6 +308,10 @@ export async function quitarRolUsuario(input: { usuarioRolId: string; usuarioId:
   if (!asignacion) return { ok: false as const, mensaje: "No se encontró esa asignación de rol." };
 
   const rol = asignacion.roles?.nombre;
+  if (input.usuarioId === sesion.usuarioId && rol !== "facilitador") {
+    return { ok: false as const, mensaje: "En tu propia cuenta sólo puedes quitarte el rol de facilitador." };
+  }
+
   const autorizado =
     rol === "super_admin"
       ? sesion.esSuperAdmin

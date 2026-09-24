@@ -286,8 +286,9 @@ export function UsuariosView({
                           </Badge>
                         ))}
                       </div>
-                      {!esPropia && (
+                      {(!esPropia || idsGestionables.size > 0 || esSuperAdmin) && (
                         <GestionarRolesDialog
+                          esPropia={esPropia}
                           cuenta={c}
                           organizaciones={organizaciones}
                           centros={centros}
@@ -600,12 +601,14 @@ function etiquetaAsignacion(a: Asignacion, mostrarOrganizacion: boolean) {
 }
 
 function GestionarRolesDialog({
+  esPropia,
   cuenta,
   organizaciones,
   centros,
   esSuperAdmin,
   mostrarOrganizacion,
 }: {
+  esPropia: boolean;
   cuenta: Cuenta;
   organizaciones: { id: string; razon_social: string }[];
   centros: Centro[];
@@ -614,19 +617,24 @@ function GestionarRolesDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const rolesDisponibles = esSuperAdmin ? (["super_admin", ...ROLES_ASIGNABLES] as RolNombre[]) : ROLES_ASIGNABLES;
+  const rolesDisponibles: RolNombre[] = esPropia
+    ? ["facilitador"]
+    : esSuperAdmin
+      ? ["super_admin", ...ROLES_ASIGNABLES]
+      : ROLES_ASIGNABLES;
   const orgInicial =
     cuenta.asignaciones.find((a) => a.organizacion_id && organizaciones.some((o) => o.id === a.organizacion_id))
       ?.organizacion_id ??
     organizaciones[0]?.id ??
     "";
   const [organizacionId, setOrganizacionId] = useState(orgInicial);
-  const [rol, setRol] = useState<RolNombre>(ROLES_ASIGNABLES[1]);
+  const [rol, setRol] = useState<RolNombre>(esPropia ? "facilitador" : ROLES_ASIGNABLES[1]);
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId);
 
   const puedeGestionar = (a: Asignacion) =>
     a.roles?.nombre !== "trabajador" &&
+    (!esPropia || a.roles?.nombre === "facilitador") &&
     (esSuperAdmin || (!!a.organizacion_id && organizaciones.some((o) => o.id === a.organizacion_id)));
 
   function quitar(a: Asignacion) {
@@ -668,8 +676,9 @@ function GestionarRolesDialog({
         <DialogHeader>
           <DialogTitle>Roles de la cuenta</DialogTitle>
           <DialogDescription>
-            {cuenta.usuario.nombres} {cuenta.usuario.apellidos}. Una misma cuenta puede tener varios roles; ingresa
-            siempre con su RUT y verá lo que cada rol le permite.
+            {esPropia
+              ? "Tu cuenta. Puedes agregarte el rol de facilitador para impartir cursos; tus demás roles los gestiona otro administrador."
+              : `${cuenta.usuario.nombres} ${cuenta.usuario.apellidos}. Una misma cuenta puede tener varios roles; ingresa siempre con su RUT y verá lo que cada rol le permite.`}
           </DialogDescription>
         </DialogHeader>
 
