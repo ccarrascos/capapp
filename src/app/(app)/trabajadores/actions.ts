@@ -219,13 +219,63 @@ export async function actualizarTrabajador(input: {
   );
   if (errorSubcontrato) return { ok: false as const, mensaje: errorSubcontrato };
 
+  const nuevoEmail = input.email ? normalizarEmail(input.email) : null;
+
+  // El correo es uno solo por persona: si ya tiene cuenta de acceso, el
+  // correo de contacto y el de login (usuarios/auth.users) deben quedar
+  // idénticos — nunca dos correos distintos en dos lugares.
+  const { data: personaActual } = await supabase
+    .from("personas")
+    .select("usuario_id, email")
+    .eq("run", input.personaRun)
+    .maybeSingle();
+
+  if (personaActual?.usuario_id && !nuevoEmail) {
+    return {
+      ok: false as const,
+      mensaje: "Esta persona tiene una cuenta de acceso: el correo no puede quedar vacío.",
+    };
+  }
+
+  if (personaActual?.usuario_id && nuevoEmail && nuevoEmail !== personaActual.email) {
+    const admin = createAdminClient();
+    const { error: errorAuthEmail } = await admin.auth.admin.updateUserById(personaActual.usuario_id, {
+      email: nuevoEmail,
+      email_confirm: true,
+    });
+    if (errorAuthEmail) {
+      const yaExiste = errorAuthEmail.code === "email_exists" || /already.*registered/i.test(errorAuthEmail.message);
+      return {
+        ok: false as const,
+        mensaje: yaExiste
+          ? "Ese correo ya está en uso por otra cuenta de acceso en Capapp."
+          : `No se pudo actualizar el correo de acceso: ${errorAuthEmail.message}`,
+      };
+    }
+    const { error: errorUsuarioEmail } = await admin
+      .from("usuarios")
+      .update({ email: nuevoEmail })
+      .eq("id", personaActual.usuario_id);
+    if (errorUsuarioEmail) {
+      return { ok: false as const, mensaje: errorUsuarioEmail.message };
+    }
+    await registrarAuditoria(admin, {
+      usuarioId: sesion.usuarioId,
+      accion: "actualizar_correo_acceso",
+      tabla: "usuarios",
+      registroId: personaActual.usuario_id,
+      datosAnteriores: { email: personaActual.email },
+      datosNuevos: { email: nuevoEmail },
+    });
+  }
+
   const { error: errorPersona } = await supabase
     .from("personas")
     .update({
       nombres: input.nombres,
       apellido_paterno: input.apellidoPaterno,
       apellido_materno: input.apellidoMaterno,
-      email: input.email ? normalizarEmail(input.email) : null,
+      email: nuevoEmail,
       fecha_nacimiento: input.fechaNacimiento,
       sexo: input.sexo,
     })

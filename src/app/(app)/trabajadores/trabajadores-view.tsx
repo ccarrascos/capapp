@@ -1561,9 +1561,16 @@ function EditarTrabajadorDialog({
               <Input
                 id="emailEdit"
                 type="email"
+                required={!!fila.usuarioId}
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
+              {fila.usuarioId && (
+                <p className="text-xs text-muted-foreground">
+                  Esta persona ya tiene acceso al portal. Ingresa con su RUT, pero este correo es al que le
+                  llegan sus credenciales — se actualiza también ahí.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Sexo</Label>

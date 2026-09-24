@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
 import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
+import { registrarAuditoria } from "@/lib/auditoria";
 import type { RolNombre } from "@/lib/auth";
 
 const ROL_LABEL: Record<RolNombre, string> = {
@@ -111,7 +112,7 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
     .update({ password_temporal_expira_en: expiraEn.toISOString() })
     .eq("id", usuario.id);
 
-  await enviarCorreoBienvenida({
+  const correo = await enviarCorreoBienvenida({
     nombres: usuario.nombres,
     email: usuario.email,
     password: passwordTemporal,
@@ -119,6 +120,18 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
     rut: `${run}-${dv}`,
     expiraEn,
     motivo: "nuevo_acceso",
+  });
+
+  // No se distingue de cara al usuario si el correo salió o no (para no
+  // revelar qué RUT existe), pero queda en el log de auditoría — si no,
+  // un envío rechazado por el proveedor de correo (ej. dominio no
+  // verificado) queda invisible y parece que "sí se envió".
+  await registrarAuditoria(admin, {
+    usuarioId: usuario.id,
+    accion: correo.ok ? "solicitar_nuevo_acceso" : "solicitar_nuevo_acceso_correo_fallido",
+    tabla: "usuarios",
+    registroId: usuario.id,
+    datosNuevos: correo.ok ? undefined : { email: usuario.email, error: correo.mensaje },
   });
 
   return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
