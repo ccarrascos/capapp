@@ -28,6 +28,8 @@ type Entrada = {
 const ACCION_LABEL: Record<string, string> = {
   crear_usuario: "Creó la cuenta",
   cambiar_rol: "Cambió el rol",
+  agregar_rol: "Agregó un rol",
+  quitar_rol: "Quitó un rol",
   reactivar_usuario: "Reactivó la cuenta",
   desactivar_usuario: "Desactivó la cuenta",
   reactivar_organizacion: "Reactivó la organización",

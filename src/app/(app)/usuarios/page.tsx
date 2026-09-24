@@ -17,7 +17,7 @@ export default async function UsuariosPage() {
     supabase
       .from("usuario_roles")
       .select(
-        "id, organizacion_id, centro_trabajo_id, usuarios(id, nombres, apellidos, email, run, dv, activo), roles(nombre), centros_trabajo(nombre)",
+        "id, organizacion_id, centro_trabajo_id, usuarios(id, nombres, apellidos, email, run, dv, activo), roles(nombre), centros_trabajo(nombre), organizaciones(razon_social)",
       )
       .order("id"),
     sesion.esSuperAdmin

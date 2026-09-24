@@ -65,9 +65,27 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   const admin = createAdminClient();
 
-  const { data: rutExistente } = await admin.from("usuarios").select("id").eq("run", run).maybeSingle();
+  const { data: rutExistente } = await admin
+    .from("usuarios")
+    .select("id, nombres, apellidos")
+    .eq("run", run)
+    .maybeSingle();
   if (rutExistente) {
-    return { ok: false as const, mensaje: "Ya existe una cuenta con ese RUT." };
+    // La persona ya tiene cuenta (por ejemplo, en otra organización o con
+    // otro rol): se le suma el rol, sin tocar su identidad ni su contraseña.
+    const resultado = await agregarRolUsuario({
+      usuarioId: rutExistente.id,
+      organizacionId: input.organizacionId,
+      rol: input.rol,
+      centroTrabajoId: input.centroTrabajoId,
+    });
+    if (!resultado.ok) return resultado;
+    return {
+      ok: true as const,
+      cuentaExistente: true as const,
+      nombreExistente: `${rutExistente.nombres} ${rutExistente.apellidos}`,
+      avisoFacilitador: resultado.avisoFacilitador,
+    };
   }
 
   const passwordTemporal = generarPasswordTemporal();
@@ -146,66 +164,196 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   return { ok: true as const, emailEnviado: true as const };
 }
 
-export async function actualizarRolUsuario(input: {
-  usuarioRolId: string;
+async function rolYaAsignado(
+  admin: ReturnType<typeof createAdminClient>,
+  usuarioId: string,
+  rolId: string,
+  organizacionId: string | null,
+  centroTrabajoId: string | null,
+) {
+  let consulta = admin.from("usuario_roles").select("id").eq("usuario_id", usuarioId).eq("rol_id", rolId);
+  consulta = organizacionId ? consulta.eq("organizacion_id", organizacionId) : consulta.is("organizacion_id", null);
+  consulta = centroTrabajoId ? consulta.eq("centro_trabajo_id", centroTrabajoId) : consulta.is("centro_trabajo_id", null);
+  const { data } = await consulta.limit(1);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * RLS de ediciones/asistencias reconoce al facilitador por
+ * facilitadores.usuario_id — sin este vínculo, una cuenta con rol
+ * facilitador no ve ni puede gestionar sus ediciones.
+ */
+async function vincularFichaFacilitador(usuarioId: string, organizacionId: string) {
+  const admin = createAdminClient();
+  const { data: usuario } = await admin.from("usuarios").select("run").eq("id", usuarioId).maybeSingle();
+  if (!usuario?.run) return false;
+  const { data } = await admin
+    .from("facilitadores")
+    .update({ usuario_id: usuarioId })
+    .eq("organizacion_id", organizacionId)
+    .eq("run", usuario.run)
+    .is("usuario_id", null)
+    .select("id");
+  if ((data ?? []).length > 0) return true;
+  const { data: yaVinculado } = await admin
+    .from("facilitadores")
+    .select("id")
+    .eq("organizacion_id", organizacionId)
+    .eq("usuario_id", usuarioId)
+    .limit(1);
+  return (yaVinculado ?? []).length > 0;
+}
+
+export async function agregarRolUsuario(input: {
   usuarioId: string;
-  organizacionId: string;
-  nuevoRol: RolNombre;
+  organizacionId: string | null;
+  rol: RolNombre;
   centroTrabajoId?: string | null;
 }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
   if (input.usuarioId === sesion.usuarioId) {
-    return { ok: false as const, mensaje: "No puedes cambiar tu propio rol desde aquí." };
+    return { ok: false as const, mensaje: "No puedes cambiar tus propios roles desde aquí." };
   }
 
-  const autorizado = await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId);
-
-  if (!autorizado) {
-    return { ok: false as const, mensaje: "No tienes permiso para cambiar el rol de esta cuenta." };
+  if (input.rol === "super_admin") {
+    if (!sesion.esSuperAdmin) {
+      return { ok: false as const, mensaje: "Sólo un super administrador puede asignar ese rol." };
+    }
+  } else {
+    if (!input.organizacionId) return { ok: false as const, mensaje: "Selecciona una organización para este rol." };
+    if (!(await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId))) {
+      return { ok: false as const, mensaje: "No tienes permiso para asignar roles en esta organización." };
+    }
   }
 
-  if (input.nuevoRol === "trabajador") {
+  if (input.rol === "trabajador") {
     return {
       ok: false as const,
       mensaje: "El rol de trabajador se otorga desde el módulo Trabajadores (botón «Dar acceso»), no desde aquí.",
     };
   }
 
-  if (input.nuevoRol === "super_admin" && !sesion.esSuperAdmin) {
-    return { ok: false as const, mensaje: "Sólo un super administrador puede asignar ese rol." };
+  const organizacionId = input.rol === "super_admin" ? null : input.organizacionId;
+  const centroTrabajoId = input.rol === "supervisor_centro" ? (input.centroTrabajoId ?? null) : null;
+
+  const admin = createAdminClient();
+
+  const { data: rolRow } = await admin.from("roles").select("id").eq("nombre", input.rol).single();
+  if (!rolRow) return { ok: false as const, mensaje: "Rol inválido." };
+
+  if (await rolYaAsignado(admin, input.usuarioId, rolRow.id, organizacionId, centroTrabajoId)) {
+    return { ok: false as const, mensaje: "Esta cuenta ya tiene ese rol." };
+  }
+
+  if (centroTrabajoId && organizacionId) {
+    const { data: centro } = await admin
+      .from("centros_trabajo")
+      .select("id")
+      .eq("id", centroTrabajoId)
+      .eq("organizacion_id", organizacionId)
+      .maybeSingle();
+    if (!centro) return { ok: false as const, mensaje: "El centro no pertenece a esta organización." };
   }
 
   const supabase = await createClient();
-
-  const { data: rolRow } = await supabase.from("roles").select("id").eq("nombre", input.nuevoRol).single();
-  if (!rolRow) return { ok: false as const, mensaje: "Rol inválido." };
-
-  const { data: rolAnterior } = await supabase
+  const { data: creado, error } = await supabase
     .from("usuario_roles")
-    .select("roles(nombre)")
-    .eq("id", input.usuarioRolId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from("usuario_roles")
-    .update({
+    .insert({
+      usuario_id: input.usuarioId,
       rol_id: rolRow.id,
-      centro_trabajo_id: input.nuevoRol === "supervisor_centro" ? (input.centroTrabajoId ?? null) : null,
+      organizacion_id: organizacionId,
+      centro_trabajo_id: centroTrabajoId,
     })
-    .eq("id", input.usuarioRolId)
-    .eq("organizacion_id", input.organizacionId);
+    .select("id")
+    .single();
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error || !creado) return { ok: false as const, mensaje: error?.message ?? "No se pudo asignar el rol." };
+
+  let avisoFacilitador: string | null = null;
+  if (input.rol === "facilitador" && organizacionId) {
+    const vinculado = await vincularFichaFacilitador(input.usuarioId, organizacionId);
+    if (!vinculado) {
+      avisoFacilitador =
+        "No hay una ficha de facilitador con este RUT en la organización. Regístralo en Facilitadores para que pueda dictar ediciones; quedará vinculado automáticamente.";
+    }
+  }
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,
-    accion: "cambiar_rol",
+    accion: "agregar_rol",
+    tabla: "usuario_roles",
+    registroId: creado.id,
+    datosNuevos: { rol: input.rol, organizacionId, centroTrabajoId, usuarioAfectado: input.usuarioId },
+  });
+
+  revalidatePath("/usuarios");
+  return { ok: true as const, avisoFacilitador };
+}
+
+export async function quitarRolUsuario(input: { usuarioRolId: string; usuarioId: string }) {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
+
+  if (input.usuarioId === sesion.usuarioId) {
+    return { ok: false as const, mensaje: "No puedes cambiar tus propios roles desde aquí." };
+  }
+
+  const admin = createAdminClient();
+  const { data: asignacion } = await admin
+    .from("usuario_roles")
+    .select("id, usuario_id, organizacion_id, roles(nombre)")
+    .eq("id", input.usuarioRolId)
+    .eq("usuario_id", input.usuarioId)
+    .maybeSingle();
+  if (!asignacion) return { ok: false as const, mensaje: "No se encontró esa asignación de rol." };
+
+  const rol = asignacion.roles?.nombre;
+  const autorizado =
+    rol === "super_admin"
+      ? sesion.esSuperAdmin
+      : await tienePermiso(sesion, "usuarios.gestionar", asignacion.organizacion_id);
+  if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para quitar este rol." };
+
+  if (rol === "trabajador") {
+    return {
+      ok: false as const,
+      mensaje: "El rol de trabajador está ligado a su registro en la matriz; se gestiona desde Trabajadores.",
+    };
+  }
+
+  const { count } = await admin
+    .from("usuario_roles")
+    .select("id", { count: "exact", head: true })
+    .eq("usuario_id", input.usuarioId);
+  if ((count ?? 0) <= 1) {
+    return {
+      ok: false as const,
+      mensaje: "Es el único rol de esta cuenta. Para quitarle el acceso, desactiva la cuenta.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("usuario_roles").delete().eq("id", input.usuarioRolId);
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  if (rol === "facilitador" && asignacion.organizacion_id) {
+    // Sin esto seguiría viendo y gestionando ediciones vía RLS
+    // (facilitadores.usuario_id), aunque ya no tenga el rol.
+    await admin
+      .from("facilitadores")
+      .update({ usuario_id: null })
+      .eq("organizacion_id", asignacion.organizacion_id)
+      .eq("usuario_id", input.usuarioId);
+  }
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: "quitar_rol",
     tabla: "usuario_roles",
     registroId: input.usuarioRolId,
-    datosAnteriores: { rol: rolAnterior?.roles?.nombre ?? null },
-    datosNuevos: { rol: input.nuevoRol, centroTrabajoId: input.centroTrabajoId ?? null, usuarioAfectado: input.usuarioId },
+    datosAnteriores: { rol, organizacionId: asignacion.organizacion_id, usuarioAfectado: input.usuarioId },
   });
 
   revalidatePath("/usuarios");
@@ -245,9 +393,9 @@ export async function actualizarEstadoUsuario(input: {
       .select("usuario_id")
       .eq("usuario_id", input.usuarioId)
       .eq("organizacion_id", input.organizacionId)
-      .maybeSingle();
+      .limit(1);
 
-    if (!rolEnOrg) {
+    if (!rolEnOrg?.length) {
       return { ok: false as const, mensaje: "Esa cuenta no pertenece a tu organización." };
     }
   }

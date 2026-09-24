@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Copy, Check, Ban, RotateCcw, ArrowUp, ArrowDown, ArrowUpDown, Pencil } from "lucide-react";
+import { Plus, Copy, Check, Ban, RotateCcw, ArrowUp, ArrowDown, ArrowUpDown, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { crearUsuario, actualizarEstadoUsuario, actualizarRolUsuario } from "./actions";
+import { crearUsuario, actualizarEstadoUsuario, agregarRolUsuario, quitarRolUsuario } from "./actions";
 import { coincideBusqueda } from "@/lib/busqueda";
 import { usePaginacion } from "@/lib/use-paginacion";
 import { Paginacion } from "@/components/ui/paginacion";
@@ -55,7 +55,22 @@ type Asignacion = {
   } | null;
   roles: { nombre: RolNombre } | null;
   centros_trabajo: { nombre: string } | null;
+  organizaciones: { razon_social: string } | null;
 };
+
+type Usuario = NonNullable<Asignacion["usuarios"]>;
+type Cuenta = { usuario: Usuario; asignaciones: Asignacion[] };
+
+function agruparPorCuenta(asignaciones: Asignacion[]): Cuenta[] {
+  const porUsuario = new Map<string, Cuenta>();
+  for (const a of asignaciones) {
+    if (!a.usuarios) continue;
+    const cuenta = porUsuario.get(a.usuarios.id) ?? { usuario: a.usuarios, asignaciones: [] };
+    cuenta.asignaciones.push(a);
+    porUsuario.set(a.usuarios.id, cuenta);
+  }
+  return [...porUsuario.values()];
+}
 
 type Centro = { id: string; nombre: string; organizacion_id: string };
 
@@ -77,15 +92,15 @@ const ROLES_ASIGNABLES: RolNombre[] = [
   "auditor",
 ];
 
-function textoBuscable(a: Asignacion): string {
+function textoBuscable(c: Cuenta): string {
   return [
-    a.usuarios?.nombres,
-    a.usuarios?.apellidos,
-    a.usuarios?.run,
-    a.usuarios?.dv,
-    a.usuarios?.email,
-    a.roles ? ROL_LABEL[a.roles.nombre] : null,
-    a.usuarios?.activo ? "activa" : "inactiva",
+    c.usuario.nombres,
+    c.usuario.apellidos,
+    c.usuario.run,
+    c.usuario.dv,
+    c.usuario.email,
+    ...c.asignaciones.map((a) => (a.roles ? ROL_LABEL[a.roles.nombre] : null)),
+    c.usuario.activo ? "activa" : "inactiva",
   ]
     .filter(Boolean)
     .join(" ")
@@ -95,18 +110,22 @@ function textoBuscable(a: Asignacion): string {
 type ColumnaOrdenable = "nombre" | "rut" | "correo" | "rol" | "estado";
 type Orden = { columna: ColumnaOrdenable; direccion: "asc" | "desc" };
 
-function valorOrdenable(a: Asignacion, columna: ColumnaOrdenable): string | number {
+function valorOrdenable(c: Cuenta, columna: ColumnaOrdenable): string | number {
   switch (columna) {
     case "nombre":
-      return `${a.usuarios?.nombres ?? ""} ${a.usuarios?.apellidos ?? ""}`.trim().toLowerCase();
+      return `${c.usuario.nombres} ${c.usuario.apellidos}`.trim().toLowerCase();
     case "rut":
-      return Number(a.usuarios?.run ?? 0);
+      return Number(c.usuario.run ?? 0);
     case "correo":
-      return (a.usuarios?.email ?? "").toLowerCase();
+      return c.usuario.email.toLowerCase();
     case "rol":
-      return (a.roles ? ROL_LABEL[a.roles.nombre] : "").toLowerCase();
+      return c.asignaciones
+        .map((a) => (a.roles ? ROL_LABEL[a.roles.nombre] : ""))
+        .sort()
+        .join(" ")
+        .toLowerCase();
     case "estado":
-      return a.usuarios?.activo ? 0 : 1;
+      return c.usuario.activo ? 0 : 1;
   }
 }
 
@@ -162,10 +181,14 @@ export function UsuariosView({
     });
   }
 
+  const cuentas = useMemo(() => agruparPorCuenta(asignaciones), [asignaciones]);
+  const idsGestionables = useMemo(() => new Set(organizaciones.map((o) => o.id)), [organizaciones]);
+  const mostrarOrganizacion = esSuperAdmin || organizaciones.length > 1;
+
   const filtradas = useMemo(() => {
     const resultado = busqueda.trim()
-      ? asignaciones.filter((a) => coincideBusqueda(textoBuscable(a), busqueda))
-      : asignaciones;
+      ? cuentas.filter((c) => coincideBusqueda(textoBuscable(c), busqueda))
+      : cuentas;
 
     if (!orden) return resultado;
 
@@ -188,7 +211,7 @@ export function UsuariosView({
       return orden.direccion === "asc" ? cmp : -cmp;
     });
     return conValor.map((x) => x.a);
-  }, [asignaciones, busqueda, orden]);
+  }, [cuentas, busqueda, orden]);
 
   const { pagina, setPagina, tamano, setTamano, totalPaginas, paginaItems, totalItems } = usePaginacion(filtradas);
 
@@ -226,7 +249,7 @@ export function UsuariosView({
               <SortableHead label="Nombre" columna="nombre" orden={orden} onSort={onSort} />
               <SortableHead label="RUT" columna="rut" orden={orden} onSort={onSort} />
               <SortableHead label="Correo" columna="correo" orden={orden} onSort={onSort} />
-              <SortableHead label="Rol" columna="rol" orden={orden} onSort={onSort} />
+              <SortableHead label="Roles" columna="rol" orden={orden} onSort={onSort} />
               <SortableHead label="Estado" columna="estado" orden={orden} onSort={onSort} />
             </TableRow>
           </TableHeader>
@@ -234,59 +257,59 @@ export function UsuariosView({
             {totalItems === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                  {asignaciones.length === 0
+                  {cuentas.length === 0
                     ? "No hay cuentas registradas todavía."
                     : "No hay cuentas que coincidan con el filtro."}
                 </TableCell>
               </TableRow>
             )}
-            {paginaItems.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell className="font-medium">
-                  {a.usuarios ? `${a.usuarios.nombres} ${a.usuarios.apellidos}` : "—"}
-                </TableCell>
-                <TableCell className="font-mono text-sm">
-                  {a.usuarios?.run && a.usuarios?.dv ? formatearRut(a.usuarios.run, a.usuarios.dv) : "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{a.usuarios?.email ?? "—"}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex flex-col">
-                      <Badge variant="secondary" className="rounded-sm">
-                        {a.roles ? ROL_LABEL[a.roles.nombre] : "—"}
-                      </Badge>
-                      {a.roles?.nombre === "supervisor_centro" && a.centros_trabajo && (
-                        <span className="text-[10px] text-muted-foreground mt-0.5">{a.centros_trabajo.nombre}</span>
+            {paginaItems.map((c) => {
+              const esPropia = c.usuario.id === usuarioActualId;
+              const orgParaEstado =
+                c.asignaciones.find((a) => a.organizacion_id && idsGestionables.has(a.organizacion_id))
+                  ?.organizacion_id ?? null;
+              return (
+                <TableRow key={c.usuario.id}>
+                  <TableCell className="font-medium">
+                    {c.usuario.nombres} {c.usuario.apellidos}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {c.usuario.run && c.usuario.dv ? formatearRut(c.usuario.run, c.usuario.dv) : "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{c.usuario.email}</TableCell>
+                  <TableCell>
+                    <div className="flex items-start gap-1.5">
+                      <div className="flex flex-wrap gap-1">
+                        {c.asignaciones.map((a) => (
+                          <Badge key={a.id} variant="secondary" className="rounded-sm">
+                            {etiquetaAsignacion(a, mostrarOrganizacion)}
+                          </Badge>
+                        ))}
+                      </div>
+                      {!esPropia && (
+                        <GestionarRolesDialog
+                          cuenta={c}
+                          organizaciones={organizaciones}
+                          centros={centros}
+                          esSuperAdmin={esSuperAdmin}
+                          mostrarOrganizacion={mostrarOrganizacion}
+                        />
                       )}
                     </div>
-                    {a.usuarios && a.organizacion_id && a.usuarios.id !== usuarioActualId && (
-                      <EditarRolDialog
-                        usuarioRolId={a.id}
-                        usuarioId={a.usuarios.id}
-                        organizacionId={a.organizacion_id}
-                        rolActual={a.roles?.nombre ?? null}
-                        centroActual={a.centro_trabajo_id}
-                        centros={centros.filter((c) => c.organizacion_id === a.organizacion_id)}
-                        nombreCompleto={`${a.usuarios.nombres} ${a.usuarios.apellidos}`}
-                        esSuperAdmin={esSuperAdmin}
-                      />
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    {a.usuarios?.activo ? (
-                      <span className="text-xs text-clear">Activa</span>
-                    ) : (
-                      <span className="text-xs text-alert">Inactiva</span>
-                    )}
-                    {a.usuarios && a.usuarios.id !== usuarioActualId && (
-                      <ToggleActivoButton usuario={a.usuarios} organizacionId={a.organizacion_id} />
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {c.usuario.activo ? (
+                        <span className="text-xs text-clear">Activa</span>
+                      ) : (
+                        <span className="text-xs text-alert">Inactiva</span>
+                      )}
+                      {!esPropia && <ToggleActivoButton usuario={c.usuario} organizacionId={orgParaEstado} />}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         <Paginacion
@@ -357,6 +380,25 @@ function NuevaCuentaDialog({
 
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
+        return;
+      }
+
+      if ("cuentaExistente" in resultado) {
+        toast.success(
+          `${resultado.nombreExistente} ya tenía una cuenta con ese RUT: se le agregó el rol ${ROL_LABEL[form.rol]}. Sigue ingresando con su contraseña actual.`,
+          { duration: 10000 },
+        );
+        if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
+        setForm({
+          nombres: "",
+          apellidos: "",
+          email: "",
+          rut: "",
+          rol: rolesDisponibles[0],
+          organizacionId: organizaciones[0]?.id ?? "",
+          centroTrabajoId: "",
+        });
+        cerrarYLimpiar();
         return;
       }
 
@@ -550,98 +592,160 @@ function NuevaCuentaDialog({
   );
 }
 
-function EditarRolDialog({
-  usuarioRolId,
-  usuarioId,
-  organizacionId,
-  rolActual,
-  centroActual,
+function etiquetaAsignacion(a: Asignacion, mostrarOrganizacion: boolean) {
+  const partes = [a.roles ? ROL_LABEL[a.roles.nombre] : "—"];
+  if (a.roles?.nombre === "supervisor_centro" && a.centros_trabajo) partes.push(a.centros_trabajo.nombre);
+  if (mostrarOrganizacion && a.organizaciones) partes.push(a.organizaciones.razon_social);
+  return partes.join(" · ");
+}
+
+function GestionarRolesDialog({
+  cuenta,
+  organizaciones,
   centros,
-  nombreCompleto,
   esSuperAdmin,
+  mostrarOrganizacion,
 }: {
-  usuarioRolId: string;
-  usuarioId: string;
-  organizacionId: string;
-  rolActual: RolNombre | null;
-  centroActual: string | null;
+  cuenta: Cuenta;
+  organizaciones: { id: string; razon_social: string }[];
   centros: Centro[];
-  nombreCompleto: string;
   esSuperAdmin: boolean;
+  mostrarOrganizacion: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const rolesDisponibles = esSuperAdmin ? (["super_admin", ...ROLES_ASIGNABLES] as RolNombre[]) : ROLES_ASIGNABLES;
-  const [nuevoRol, setNuevoRol] = useState<RolNombre>(
-    rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0],
-  );
-  const [centroTrabajoId, setCentroTrabajoId] = useState(centroActual ?? "");
+  const orgInicial =
+    cuenta.asignaciones.find((a) => a.organizacion_id && organizaciones.some((o) => o.id === a.organizacion_id))
+      ?.organizacion_id ??
+    organizaciones[0]?.id ??
+    "";
+  const [organizacionId, setOrganizacionId] = useState(orgInicial);
+  const [rol, setRol] = useState<RolNombre>(ROLES_ASIGNABLES[1]);
+  const [centroTrabajoId, setCentroTrabajoId] = useState("");
+  const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId);
 
-  function onSubmit(e: React.FormEvent) {
+  const puedeGestionar = (a: Asignacion) =>
+    a.roles?.nombre !== "trabajador" &&
+    (esSuperAdmin || (!!a.organizacion_id && organizaciones.some((o) => o.id === a.organizacion_id)));
+
+  function quitar(a: Asignacion) {
+    startTransition(async () => {
+      const resultado = await quitarRolUsuario({ usuarioRolId: a.id, usuarioId: cuenta.usuario.id });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      toast.success(`Se quitó el rol ${a.roles ? ROL_LABEL[a.roles.nombre] : ""}.`);
+    });
+  }
+
+  function agregar(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      const resultado = await actualizarRolUsuario({
-        usuarioRolId,
-        usuarioId,
-        organizacionId,
-        nuevoRol,
-        centroTrabajoId: nuevoRol === "supervisor_centro" ? centroTrabajoId || null : null,
+      const resultado = await agregarRolUsuario({
+        usuarioId: cuenta.usuario.id,
+        organizacionId: rol === "super_admin" ? null : organizacionId,
+        rol,
+        centroTrabajoId: rol === "supervisor_centro" ? centroTrabajoId || null : null,
       });
       if (!resultado.ok) {
         toast.error(resultado.mensaje);
         return;
       }
-      toast.success("Rol actualizado.");
-      setOpen(false);
+      toast.success(`Se agregó el rol ${ROL_LABEL[rol]}.`);
+      if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
+      setCentroTrabajoId("");
     });
   }
 
-  const sinCambios = nuevoRol === rolActual && (nuevoRol !== "supervisor_centro" || centroTrabajoId === (centroActual ?? ""));
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) {
-          setNuevoRol(rolActual && rolesDisponibles.includes(rolActual) ? rolActual : rolesDisponibles[0]);
-          setCentroTrabajoId(centroActual ?? "");
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6" title="Cambiar rol" />}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6 shrink-0" title="Gestionar roles" />}>
         <Pencil className="size-3.5" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cambiar rol</DialogTitle>
-          <DialogDescription>{nombreCompleto}</DialogDescription>
+          <DialogTitle>Roles de la cuenta</DialogTitle>
+          <DialogDescription>
+            {cuenta.usuario.nombres} {cuenta.usuario.apellidos}. Una misma cuenta puede tener varios roles; ingresa
+            siempre con su RUT y verá lo que cada rol le permite.
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Nuevo rol</Label>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Roles actuales</Label>
+          <div className="flex flex-col divide-y divide-border border border-border">
+            {cuenta.asignaciones.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span>{etiquetaAsignacion(a, mostrarOrganizacion)}</span>
+                {puedeGestionar(a) && cuenta.asignaciones.length > 1 && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    disabled={pending}
+                    title="Quitar este rol"
+                    aria-label={`Quitar rol ${a.roles ? ROL_LABEL[a.roles.nombre] : ""}`}
+                    onClick={() => quitar(a)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          {cuenta.asignaciones.length === 1 && (
+            <p className="text-xs text-muted-foreground">
+              Es su único rol. Para quitarle el acceso, desactiva la cuenta.
+            </p>
+          )}
+        </div>
+
+        <form onSubmit={agregar} className="flex flex-col gap-3 border-t border-border pt-4">
+          <Label>Agregar rol</Label>
+          {rol !== "super_admin" && organizaciones.length > 1 && (
             <Select
-              items={Object.fromEntries(rolesDisponibles.map((r) => [r, ROL_LABEL[r]]))}
-              value={nuevoRol}
-              onValueChange={(v) => setNuevoRol((v ?? rolesDisponibles[0]) as RolNombre)}
+              items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
+              value={organizacionId}
+              onValueChange={(v) => {
+                setOrganizacionId(v ?? "");
+                setCentroTrabajoId("");
+              }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Organización" />
               </SelectTrigger>
               <SelectContent>
-                {rolesDisponibles.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROL_LABEL[r]}
+                {organizaciones.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.razon_social}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          {nuevoRol === "supervisor_centro" && (
+          )}
+          <Select
+            items={Object.fromEntries(rolesDisponibles.map((r) => [r, ROL_LABEL[r]]))}
+            value={rol}
+            onValueChange={(v) => setRol((v ?? rolesDisponibles[0]) as RolNombre)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {rolesDisponibles.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {ROL_LABEL[r]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {rol === "supervisor_centro" && (
             <div className="flex flex-col gap-1.5">
-              <Label>Centro de trabajo</Label>
               <Select
-                items={Object.fromEntries(centros.map((c) => [c.id, c.nombre]))}
+                items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
                 value={centroTrabajoId}
                 onValueChange={(v) => setCentroTrabajoId(v ?? "")}
               >
@@ -649,7 +753,7 @@ function EditarRolDialog({
                   <SelectValue placeholder="Todos los centros (sin acotar)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {centros.map((c) => (
+                  {centrosDeOrg.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.nombre}
                     </SelectItem>
@@ -661,9 +765,14 @@ function EditarRolDialog({
               </p>
             </div>
           )}
+          {rol === "facilitador" && (
+            <p className="text-xs text-muted-foreground">
+              Se vincula con su ficha en Facilitadores (mismo RUT) para que vea y gestione sus ediciones.
+            </p>
+          )}
           <DialogFooter>
-            <Button type="submit" disabled={pending || sinCambios}>
-              {pending ? "Guardando…" : "Guardar"}
+            <Button type="submit" disabled={pending || (rol !== "super_admin" && !organizacionId)}>
+              {pending ? "Guardando…" : "Agregar rol"}
             </Button>
           </DialogFooter>
         </form>

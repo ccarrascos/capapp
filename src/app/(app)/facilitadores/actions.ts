@@ -148,6 +148,29 @@ export async function crearFacilitador(input: {
 
   if (error) return { ok: false as const, mensaje: error.message };
 
+  // Si la persona ya tiene cuenta con rol facilitador en esta organización,
+  // se vincula la ficha para que vea y gestione sus ediciones (RLS usa
+  // facilitadores.usuario_id).
+  const admin = createAdminClient();
+  const { data: usuario } = await admin.from("usuarios").select("id").eq("run", input.run).maybeSingle();
+  if (usuario) {
+    const { data: rolFacilitador } = await admin
+      .from("usuario_roles")
+      .select("id, roles!inner(nombre)")
+      .eq("usuario_id", usuario.id)
+      .eq("organizacion_id", input.organizacionId)
+      .eq("roles.nombre", "facilitador")
+      .limit(1);
+    if (rolFacilitador?.length) {
+      await admin
+        .from("facilitadores")
+        .update({ usuario_id: usuario.id })
+        .eq("organizacion_id", input.organizacionId)
+        .eq("run", input.run)
+        .is("usuario_id", null);
+    }
+  }
+
   revalidatePath("/facilitadores");
   return { ok: true as const };
 }
