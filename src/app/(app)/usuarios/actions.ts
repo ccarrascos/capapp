@@ -21,13 +21,16 @@ const ROL_LABEL: Record<RolNombre, string> = {
   trabajador: "Trabajador",
 };
 
+const AVISO_SIN_FICHA_FACILITADOR =
+  "No hay una ficha de facilitador con este RUT en la organización. Regístralo en Facilitadores para que pueda dictar ediciones; quedará vinculado automáticamente.";
+
 export type CrearUsuarioInput = {
   nombres: string;
   apellidos: string;
   email: string;
   run: string;
   dv: string;
-  rol: RolNombre;
+  roles: RolNombre[];
   organizacionId: string | null;
   centroTrabajoId: string | null;
 };
@@ -36,19 +39,24 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    (input.rol !== "super_admin" && (await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId)));
+  const roles = [...new Set(input.roles)];
+  if (roles.length === 0) return { ok: false as const, mensaje: "Selecciona al menos un rol." };
+  const rolesDeOrganizacion = roles.filter((r) => r !== "super_admin");
 
-  if (!autorizado) {
-    return { ok: false as const, mensaje: "No tienes permiso para crear esta cuenta." };
+  if (roles.includes("super_admin") && !sesion.esSuperAdmin) {
+    return { ok: false as const, mensaje: "Sólo un super administrador puede asignar ese rol." };
   }
 
-  if (input.rol !== "super_admin" && !input.organizacionId) {
-    return { ok: false as const, mensaje: "Selecciona una organización para este rol." };
+  if (rolesDeOrganizacion.length > 0) {
+    if (!input.organizacionId) {
+      return { ok: false as const, mensaje: "Selecciona una organización para estos roles." };
+    }
+    if (!(await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId))) {
+      return { ok: false as const, mensaje: "No tienes permiso para crear esta cuenta." };
+    }
   }
 
-  if (input.rol === "trabajador") {
+  if (roles.includes("trabajador")) {
     return {
       ok: false as const,
       mensaje: "El acceso de un trabajador se otorga desde el módulo Trabajadores (botón «Dar acceso»), para que quede vinculado a su registro en la matriz de vigencia.",
@@ -73,18 +81,28 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   if (rutExistente) {
     // La persona ya tiene cuenta (por ejemplo, en otra organización o con
     // otro rol): se le suma el rol, sin tocar su identidad ni su contraseña.
-    const resultado = await agregarRolUsuario({
-      usuarioId: rutExistente.id,
-      organizacionId: input.organizacionId,
-      rol: input.rol,
-      centroTrabajoId: input.centroTrabajoId,
-    });
-    if (!resultado.ok) return resultado;
+    const resultados: Awaited<ReturnType<typeof agregarRolUsuario>>[] = [];
+    for (const rol of roles) {
+      resultados.push(
+        await agregarRolUsuario({
+          usuarioId: rutExistente.id,
+          organizacionId: rol === "super_admin" ? null : input.organizacionId,
+          rol,
+          centroTrabajoId: input.centroTrabajoId,
+        }),
+      );
+    }
+    const agregados = roles.filter((_, i) => resultados[i].ok);
+    if (agregados.length === 0) {
+      const primerError = resultados.find((r) => !r.ok);
+      return { ok: false as const, mensaje: primerError && !primerError.ok ? primerError.mensaje : "No se pudo asignar." };
+    }
     return {
       ok: true as const,
       cuentaExistente: true as const,
       nombreExistente: `${rutExistente.nombres} ${rutExistente.apellidos}`,
-      avisoFacilitador: resultado.avisoFacilitador,
+      rolesAgregados: agregados,
+      avisoFacilitador: resultados.map((r) => (r.ok ? r.avisoFacilitador : null)).find(Boolean) ?? null,
     };
   }
 
@@ -118,23 +136,32 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     return { ok: false as const, mensaje: errorPerfil.message };
   }
 
-  const { data: rolRow } = await supabase.from("roles").select("id").eq("nombre", input.rol).single();
+  const { data: rolRows } = await supabase.from("roles").select("id, nombre").in("nombre", roles);
 
-  if (!rolRow) {
+  if (!rolRows || rolRows.length !== roles.length) {
     await admin.auth.admin.deleteUser(creado.user.id);
     return { ok: false as const, mensaje: "Rol inválido." };
   }
 
-  const { error: errorRol } = await admin.from("usuario_roles").insert({
-    usuario_id: creado.user.id,
-    rol_id: rolRow.id,
-    organizacion_id: input.organizacionId,
-    centro_trabajo_id: input.centroTrabajoId,
-  });
+  const { error: errorRol } = await admin.from("usuario_roles").insert(
+    rolRows.map((r) => ({
+      usuario_id: creado.user.id,
+      rol_id: r.id,
+      organizacion_id: r.nombre === "super_admin" ? null : input.organizacionId,
+      centro_trabajo_id: r.nombre === "supervisor_centro" ? input.centroTrabajoId : null,
+    })),
+  );
 
   if (errorRol) {
     await admin.auth.admin.deleteUser(creado.user.id);
     return { ok: false as const, mensaje: errorRol.message };
+  }
+
+  let avisoFacilitador: string | null = null;
+  if (roles.includes("facilitador") && input.organizacionId) {
+    if (!(await vincularFichaFacilitador(creado.user.id, input.organizacionId))) {
+      avisoFacilitador = AVISO_SIN_FICHA_FACILITADOR;
+    }
   }
 
   revalidatePath("/usuarios");
@@ -144,24 +171,31 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     accion: "crear_usuario",
     tabla: "usuarios",
     registroId: creado.user.id,
-    datosNuevos: { nombres: input.nombres, apellidos: input.apellidos, rol: input.rol, organizacionId: input.organizacionId },
+    datosNuevos: { nombres: input.nombres, apellidos: input.apellidos, roles, organizacionId: input.organizacionId },
   });
 
   const correo = await enviarCorreoBienvenida({
     nombres: input.nombres,
     email,
     password: passwordTemporal,
-    rolLabel: ROL_LABEL[input.rol],
+    rolLabel: roles.map((r) => ROL_LABEL[r]).join(", "),
     rut: `${run}-${dv}`,
     expiraEn,
   });
 
   if (!correo.ok) {
     // La cuenta ya existe; si el correo falla, entregamos la clave para respaldo manual.
-    return { ok: true as const, emailEnviado: false as const, passwordTemporal, expiraEn, mensajeCorreo: correo.mensaje };
+    return {
+      ok: true as const,
+      emailEnviado: false as const,
+      passwordTemporal,
+      expiraEn,
+      mensajeCorreo: correo.mensaje,
+      avisoFacilitador,
+    };
   }
 
-  return { ok: true as const, emailEnviado: true as const };
+  return { ok: true as const, emailEnviado: true as const, avisoFacilitador };
 }
 
 async function rolYaAsignado(
@@ -277,8 +311,7 @@ export async function agregarRolUsuario(input: {
   if (input.rol === "facilitador" && organizacionId) {
     const vinculado = await vincularFichaFacilitador(input.usuarioId, organizacionId);
     if (!vinculado) {
-      avisoFacilitador =
-        "No hay una ficha de facilitador con este RUT en la organización. Regístralo en Facilitadores para que pueda dictar ediciones; quedará vinculado automáticamente.";
+      avisoFacilitador = AVISO_SIN_FICHA_FACILITADOR;
     }
   }
 

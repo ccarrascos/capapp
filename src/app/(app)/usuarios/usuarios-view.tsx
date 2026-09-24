@@ -348,10 +348,11 @@ function NuevaCuentaDialog({
     apellidos: "",
     email: "",
     rut: "",
-    rol: rolesDisponibles[0],
+    roles: [] as RolNombre[],
     organizacionId: organizaciones[0]?.id ?? "",
     centroTrabajoId: "",
   });
+  const requiereOrganizacion = form.roles.length === 0 || form.roles.some((r) => r !== "super_admin");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
 
   function onSubmit(e: React.FormEvent) {
@@ -374,9 +375,9 @@ function NuevaCuentaDialog({
         email: form.email.trim(),
         run: parsed.run,
         dv: parsed.dv,
-        rol: form.rol,
-        organizacionId: form.rol === "super_admin" ? null : form.organizacionId,
-        centroTrabajoId: form.rol === "supervisor_centro" ? form.centroTrabajoId || null : null,
+        roles: form.roles,
+        organizacionId: requiereOrganizacion ? form.organizacionId : null,
+        centroTrabajoId: form.roles.includes("supervisor_centro") ? form.centroTrabajoId || null : null,
       });
 
       if (!resultado.ok) {
@@ -386,7 +387,9 @@ function NuevaCuentaDialog({
 
       if ("cuentaExistente" in resultado) {
         toast.success(
-          `${resultado.nombreExistente} ya tenía una cuenta con ese RUT: se le agregó el rol ${ROL_LABEL[form.rol]}. Sigue ingresando con su contraseña actual.`,
+          `${resultado.nombreExistente} ya tenía una cuenta con ese RUT: se le ${
+            (resultado.rolesAgregados ?? []).length > 1 ? "agregaron los roles" : "agregó el rol"
+          } ${(resultado.rolesAgregados ?? []).map((r) => ROL_LABEL[r]).join(", ")}. Sigue ingresando con su contraseña actual.`,
           { duration: 10000 },
         );
         if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
@@ -395,7 +398,7 @@ function NuevaCuentaDialog({
           apellidos: "",
           email: "",
           rut: "",
-          rol: rolesDisponibles[0],
+          roles: [] as RolNombre[],
           organizacionId: organizaciones[0]?.id ?? "",
           centroTrabajoId: "",
         });
@@ -403,6 +406,7 @@ function NuevaCuentaDialog({
         return;
       }
 
+      if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
       const rutFormateado = formatearRut(parsed.run, parsed.dv);
       setResultado(
         resultado.emailEnviado
@@ -420,7 +424,7 @@ function NuevaCuentaDialog({
         apellidos: "",
         email: "",
         rut: "",
-        rol: rolesDisponibles[0],
+        roles: [] as RolNombre[],
         organizacionId: organizaciones[0]?.id ?? "",
         centroTrabajoId: "",
       });
@@ -517,25 +521,15 @@ function NuevaCuentaDialog({
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label>Rol</Label>
-                <Select
-                  items={Object.fromEntries(rolesDisponibles.map((r) => [r, ROL_LABEL[r]]))}
-                  value={form.rol}
-                  onValueChange={(v) => setForm((f) => ({ ...f, rol: (v ?? "trabajador") as RolNombre }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rolesDisponibles.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {ROL_LABEL[r]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Roles</Label>
+                <SelectorRoles
+                  disponibles={rolesDisponibles}
+                  seleccionados={form.roles}
+                  onChange={(roles) => setForm((f) => ({ ...f, roles }))}
+                />
+                <p className="text-xs text-muted-foreground">Puedes marcar varios.</p>
               </div>
-              {form.rol !== "super_admin" && (
+              {requiereOrganizacion && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Organización</Label>
                   <Select
@@ -556,7 +550,7 @@ function NuevaCuentaDialog({
                   </Select>
                 </div>
               )}
-              {form.rol === "supervisor_centro" && (
+              {form.roles.includes("supervisor_centro") && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Centro de trabajo</Label>
                   <Select
@@ -581,7 +575,7 @@ function NuevaCuentaDialog({
                 </div>
               )}
               <DialogFooter>
-                <Button type="submit" disabled={pending}>
+                <Button type="submit" disabled={pending || form.roles.length === 0}>
                   {pending ? "Creando…" : "Crear cuenta"}
                 </Button>
               </DialogFooter>
@@ -590,6 +584,37 @@ function NuevaCuentaDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SelectorRoles({
+  disponibles,
+  seleccionados,
+  onChange,
+  disabled,
+}: {
+  disponibles: RolNombre[];
+  seleccionados: RolNombre[];
+  onChange: (roles: RolNombre[]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-2 border border-border p-3">
+      {disponibles.map((r) => (
+        <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            disabled={disabled}
+            checked={seleccionados.includes(r)}
+            onChange={(e) =>
+              onChange(e.target.checked ? [...seleccionados, r] : seleccionados.filter((x) => x !== r))
+            }
+          />
+          {ROL_LABEL[r]}
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -628,7 +653,7 @@ function GestionarRolesDialog({
     organizaciones[0]?.id ??
     "";
   const [organizacionId, setOrganizacionId] = useState(orgInicial);
-  const [rol, setRol] = useState<RolNombre>(esPropia ? "facilitador" : ROLES_ASIGNABLES[1]);
+  const [seleccion, setSeleccion] = useState<RolNombre[]>([]);
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId);
 
@@ -639,7 +664,8 @@ function GestionarRolesDialog({
       (a) => a.roles?.nombre === r && a.organizacion_id === (r === "super_admin" ? null : organizacionId),
     );
   const rolesParaAgregar = rolesDisponibles.filter((r) => !yaAsignado(r));
-  const rolEfectivo = rolesParaAgregar.includes(rol) ? rol : rolesParaAgregar[0];
+  const aAgregar = seleccion.filter((r) => rolesParaAgregar.includes(r));
+  const requiereOrganizacion = aAgregar.length === 0 || aAgregar.some((r) => r !== "super_admin");
 
   const puedeGestionar = (a: Asignacion) =>
     a.roles?.nombre !== "trabajador" &&
@@ -659,21 +685,28 @@ function GestionarRolesDialog({
 
   function agregar(e: React.FormEvent) {
     e.preventDefault();
-    if (!rolEfectivo) return;
-    const rol = rolEfectivo;
+    if (aAgregar.length === 0) return;
     startTransition(async () => {
-      const resultado = await agregarRolUsuario({
-        usuarioId: cuenta.usuario.id,
-        organizacionId: rol === "super_admin" ? null : organizacionId,
-        rol,
-        centroTrabajoId: rol === "supervisor_centro" ? centroTrabajoId || null : null,
-      });
-      if (!resultado.ok) {
-        toast.error(resultado.mensaje);
-        return;
+      const agregados: RolNombre[] = [];
+      for (const rol of aAgregar) {
+        const resultado = await agregarRolUsuario({
+          usuarioId: cuenta.usuario.id,
+          organizacionId: rol === "super_admin" ? null : organizacionId,
+          rol,
+          centroTrabajoId: rol === "supervisor_centro" ? centroTrabajoId || null : null,
+        });
+        if (!resultado.ok) {
+          toast.error(`${ROL_LABEL[rol]}: ${resultado.mensaje}`);
+          continue;
+        }
+        agregados.push(rol);
+        if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
       }
-      toast.success(`Se agregó el rol ${ROL_LABEL[rol]}.`);
-      if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
+      if (agregados.length === 0) return;
+      toast.success(
+        `${agregados.length > 1 ? "Se agregaron los roles" : "Se agregó el rol"} ${agregados.map((r) => ROL_LABEL[r]).join(", ")}.`,
+      );
+      setSeleccion([]);
       setCentroTrabajoId("");
       setOpen(false);
     });
@@ -730,8 +763,14 @@ function GestionarRolesDialog({
           </p>
         ) : (
           <form onSubmit={agregar} className="flex flex-col gap-3 border-t border-border pt-4">
-            <Label>Agregar rol</Label>
-            {rolEfectivo !== "super_admin" && organizaciones.length > 1 && (
+            <Label>Agregar roles</Label>
+            <SelectorRoles
+              disponibles={rolesParaAgregar}
+              seleccionados={seleccion}
+              onChange={setSeleccion}
+              disabled={pending}
+            />
+            {requiereOrganizacion && organizaciones.length > 1 && (
               <Select
                 items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
                 value={organizacionId}
@@ -752,23 +791,7 @@ function GestionarRolesDialog({
                 </SelectContent>
               </Select>
             )}
-            <Select
-              items={Object.fromEntries(rolesParaAgregar.map((r) => [r, ROL_LABEL[r]]))}
-              value={rolEfectivo}
-              onValueChange={(v) => setRol((v ?? rolesParaAgregar[0]) as RolNombre)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {rolesParaAgregar.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROL_LABEL[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {rolEfectivo === "supervisor_centro" && (
+            {aAgregar.includes("supervisor_centro") && (
               <div className="flex flex-col gap-1.5">
                 <Select
                   items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
@@ -787,18 +810,18 @@ function GestionarRolesDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Si no eliges un centro, verá el cumplimiento de toda la organización.
+                  Supervisor de centro: si no eliges un centro, verá el cumplimiento de toda la organización.
                 </p>
               </div>
             )}
-            {rolEfectivo === "facilitador" && (
+            {aAgregar.includes("facilitador") && (
               <p className="text-xs text-muted-foreground">
-                Se vincula con su ficha en Facilitadores (mismo RUT) para que vea y gestione sus ediciones.
+                Facilitador: se vincula con su ficha en Facilitadores (mismo RUT) para que vea y gestione sus ediciones.
               </p>
             )}
             <DialogFooter>
-              <Button type="submit" disabled={pending || (rolEfectivo !== "super_admin" && !organizacionId)}>
-                {pending ? "Guardando…" : "Agregar rol"}
+              <Button type="submit" disabled={pending || aAgregar.length === 0 || (requiereOrganizacion && !organizacionId)}>
+                {pending ? "Guardando…" : aAgregar.length > 1 ? `Agregar ${aAgregar.length} roles` : "Agregar rol"}
               </Button>
             </DialogFooter>
           </form>
