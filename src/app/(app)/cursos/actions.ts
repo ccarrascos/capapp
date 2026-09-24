@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { tienePermiso } from "@/lib/permisos";
+import type { AccionPermiso } from "@/lib/permisos-catalogo";
 import type { Database } from "@/lib/database.types";
 
 type TemaModulo = Database["public"]["Enums"]["tema_modulo"];
@@ -24,19 +26,14 @@ const MODULOS_DS44: {
   { tema: "senalizacion_prevencion_incendios", nombre: "Señalización y prevención de incendios", duracionHoras: 1 },
 ];
 
-async function autorizadoParaOrganizacion(organizacionId: string) {
+async function autorizadoParaOrganizacion(accion: AccionPermiso, organizacionId: string) {
   const sesion = await getSesion();
   if (!sesion) return false;
-  return (
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
-    )
-  );
+  return tienePermiso(sesion, accion, organizacionId);
 }
 
 export async function crearCursoDS44(input: { organizacionId: string; nombre: string; modalidad: ModalidadEjecucion }) {
-  if (!(await autorizadoParaOrganizacion(input.organizacionId))) {
+  if (!(await autorizadoParaOrganizacion("cursos.gestionar", input.organizacionId))) {
     return { ok: false as const, mensaje: "No tienes permiso para crear cursos en esta organización." };
   }
 
@@ -109,7 +106,7 @@ export async function crearEdicion(input: {
   facilitadorId: string | null;
   fechaInicio: string;
 }) {
-  if (!(await autorizadoParaOrganizacion(input.organizacionId))) {
+  if (!(await autorizadoParaOrganizacion("ediciones.crear", input.organizacionId))) {
     return { ok: false as const, mensaje: "No tienes permiso para crear ediciones en esta organización." };
   }
 

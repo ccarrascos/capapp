@@ -1051,6 +1051,27 @@ export type Database = {
           },
         ]
       }
+      permisos_revocados: {
+        Row: {
+          accion: string
+          revocado_en: string
+          revocado_por: string | null
+          rol: Database["public"]["Enums"]["rol_nombre"]
+        }
+        Insert: {
+          accion: string
+          revocado_en?: string
+          revocado_por?: string | null
+          rol: Database["public"]["Enums"]["rol_nombre"]
+        }
+        Update: {
+          accion?: string
+          revocado_en?: string
+          revocado_por?: string | null
+          rol?: Database["public"]["Enums"]["rol_nombre"]
+        }
+        Relationships: []
+      }
       personas: {
         Row: {
           apellido_materno: string | null

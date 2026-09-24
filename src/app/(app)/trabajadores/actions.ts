@@ -13,6 +13,7 @@ import { generarQrDataUrl } from "@/lib/qr";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { tienePermiso } from "@/lib/permisos";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -64,12 +65,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) =>
-        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para registrar trabajadores en esta organización." };
@@ -188,12 +184,7 @@ export async function actualizarTrabajador(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) =>
-        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para editar a este trabajador." };
@@ -331,23 +322,11 @@ export async function actualizarTrabajador(input: {
   return { ok: true as const };
 }
 
-const ROLES_DETALLE = [
-  "super_admin",
-  "admin_organizacion",
-  "prevencionista",
-  "supervisor_centro",
-  "auditor",
-] as const;
-
 export async function obtenerDetalleTrabajador(personaRun: string, organizacionId: string) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.ver_detalle", organizacionId);
 
   if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para ver este detalle." };
 
@@ -412,11 +391,7 @@ export async function crearAccesoTrabajador(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.dar_acceso", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para dar acceso a este trabajador." };
@@ -544,11 +519,7 @@ export async function obtenerCredencialQr(personaRun: string, organizacionId: st
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]) && r.organizacionId === organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.ver_detalle", organizacionId);
 
   if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para generar esta credencial." };
 
@@ -618,12 +589,7 @@ export async function cargarTrabajadoresMasivo(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) =>
-        (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === input.organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "trabajadores.gestionar", input.organizacionId);
   if (!autorizado) {
     return { ok: false, mensaje: "No tienes permiso para cargar trabajadores en esta organización." };
   }
@@ -850,11 +816,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
-    );
+  const autorizado = await tienePermiso(sesion, "ediciones.inscribir", organizacionId);
   if (!autorizado) return { ok: false as const, mensaje: "No tienes permiso para inscribir en esta organización." };
 
   const supabase = await createClient();

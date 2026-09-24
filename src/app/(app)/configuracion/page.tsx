@@ -10,9 +10,10 @@ export default async function ConfiguracionPage() {
   if (!sesion.esSuperAdmin) redirect("/dashboard");
 
   const supabase = await createClient();
-  const { data: filas } = await supabase
-    .from("configuracion_plataforma")
-    .select("clave, valor, actualizado_en");
+  const [{ data: filas }, { data: revocados, error: errorPermisos }] = await Promise.all([
+    supabase.from("configuracion_plataforma").select("clave, valor, actualizado_en"),
+    supabase.from("permisos_revocados").select("rol, accion"),
+  ]);
 
   const valores = Object.fromEntries(
     (Object.keys(DEFAULTS_CONFIGURACION) as ClaveConfiguracion[]).map((clave) => {
@@ -26,5 +27,11 @@ export default async function ConfiguracionPage() {
     }),
   ) as Record<ClaveConfiguracion, ValorActual>;
 
-  return <ConfiguracionView valores={valores} />;
+  return (
+    <ConfiguracionView
+      valores={valores}
+      revocados={(revocados ?? []).map((r) => `${r.rol}:${r.accion}`)}
+      permisosDisponibles={!errorPermisos}
+    />
+  );
 }

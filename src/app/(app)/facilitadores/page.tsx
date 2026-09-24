@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { organizacionesConPermiso } from "@/lib/permisos";
 import { FacilitadoresView } from "./facilitadores-view";
 
 const ROLES_DETALLE = [
@@ -51,7 +52,7 @@ export default async function FacilitadoresPage() {
   ]);
 
   const organizacionesAdmin = new Set(
-    sesion.roles.filter((r) => r.rol === "admin_organizacion" && r.organizacionId).map((r) => r.organizacionId),
+    (await organizacionesConPermiso(sesion, "facilitadores.gestionar")).map((o) => o.id),
   );
 
   return (

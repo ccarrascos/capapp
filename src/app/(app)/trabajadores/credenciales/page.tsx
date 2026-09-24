@@ -1,16 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { generarQrDataUrl } from "@/lib/qr";
 import { CredencialesView } from "./credenciales-view";
-
-const ROLES_DETALLE = [
-  "super_admin",
-  "admin_organizacion",
-  "prevencionista",
-  "supervisor_centro",
-  "auditor",
-] as const;
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -18,8 +11,7 @@ export default async function CredencialesPage() {
   const sesion = await getSesion();
   if (!sesion) return null;
 
-  const puedeVer =
-    sesion.esSuperAdmin || sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
+  const puedeVer = await tienePermisoEnAlgunaOrg(sesion, "trabajadores.ver_detalle");
   if (!puedeVer) redirect("/trabajadores");
 
   const supabase = await createClient();

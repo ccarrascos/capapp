@@ -2,18 +2,11 @@
 
 import type Groq from "groq-sdk";
 import { getSesion } from "@/lib/auth";
+import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { groq, MODELO_IA } from "@/lib/groq";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/server";
 import { DEFINICIONES_HERRAMIENTAS, ejecutarHerramienta } from "./herramientas";
-
-const ROLES_PERMITIDOS = [
-  "super_admin",
-  "admin_organizacion",
-  "prevencionista",
-  "supervisor_centro",
-  "auditor",
-] as const;
 
 const MENSAJE_SISTEMA = `Eres el asistente de Capapp, una plataforma de gestión de capacitación en prevención de riesgos (DS 44) para empresas en Chile.
 
@@ -36,8 +29,7 @@ export async function enviarMensaje(
   const sesion = await getSesion();
   if (!sesion) return { ok: false, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin || sesion.roles.some((r) => ROLES_PERMITIDOS.includes(r.rol as (typeof ROLES_PERMITIDOS)[number]));
+  const autorizado = await tienePermisoEnAlgunaOrg(sesion, "ia.usar");
   if (!autorizado) {
     return { ok: false, mensaje: "No tienes permiso para usar el asistente." };
   }

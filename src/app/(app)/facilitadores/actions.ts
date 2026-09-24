@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth";
+import { tienePermiso, tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esRutValido } from "@/lib/rut";
@@ -45,20 +46,10 @@ async function resolverEntidadExterna(
   return tipoProveedor === "oal" ? { ok: true, oalId: creado.id, otecId: null } : { ok: true, oalId: null, otecId: creado.id };
 }
 
-const ROLES_BUSQUEDA_PERSONA = [
-  "super_admin",
-  "admin_organizacion",
-  "prevencionista",
-  "supervisor_centro",
-  "auditor",
-] as const;
-
 export async function buscarPersonaPorRun(run: string) {
   const sesion = await getSesion();
   if (!sesion) return null;
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => ROLES_BUSQUEDA_PERSONA.includes(r.rol as (typeof ROLES_BUSQUEDA_PERSONA)[number]));
+  const autorizado = await tienePermisoEnAlgunaOrg(sesion, "personas.buscar_por_run");
   if (!autorizado) return null;
 
   // Se usa el cliente admin (sólo lectura de nombre, nada sensible) porque
@@ -127,9 +118,7 @@ export async function crearFacilitador(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+  const autorizado = await tienePermiso(sesion, "facilitadores.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para crear facilitadores en esta organización." };
@@ -176,9 +165,7 @@ export async function actualizarFacilitador(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+  const autorizado = await tienePermiso(sesion, "facilitadores.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para editar este facilitador." };
@@ -216,9 +203,7 @@ export async function actualizarEstadoFacilitador(input: {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+  const autorizado = await tienePermiso(sesion, "facilitadores.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para modificar este facilitador." };

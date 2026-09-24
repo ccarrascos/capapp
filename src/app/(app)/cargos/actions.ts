@@ -3,20 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { getSesion, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { tienePermiso } from "@/lib/permisos";
 
 function autorizado(sesion: Sesion, organizacionId: string) {
-  return (
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
-    )
-  );
+  return tienePermiso(sesion, "cargos.gestionar", organizacionId);
 }
 
 export async function crearCargo(input: { organizacionId: string; nombre: string }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
-  if (!autorizado(sesion, input.organizacionId)) {
+  if (!(await autorizado(sesion, input.organizacionId))) {
     return { ok: false as const, mensaje: "No tienes permiso para gestionar cargos." };
   }
 
@@ -42,7 +38,7 @@ export async function crearCargo(input: { organizacionId: string; nombre: string
 export async function actualizarCargo(input: { cargoId: string; organizacionId: string; nombre: string }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
-  if (!autorizado(sesion, input.organizacionId)) {
+  if (!(await autorizado(sesion, input.organizacionId))) {
     return { ok: false as const, mensaje: "No tienes permiso para gestionar cargos." };
   }
 
@@ -69,7 +65,7 @@ export async function actualizarCargo(input: { cargoId: string; organizacionId: 
 export async function actualizarActivoCargo(input: { cargoId: string; organizacionId: string; activo: boolean }) {
   const sesion = await getSesion();
   if (!sesion) return { ok: false as const, mensaje: "No autenticado." };
-  if (!autorizado(sesion, input.organizacionId)) {
+  if (!(await autorizado(sesion, input.organizacionId))) {
     return { ok: false as const, mensaje: "No tienes permiso para gestionar cargos." };
   }
 

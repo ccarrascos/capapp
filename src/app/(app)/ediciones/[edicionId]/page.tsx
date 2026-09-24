@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { tienePermiso } from "@/lib/permisos";
 import { EdicionView } from "./edicion-view";
 
 const ROLES_DETALLE = [
@@ -38,9 +39,6 @@ export default async function EdicionDetallePage({
 
   if (!edicion) notFound();
 
-  const esAdminOrgOPrevencionista = sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
-  );
   const esFacilitadorDeEstaEdicion = miFacilitador?.id != null && miFacilitador.id === edicion.facilitador_id;
   const puedeVer =
     sesion.esSuperAdmin ||
@@ -101,9 +99,12 @@ export default async function EdicionDetallePage({
     .sort((a, b) => a.nombres.localeCompare(b.nombres, "es"));
 
   // Inscribir trabajadores (decidir quién toma el curso) es una decisión de gestión.
-  const puedeInscribir = sesion.esSuperAdmin || esAdminOrgOPrevencionista;
+  const [puedeInscribir, puedeGestionarEdicion] = await Promise.all([
+    tienePermiso(sesion, "ediciones.inscribir", edicion.organizacion_id),
+    tienePermiso(sesion, "ediciones.gestionar", edicion.organizacion_id),
+  ]);
   // Tomar asistencia y calificar es responsabilidad de quien dicta el curso.
-  const puedeGestionarAsistencia = puedeInscribir || esFacilitadorDeEstaEdicion;
+  const puedeGestionarAsistencia = puedeGestionarEdicion || esFacilitadorDeEstaEdicion;
   // Pasado el plazo, ya no tiene sentido seguir gestionando a quien nunca
   // completó el curso — queda como "curso no realizado" en vez de "inscrito".
   const edicionVencida = edicion.fecha_limite < new Date().toISOString().slice(0, 10);

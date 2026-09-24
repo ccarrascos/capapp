@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { organizacionesConPermiso, tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { UsuariosView } from "./usuarios-view";
 
 export default async function UsuariosPage() {
   const sesion = await getSesion();
   if (!sesion) return null;
 
-  const puedeAdministrar =
-    sesion.esSuperAdmin || sesion.roles.some((r) => r.rol === "admin_organizacion");
+  const puedeAdministrar = await tienePermisoEnAlgunaOrg(sesion, "usuarios.gestionar");
   if (!puedeAdministrar) redirect("/dashboard");
 
   const supabase = await createClient();
@@ -22,15 +22,7 @@ export default async function UsuariosPage() {
       .order("id"),
     sesion.esSuperAdmin
       ? supabase.from("organizaciones").select("id, razon_social").order("razon_social")
-      : Promise.resolve({
-          data: [
-            ...new Map(
-              sesion.roles
-                .filter((r) => r.rol === "admin_organizacion" && r.organizacionId)
-                .map((r) => [r.organizacionId, { id: r.organizacionId!, razon_social: r.organizacionNombre! }]),
-            ).values(),
-          ],
-        }),
+      : organizacionesConPermiso(sesion, "usuarios.gestionar").then((data) => ({ data })),
   ]);
 
   const organizacionIds = (organizaciones ?? []).map((o) => o.id);

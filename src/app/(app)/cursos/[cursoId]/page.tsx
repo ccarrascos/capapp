@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { tienePermiso } from "@/lib/permisos";
 import { NuevaEdicionDialog } from "./nueva-edicion-dialog";
 import { FileField } from "@/components/materiales/file-field";
 import { guardarManualCurso, guardarMaterialModulo } from "./materiales-actions";
@@ -43,9 +44,10 @@ export default async function CursoDetallePage({
 
   if (!curso) notFound();
 
-  const puedeGestionar = sesion.esSuperAdmin || sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === curso.organizacion_id,
-  );
+  const [puedeGestionar, puedeCrearEdicion] = await Promise.all([
+    tienePermiso(sesion, "cursos.gestionar", curso.organizacion_id),
+    tienePermiso(sesion, "ediciones.crear", curso.organizacion_id),
+  ]);
   const esFacilitadorDeLaOrg = miFacilitador?.organizacion_id != null && miFacilitador.organizacion_id === curso.organizacion_id;
   const puedeVer =
     sesion.esSuperAdmin ||
@@ -148,7 +150,7 @@ export default async function CursoDetallePage({
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading text-lg font-bold uppercase tracking-wide">Ediciones (cohortes)</h2>
-          {puedeGestionar && (
+          {puedeCrearEdicion && (
             <NuevaEdicionDialog
               cursoId={cursoId}
               organizacionId={curso.organizacion_id!}

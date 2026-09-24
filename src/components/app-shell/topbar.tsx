@@ -41,6 +41,7 @@ export function Topbar({
   organizacionLogoUrl,
   rolesUsuario,
   esSuperAdmin,
+  rutasOcultas,
   avatarUrl,
 }: {
   nombres: string;
@@ -50,12 +51,13 @@ export function Topbar({
   organizacionLogoUrl: string | null;
   rolesUsuario: RolNombre[];
   esSuperAdmin: boolean;
+  rutasOcultas: string[];
   avatarUrl: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const items = navParaRoles(rolesUsuario, esSuperAdmin);
+  const items = navParaRoles(rolesUsuario, esSuperAdmin, rutasOcultas);
 
   function cerrarSesion() {
     startTransition(async () => {

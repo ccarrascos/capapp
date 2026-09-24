@@ -9,12 +9,14 @@ import type { RolNombre } from "@/lib/auth";
 export function Sidebar({
   rolesUsuario,
   esSuperAdmin,
+  rutasOcultas,
 }: {
   rolesUsuario: RolNombre[];
   esSuperAdmin: boolean;
+  rutasOcultas: string[];
 }) {
   const pathname = usePathname();
-  const items = navParaRoles(rolesUsuario, esSuperAdmin);
+  const items = navParaRoles(rolesUsuario, esSuperAdmin, rutasOcultas);
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">

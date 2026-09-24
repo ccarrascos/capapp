@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
+import type { AccionPermiso } from "@/lib/permisos-catalogo";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Topbar } from "@/components/app-shell/topbar";
 import { CuentaSuspendida } from "@/components/app-shell/cuenta-suspendida";
@@ -20,6 +22,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const rolConOrganizacion = sesion.roles.find((r) => r.organizacionNombre);
   const organizacionActual = rolConOrganizacion?.organizacionNombre ?? null;
 
+  const PERMISO_POR_RUTA: [string, AccionPermiso][] = [
+    ["/usuarios", "usuarios.gestionar"],
+    ["/subcontratos", "subcontratos.gestionar"],
+    ["/ia", "ia.usar"],
+  ];
+  const rutasOcultas = (
+    await Promise.all(
+      PERMISO_POR_RUTA.map(async ([ruta, accion]) => ((await tienePermisoEnAlgunaOrg(sesion, accion)) ? null : ruta)),
+    )
+  ).filter((r): r is string => r !== null);
+
   let organizacionLogoUrl: string | null = null;
   if (rolConOrganizacion?.organizacionId) {
     const supabase = await createClient();
@@ -33,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
-      <Sidebar rolesUsuario={rolesUsuario} esSuperAdmin={sesion.esSuperAdmin} />
+      <Sidebar rolesUsuario={rolesUsuario} esSuperAdmin={sesion.esSuperAdmin} rutasOcultas={rutasOcultas} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar
           nombres={sesion.nombres}
@@ -43,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           organizacionLogoUrl={sesion.esSuperAdmin ? null : organizacionLogoUrl}
           rolesUsuario={rolesUsuario}
           esSuperAdmin={sesion.esSuperAdmin}
+          rutasOcultas={rutasOcultas}
           avatarUrl={sesion.avatarUrl}
         />
         <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8">{children}</main>

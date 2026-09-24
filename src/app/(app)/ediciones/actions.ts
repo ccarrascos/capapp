@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSesion } from "@/lib/auth";
+import { tienePermiso } from "@/lib/permisos";
 
 /**
  * Gestionar una edición (inscribir, tomar asistencia, evaluar, certificar) requiere
@@ -26,10 +27,7 @@ async function autorizadoParaEdicion(
   if (!edicion) return false;
   if (sesion.esSuperAdmin) return true;
 
-  const esAdminOrgOPrevencionista = sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
-  );
-  if (esAdminOrgOPrevencionista) return true;
+  if (await tienePermiso(sesion, "ediciones.gestionar", edicion.organizacion_id)) return true;
 
   if (edicion.facilitador_id) {
     const { data: miFacilitador } = await supabase
@@ -95,10 +93,7 @@ async function autorizadoParaInscribir(
   edicionId: string,
   organizacionId: string,
 ) {
-  if (sesion.esSuperAdmin) return true;
-  return sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === organizacionId,
-  );
+  return tienePermiso(sesion, "ediciones.inscribir", organizacionId);
 }
 
 export async function inscribirTrabajadores(edicionId: string, personaRuns: string[]) {
@@ -398,11 +393,7 @@ export async function emitirCertificado(input: {
 
   if (!edicion) return { ok: false as const, mensaje: "No se encontró la edición." };
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some(
-      (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === edicion.organizacion_id,
-    );
+  const autorizado = await tienePermiso(sesion, "certificados.emitir", edicion.organizacion_id);
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para emitir certificados en esta edición." };
   }

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { obtenerConfiguracion } from "@/lib/configuracion";
 import { CursosView } from "./cursos-view";
 
-const ROLES_GESTION = ["super_admin", "admin_organizacion", "prevencionista"] as const;
 const ROLES_DETALLE = [
   "super_admin",
   "admin_organizacion",
@@ -59,9 +59,7 @@ export default async function CursosPage() {
     obtenerConfiguracion(),
   ]);
 
-  const puedeGestionar = sesion.roles.some((r) =>
-    ROLES_GESTION.includes(r.rol as (typeof ROLES_GESTION)[number]),
-  );
+  const puedeGestionar = await tienePermisoEnAlgunaOrg(sesion, "cursos.gestionar");
 
   return (
     <CursosView

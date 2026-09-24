@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSesion, type RolNombre } from "@/lib/auth";
+import { tienePermiso } from "@/lib/permisos";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
@@ -37,11 +38,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   const autorizado =
     sesion.esSuperAdmin ||
-    (input.rol !== "super_admin" &&
-      input.organizacionId &&
-      sesion.roles.some(
-        (r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId,
-      ));
+    (input.rol !== "super_admin" && (await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId)));
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para crear esta cuenta." };
@@ -163,9 +160,7 @@ export async function actualizarRolUsuario(input: {
     return { ok: false as const, mensaje: "No puedes cambiar tu propio rol desde aquí." };
   }
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId);
+  const autorizado = await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para cambiar el rol de esta cuenta." };
@@ -229,10 +224,7 @@ export async function actualizarEstadoUsuario(input: {
     return { ok: false as const, mensaje: "No puedes desactivar tu propia cuenta desde aquí." };
   }
 
-  const autorizado =
-    sesion.esSuperAdmin ||
-    (!!input.organizacionId &&
-      sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === input.organizacionId));
+  const autorizado = await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId);
 
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para modificar esta cuenta." };

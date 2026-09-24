@@ -6,6 +6,9 @@ import { getSesion } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { invalidarCacheConfiguracion } from "@/lib/configuracion";
 import { CAMPOS_CONFIGURACION } from "@/lib/configuracion-campos";
+import { invalidarCachePermisos } from "@/lib/permisos";
+import { CATALOGO_PERMISOS, rolPuedeTenerPermiso, type AccionPermiso } from "@/lib/permisos-catalogo";
+import type { RolNombre } from "@/lib/auth";
 
 export async function actualizarConfiguracion(input: { clave: string; valor: number }) {
   const sesion = await getSesion();
@@ -50,6 +53,40 @@ export async function actualizarConfiguracion(input: { clave: string; valor: num
   });
 
   invalidarCacheConfiguracion();
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
+export async function actualizarPermiso(input: { rol: RolNombre; accion: string; permitido: boolean }) {
+  const sesion = await getSesion();
+  if (!sesion?.esSuperAdmin) {
+    return { ok: false as const, mensaje: "Sólo un super administrador puede cambiar permisos." };
+  }
+
+  if (!(input.accion in CATALOGO_PERMISOS)) return { ok: false as const, mensaje: "Permiso desconocido." };
+  const accion = input.accion as AccionPermiso;
+  if (!rolPuedeTenerPermiso(accion, input.rol)) {
+    return { ok: false as const, mensaje: "Ese rol no puede tener este permiso." };
+  }
+
+  const supabase = await createClient();
+  const { error } = input.permitido
+    ? await supabase.from("permisos_revocados").delete().eq("rol", input.rol).eq("accion", accion)
+    : await supabase
+        .from("permisos_revocados")
+        .upsert({ rol: input.rol, accion, revocado_por: sesion.usuarioId, revocado_en: new Date().toISOString() });
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: input.permitido ? "otorgar_permiso" : "revocar_permiso",
+    tabla: "permisos_revocados",
+    registroId: null,
+    datosNuevos: { rol: input.rol, permiso: accion },
+  });
+
+  invalidarCachePermisos();
   revalidatePath("/", "layout");
   return { ok: true as const };
 }

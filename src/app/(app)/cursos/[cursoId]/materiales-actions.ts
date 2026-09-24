@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
+import { tienePermiso } from "@/lib/permisos";
 
 async function autorizadoParaCurso(supabase: Awaited<ReturnType<typeof createClient>>, cursoId: string) {
   const sesion = await getSesion();
@@ -12,9 +13,7 @@ async function autorizadoParaCurso(supabase: Awaited<ReturnType<typeof createCli
   const { data: curso } = await supabase.from("cursos").select("organizacion_id").eq("id", cursoId).maybeSingle();
   if (!curso) return false;
 
-  return sesion.roles.some(
-    (r) => (r.rol === "admin_organizacion" || r.rol === "prevencionista") && r.organizacionId === curso.organizacion_id,
-  );
+  return tienePermiso(sesion, "cursos.gestionar", curso.organizacion_id);
 }
 
 export async function guardarManualCurso(input: {

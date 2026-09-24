@@ -300,6 +300,8 @@ export function TrabajadoresView({
   centros,
   subcontratos,
   puedeGestionar,
+  puedeDarAcceso,
+  puedeInscribir,
   puedeVerDetalle,
 }: {
   filas: FilaMatriz[];
@@ -308,6 +310,8 @@ export function TrabajadoresView({
   centros: Centro[];
   subcontratos: Subcontrato[];
   puedeGestionar: boolean;
+  puedeDarAcceso: boolean;
+  puedeInscribir: boolean;
   puedeVerDetalle: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -485,7 +489,7 @@ export function TrabajadoresView({
                 <TableCell>
                   {f.usuarioId ? (
                     <span className="text-xs text-clear">Con acceso</span>
-                  ) : puedeGestionar && f.persona_run && f.organizacion_id ? (
+                  ) : puedeDarAcceso && f.persona_run && f.organizacion_id ? (
                     <DarAccesoDialog
                       personaRun={f.persona_run}
                       organizacionId={f.organizacion_id}
@@ -497,7 +501,7 @@ export function TrabajadoresView({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    {puedeGestionar &&
+                    {puedeInscribir &&
                       f.persona_run &&
                       f.organizacion_id &&
                       (f.estado_vigencia === "sin_capacitacion" ||

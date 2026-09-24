@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { tienePermiso } from "@/lib/permisos";
 
 export type CrearOrganizacionInput = {
   rut: string;
@@ -50,10 +51,7 @@ const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/svg+xm
 
 export async function subirLogoOrganizacion(organizacionId: string, formData: FormData) {
   const sesion = await getSesion();
-  const autorizado =
-    !!sesion &&
-    (sesion.esSuperAdmin ||
-      sesion.roles.some((r) => r.rol === "admin_organizacion" && r.organizacionId === organizacionId));
+  const autorizado = !!sesion && (await tienePermiso(sesion, "organizacion.editar_logo", organizacionId));
   if (!autorizado) {
     return { ok: false as const, mensaje: "No tienes permiso para editar el logo de esta organización." };
   }

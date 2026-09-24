@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { TrabajadoresView } from "./trabajadores-view";
 
-const ROLES_GESTION = ["super_admin", "admin_organizacion", "prevencionista"] as const;
 const ROLES_DETALLE = [
   "super_admin",
   "admin_organizacion",
@@ -16,10 +16,10 @@ export default async function TrabajadoresPage() {
   const sesion = await getSesion();
   if (!sesion) return null;
 
-  const puedeVerDetalle =
+  const puedeVerMatriz =
     sesion.esSuperAdmin ||
     sesion.roles.some((r) => ROLES_DETALLE.includes(r.rol as (typeof ROLES_DETALLE)[number]));
-  if (!puedeVerDetalle) redirect("/dashboard");
+  if (!puedeVerMatriz) redirect("/dashboard");
 
   const supabase = await createClient();
 
@@ -76,9 +76,12 @@ export default async function TrabajadoresPage() {
     centroIds: s.subcontratos_centros.map((sc) => sc.centro_trabajo_id),
   }));
 
-  const puedeGestionar = sesion.roles.some((r) =>
-    ROLES_GESTION.includes(r.rol as (typeof ROLES_GESTION)[number]),
-  );
+  const [puedeGestionar, puedeDarAcceso, puedeInscribir, puedeVerDetalle] = await Promise.all([
+    tienePermisoEnAlgunaOrg(sesion, "trabajadores.gestionar"),
+    tienePermisoEnAlgunaOrg(sesion, "trabajadores.dar_acceso"),
+    tienePermisoEnAlgunaOrg(sesion, "ediciones.inscribir"),
+    tienePermisoEnAlgunaOrg(sesion, "trabajadores.ver_detalle"),
+  ]);
 
   return (
     <TrabajadoresView
@@ -88,6 +91,8 @@ export default async function TrabajadoresPage() {
       centros={centros ?? []}
       subcontratos={subcontratosPorOrg}
       puedeGestionar={puedeGestionar}
+      puedeDarAcceso={puedeDarAcceso}
+      puedeInscribir={puedeInscribir}
       puedeVerDetalle={puedeVerDetalle}
     />
   );
