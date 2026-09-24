@@ -1,9 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoBienvenida } from "@/lib/email";
-import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/lib/password";
+import { generarPasswordTemporal, calcularExpiracionPasswordTemporal, DURACION_PASSWORD_TEMPORAL_MS } from "@/lib/password";
 import { esRutValido } from "@/lib/rut";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { RolNombre } from "@/lib/auth";
@@ -63,28 +64,48 @@ export async function iniciarSesionConRut(input: { run: string; dv: string; pass
 
 const MENSAJE_RECUPERACION = "Si el RUT está registrado y activo, enviamos un nuevo acceso al correo asociado.";
 
+// Cuánto debe pasar entre dos solicitudes que sí llegan a emitir una
+// clave nueva para la misma cuenta. Sin este límite, cualquiera que
+// conozca un RUT válido podría invalidar el acceso de ese trabajador una
+// y otra vez con solicitudes seguidas (cada una reemplaza la clave
+// anterior), o agotar la cuota de envíos de Resend, sin necesitar saber
+// nada más sobre la cuenta.
+const VENTANA_MINIMA_ENTRE_SOLICITUDES_MS = 5 * 60 * 1000;
+
 export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
   const run = input.run.trim();
   const dv = input.dv.trim().toUpperCase();
 
-  // No se revela si el RUT existe o no: siempre se responde el mismo
-  // mensaje genérico, para no convertir este formulario en una forma de
-  // comprobar qué RUT tiene cuenta en Capapp.
-  if (!esRutValido(run, dv)) {
-    return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
+  // El trabajo real (buscar la cuenta, resetear la clave, enviar el
+  // correo) se agenda para después de responder — nunca se espera acá.
+  // Si se esperara, el tiempo de respuesta sería en sí mismo una forma de
+  // distinguir un RUT que existe de uno que no (una solicitud a un RUT
+  // inexistente termina de inmediato; una real hace varias llamadas a la
+  // base y a Resend y tarda notoriamente más). Al responder siempre lo
+  // mismo y de inmediato, no queda ningún canal — ni el contenido de la
+  // respuesta ni cuánto demora — para comprobar qué RUT tiene cuenta.
+  if (esRutValido(run, dv)) {
+    after(() => procesarSolicitudNuevoAcceso(run, dv));
   }
 
+  return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
+}
+
+async function procesarSolicitudNuevoAcceso(run: string, dv: string) {
   const admin = createAdminClient();
 
   const { data: usuario } = await admin
     .from("usuarios")
-    .select("id, nombres, email, activo")
+    .select("id, nombres, email, activo, password_temporal_expira_en")
     .eq("run", run)
     .eq("dv", dv)
     .maybeSingle();
 
-  if (!usuario || !usuario.activo) {
-    return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
+  if (!usuario || !usuario.activo) return;
+
+  if (usuario.password_temporal_expira_en) {
+    const emitidaEn = new Date(usuario.password_temporal_expira_en).getTime() - DURACION_PASSWORD_TEMPORAL_MS;
+    if (Date.now() - emitidaEn < VENTANA_MINIMA_ENTRE_SOLICITUDES_MS) return;
   }
 
   const { data: rolFila } = await admin
@@ -103,9 +124,7 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
     password: passwordTemporal,
   });
 
-  if (errorAuth) {
-    return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
-  }
+  if (errorAuth) return;
 
   await admin
     .from("usuarios")
@@ -122,10 +141,10 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
     motivo: "nuevo_acceso",
   });
 
-  // No se distingue de cara al usuario si el correo salió o no (para no
-  // revelar qué RUT existe), pero queda en el log de auditoría — si no,
-  // un envío rechazado por el proveedor de correo (ej. dominio no
-  // verificado) queda invisible y parece que "sí se envió".
+  // Nadie ve esto de vuelta (ya se respondió el mensaje genérico antes de
+  // llegar aquí), pero queda en el log de auditoría — si no, un envío
+  // rechazado por el proveedor de correo (ej. dominio no verificado)
+  // queda invisible y parece que "sí se envió".
   await registrarAuditoria(admin, {
     usuarioId: usuario.id,
     accion: correo.ok ? "solicitar_nuevo_acceso" : "solicitar_nuevo_acceso_correo_fallido",
@@ -133,6 +152,4 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
     registroId: usuario.id,
     datosNuevos: correo.ok ? undefined : { email: usuario.email, error: correo.mensaje },
   });
-
-  return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
 }
