@@ -274,6 +274,30 @@ export type Database = {
           },
         ]
       }
+      configuracion_plataforma: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          clave: string
+          descripcion: string | null
+          valor: Json
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          clave: string
+          descripcion?: string | null
+          valor: Json
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          clave?: string
+          descripcion?: string | null
+          valor?: Json
+        }
+        Relationships: []
+      }
       cursos: {
         Row: {
           created_at: string
@@ -782,6 +806,30 @@ export type Database = {
             referencedColumns: ["run"]
           },
         ]
+      }
+      intentos_login: {
+        Row: {
+          bloqueado_hasta: string | null
+          dv: string
+          intentos: number
+          run: string
+          ultimo_intento: string
+        }
+        Insert: {
+          bloqueado_hasta?: string | null
+          dv: string
+          intentos?: number
+          run: string
+          ultimo_intento?: string
+        }
+        Update: {
+          bloqueado_hasta?: string | null
+          dv?: string
+          intentos?: number
+          run?: string
+          ultimo_intento?: string
+        }
+        Relationships: []
       }
       modulos: {
         Row: {

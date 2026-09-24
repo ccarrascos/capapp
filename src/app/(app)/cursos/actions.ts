@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import type { Database } from "@/lib/database.types";
 
 type TemaModulo = Database["public"]["Enums"]["tema_modulo"];
@@ -58,13 +59,15 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
     };
   }
 
+  const { curso_horas_minimas } = await obtenerConfiguracion();
+
   const { data: curso, error: errorCurso } = await supabase
     .from("cursos")
     .insert({
       nombre,
       tipo_proveedor: "interno",
       organizacion_id: input.organizacionId,
-      horas_totales: 8,
+      horas_totales: curso_horas_minimas,
       incorpora_enfoque_genero: true,
       vigente: true,
       descripcion: "Curso de capacitación de trabajadores en prevención de riesgos laborales (art. 16, DS N.º 44/2023).",
@@ -124,7 +127,8 @@ export async function crearEdicion(input: {
 
   const fechaInicio = new Date(input.fechaInicio + "T00:00:00");
   const fechaLimite = new Date(fechaInicio);
-  fechaLimite.setMonth(fechaLimite.getMonth() + 3);
+  const { edicion_plazo_maximo_meses } = await obtenerConfiguracion();
+  fechaLimite.setMonth(fechaLimite.getMonth() + edicion_plazo_maximo_meses);
 
   const { error } = await supabase.from("ediciones_curso").insert({
     curso_id: input.cursoId,

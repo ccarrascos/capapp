@@ -31,7 +31,13 @@ type Organizacion = {
   logo_url: string | null;
 };
 
-export function OrganizacionesView({ organizaciones }: { organizaciones: Organizacion[] }) {
+export function OrganizacionesView({
+  organizaciones,
+  maxMbLogo,
+}: {
+  organizaciones: Organizacion[];
+  maxMbLogo: number;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -55,7 +61,7 @@ export function OrganizacionesView({ organizaciones }: { organizaciones: Organiz
         {organizaciones.map((o) => (
           <div key={o.id} className="border border-border bg-card p-5 flex flex-col gap-3 relative">
             <div className="absolute top-3 right-3 flex items-center gap-0.5">
-              <EditarLogoDialog organizacionId={o.id} nombre={o.razon_social} logoUrl={o.logo_url} />
+              <EditarLogoDialog organizacionId={o.id} nombre={o.razon_social} logoUrl={o.logo_url} maxMb={maxMbLogo} />
               <ToggleActivoOrganizacionDialog organizacionId={o.id} nombre={o.razon_social} activo={o.activo} />
             </div>
             <div className="flex items-start justify-between gap-2">
@@ -94,10 +100,12 @@ function EditarLogoDialog({
   organizacionId,
   nombre,
   logoUrl,
+  maxMb,
 }: {
   organizacionId: string;
   nombre: string;
   logoUrl: string | null;
+  maxMb: number;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -132,7 +140,7 @@ function EditarLogoDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Logo de {nombre}</DialogTitle>
-          <DialogDescription>Se muestra en el encabezado de la app y en los certificados. JPG, PNG, WEBP o SVG, máximo 2 MB.</DialogDescription>
+          <DialogDescription>Se muestra en el encabezado de la app y en los certificados. JPG, PNG, WEBP o SVG, máximo {maxMb} MB.</DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-32 items-center justify-center border border-dashed border-border bg-muted/40">

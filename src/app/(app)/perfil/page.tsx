@@ -1,6 +1,7 @@
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatearRut } from "@/lib/rut";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import { PerfilView } from "./perfil-view";
 
 const ROL_LABEL: Record<string, string> = {
@@ -18,11 +19,10 @@ export default async function PerfilPage() {
   if (!sesion) return null;
 
   const supabase = await createClient();
-  const { data: usuario } = await supabase
-    .from("usuarios")
-    .select("nombres, apellidos, email, telefono, run, dv")
-    .eq("id", sesion.usuarioId)
-    .single();
+  const [{ data: usuario }, { max_mb_avatar_usuario }] = await Promise.all([
+    supabase.from("usuarios").select("nombres, apellidos, email, telefono, run, dv").eq("id", sesion.usuarioId).single(),
+    obtenerConfiguracion(),
+  ]);
 
   return (
     <PerfilView
@@ -32,6 +32,7 @@ export default async function PerfilPage() {
       telefono={usuario?.telefono ?? ""}
       rut={usuario?.run && usuario?.dv ? formatearRut(usuario.run, usuario.dv) : null}
       avatarUrl={sesion.avatarUrl}
+      maxMbAvatar={max_mb_avatar_usuario}
       roles={sesion.roles.map((r) => ({
         rol: ROL_LABEL[r.rol] ?? r.rol,
         organizacion: r.organizacionNombre,

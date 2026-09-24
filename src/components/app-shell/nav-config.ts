@@ -13,6 +13,7 @@ import {
   BarChart3,
   History,
   Sparkles,
+  Settings,
 } from "lucide-react";
 
 export type NavItem = {
@@ -100,6 +101,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/auditoria",
     label: "Auditoría",
     icon: History,
+    roles: ["super_admin"],
+  },
+  {
+    href: "/configuracion",
+    label: "Configuración",
+    icon: Settings,
     roles: ["super_admin"],
   },
 ];

@@ -32,7 +32,7 @@ export function MisEdicionesView({ ediciones }: { ediciones: Edicion[] }) {
           <TableRow>
             <TableHead>Curso</TableHead>
             <TableHead>Inicio</TableHead>
-            <TableHead>Límite (3 meses)</TableHead>
+            <TableHead>Límite</TableHead>
             <TableHead>Término</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>

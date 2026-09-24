@@ -82,7 +82,7 @@ export const GUIAS_AYUDA: GuiaAyuda[] = [
     palabrasClave: ["notificaciones", "campana", "avisos", "vencimiento"],
     pasos: [
       "La campana en la barra superior muestra un contador de notificaciones no leídas.",
-      "Se generan solas al vencer o estar por vencer (60 días) una capacitación, al ser inscrito en un curso, al ser aprobado, o al emitirse un certificado — no hay que pedirlas manualmente.",
+      "Se generan solas al vencer o estar por vencer una capacitación (la ventana de aviso la define el super administrador en Configuración), al ser inscrito en un curso, al ser aprobado, o al emitirse un certificado — no hay que pedirlas manualmente.",
       "Quien gestiona (admin/prevencionista/supervisor de centro) ve las de su alcance; quien tiene portal propio ve además las suyas.",
     ],
   },

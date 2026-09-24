@@ -1,12 +1,12 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 
 export function generarPasswordTemporal() {
   return randomBytes(9).toString("base64url");
 }
 
-export const DURACION_PASSWORD_TEMPORAL_MS = 72 * 60 * 60 * 1000;
-
-export function calcularExpiracionPasswordTemporal() {
-  return new Date(Date.now() + DURACION_PASSWORD_TEMPORAL_MS);
+export async function calcularExpiracionPasswordTemporal() {
+  const { password_temporal_horas } = await obtenerConfiguracion();
+  return new Date(Date.now() + password_temporal_horas * 60 * 60 * 1000);
 }

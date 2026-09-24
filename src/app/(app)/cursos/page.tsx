@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import { CursosView } from "./cursos-view";
 
 const ROLES_GESTION = ["super_admin", "admin_organizacion", "prevencionista"] as const;
@@ -41,7 +42,7 @@ export default async function CursosPage() {
     ? [...new Set([...orgsPropias.map((o) => o.id), miFacilitador.organizacion_id])]
     : orgsPropias.map((o) => o.id);
 
-  const [{ data: cursos }, { data: organizaciones }] = await Promise.all([
+  const [{ data: cursos }, { data: organizaciones }, { curso_horas_minimas }] = await Promise.all([
     sesion.esSuperAdmin
       ? supabase
           .from("cursos")
@@ -55,6 +56,7 @@ export default async function CursosPage() {
     sesion.esSuperAdmin
       ? supabase.from("organizaciones").select("id, razon_social").order("razon_social")
       : Promise.resolve({ data: orgsPropias }),
+    obtenerConfiguracion(),
   ]);
 
   const puedeGestionar = sesion.roles.some((r) =>
@@ -62,6 +64,11 @@ export default async function CursosPage() {
   );
 
   return (
-    <CursosView cursos={cursos ?? []} organizaciones={organizaciones ?? []} puedeGestionar={puedeGestionar} />
+    <CursosView
+      cursos={cursos ?? []}
+      organizaciones={organizaciones ?? []}
+      puedeGestionar={puedeGestionar}
+      horasMinimas={curso_horas_minimas}
+    />
   );
 }

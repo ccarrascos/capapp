@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 
 export type CrearOrganizacionInput = {
   rut: string;
@@ -46,7 +47,6 @@ export async function crearOrganizacion(input: CrearOrganizacionInput) {
 }
 
 const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-const TAMANO_MAXIMO = 2 * 1024 * 1024;
 
 export async function subirLogoOrganizacion(organizacionId: string, formData: FormData) {
   const sesion = await getSesion();
@@ -69,8 +69,9 @@ export async function subirLogoOrganizacion(organizacionId: string, formData: Fo
     return { ok: false as const, mensaje: "Formato no permitido. Usa JPG, PNG, WEBP o SVG." };
   }
 
-  if (archivo.size > TAMANO_MAXIMO) {
-    return { ok: false as const, mensaje: "La imagen no puede superar los 2 MB." };
+  const { max_mb_logo_organizacion } = await obtenerConfiguracion();
+  if (archivo.size > max_mb_logo_organizacion * 1024 * 1024) {
+    return { ok: false as const, mensaje: `La imagen no puede superar los ${max_mb_logo_organizacion} MB.` };
   }
 
   const extension =

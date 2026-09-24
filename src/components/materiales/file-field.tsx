@@ -19,20 +19,20 @@ const TIPOS_PERMITIDOS = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.ms-powerpoint",
 ];
-const TAMANO_MAXIMO = 20 * 1024 * 1024;
-
 export function FileField({
   label,
   path,
   storagePathPrefix,
   fileName,
   onGuardarPath,
+  tamanoMaximoMb,
 }: {
   label: string;
   path: string | null;
   storagePathPrefix: string;
   fileName: string;
   onGuardarPath: (path: string) => Promise<{ ok: boolean; mensaje?: string }>;
+  tamanoMaximoMb: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
@@ -52,8 +52,8 @@ export function FileField({
       return;
     }
 
-    if (file.size > TAMANO_MAXIMO) {
-      toast.error("El archivo no puede superar los 20 MB.");
+    if (file.size > tamanoMaximoMb * 1024 * 1024) {
+      toast.error(`El archivo no puede superar los ${tamanoMaximoMb} MB.`);
       return;
     }
 

@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 
 const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
-const TAMANO_MAXIMO = 3 * 1024 * 1024;
 
 export async function subirAvatar(formData: FormData) {
   const supabase = await createClient();
@@ -23,8 +23,9 @@ export async function subirAvatar(formData: FormData) {
     return { ok: false as const, mensaje: "Formato no permitido. Usa JPG, PNG o WEBP." };
   }
 
-  if (archivo.size > TAMANO_MAXIMO) {
-    return { ok: false as const, mensaje: "La imagen no puede superar los 3 MB." };
+  const { max_mb_avatar_usuario } = await obtenerConfiguracion();
+  if (archivo.size > max_mb_avatar_usuario * 1024 * 1024) {
+    return { ok: false as const, mensaje: `La imagen no puede superar los ${max_mb_avatar_usuario} MB.` };
   }
 
   const extension = archivo.type === "image/png" ? "png" : archivo.type === "image/webp" ? "webp" : "jpg";

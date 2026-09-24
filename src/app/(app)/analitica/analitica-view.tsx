@@ -62,7 +62,7 @@ const ESTADO_ICONOS: Record<string, LucideIcon> = {
 
 const ESTADO_SUBTITULO: Record<string, string> = {
   vigente: "Al día",
-  por_vencer: "Vence en 60 días",
+  por_vencer: "Vence pronto",
   vencido: "Curso vencido",
   sin_capacitacion: "Nunca capacitado",
 };
@@ -390,9 +390,11 @@ function TarjetaSexo({
 export function AnaliticaView({
   filas,
   estadosConfig,
+  ventanaPorVencerDias,
 }: {
   filas: FilaAnalitica[];
   estadosConfig: EstadoConfig[];
+  ventanaPorVencerDias: number;
 }) {
   const centros = useMemo(() => [...new Set(filas.map((f) => f.centro))].sort(), [filas]);
   const subcontratosNombres = useMemo(
@@ -729,7 +731,9 @@ export function AnaliticaView({
             key={e.codigo}
             icon={ESTADO_ICONOS[e.codigo] ?? CircleHelp}
             label={e.estado}
-            sublabel={ESTADO_SUBTITULO[e.codigo] ?? ""}
+            sublabel={
+              e.codigo === "por_vencer" ? `Vence en ${ventanaPorVencerDias} días` : (ESTADO_SUBTITULO[e.codigo] ?? "")
+            }
             valor={e.cantidad}
             pct={totalBaseEstado > 0 ? (e.cantidad / totalBaseEstado) * 100 : 0}
             color={e.color}

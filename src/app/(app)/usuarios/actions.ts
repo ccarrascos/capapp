@@ -74,7 +74,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   }
 
   const passwordTemporal = generarPasswordTemporal();
-  const expiraEn = calcularExpiracionPasswordTemporal();
+  const expiraEn = await calcularExpiracionPasswordTemporal();
 
   const { data: creado, error: errorAuth } = await admin.auth.admin.createUser({
     email,

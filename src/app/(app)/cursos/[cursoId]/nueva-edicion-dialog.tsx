@@ -29,11 +29,13 @@ export function NuevaEdicionDialog({
   organizacionId,
   facilitadores,
   centros,
+  plazoMeses,
 }: {
   cursoId: string;
   organizacionId: string;
   facilitadores: { id: string; nombres: string; apellidos: string }[];
   centros: { id: string; nombre: string }[];
+  plazoMeses: number;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -72,7 +74,7 @@ export function NuevaEdicionDialog({
         <DialogHeader>
           <DialogTitle>Nueva edición (cohorte)</DialogTitle>
           <DialogDescription>
-            El plazo límite se calcula automáticamente a 3 meses desde el inicio, conforme al
+            El plazo límite se calcula automáticamente a {plazoMeses} meses desde el inicio, conforme al
             Anexo Metodológico.
           </DialogDescription>
         </DialogHeader>

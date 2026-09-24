@@ -33,6 +33,7 @@ const ACCION_LABEL: Record<string, string> = {
   reactivar_organizacion: "Reactivó la organización",
   desactivar_organizacion: "Desactivó la organización",
   dar_acceso_trabajador: "Dio acceso al trabajador",
+  actualizar_configuracion: "Cambió la configuración",
 };
 
 function resumenCambio(valor: unknown): string {

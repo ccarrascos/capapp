@@ -2,6 +2,7 @@ import { CircleX, UserX } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 
 export default async function CredencialPage({
   params,
@@ -22,6 +23,7 @@ export default async function CredencialPage({
   let cursos: { nombre: string; vigenciaHasta: string | null; estado: EstadoVigencia }[] = [];
 
   if (vinculo) {
+    const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
     const { data: inscripciones } = await admin
       .from("inscripciones")
       .select("fecha_aprobacion, vigencia_hasta, ediciones_curso!inner(organizacion_id, curso_id, cursos(nombre))")
@@ -41,7 +43,7 @@ export default async function CredencialPage({
     cursos = ultimos.map((i) => ({
       nombre: i.ediciones_curso!.cursos!.nombre,
       vigenciaHasta: i.vigencia_hasta,
-      estado: estadoVigenciaDeCurso(i.vigencia_hasta),
+      estado: estadoVigenciaDeCurso(i.vigencia_hasta, vigencia_por_vencer_dias),
     }));
   }
 

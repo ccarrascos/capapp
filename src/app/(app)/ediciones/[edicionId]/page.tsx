@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import { EdicionView } from "./edicion-view";
 
 const ROLES_DETALLE = [
@@ -86,9 +87,10 @@ export default async function EdicionDetallePage({
       vigenciaPorPersona.set(i.persona_run, { fechaAprobacion: i.fecha_aprobacion, vigenciaHasta: i.vigencia_hasta });
     }
   }
+  const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
   const personasConEsteCursoVigente = new Set(
     [...vigenciaPorPersona.entries()]
-      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta) === "vigente")
+      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta, vigencia_por_vencer_dias) === "vigente")
       .map(([run]) => run),
   );
 

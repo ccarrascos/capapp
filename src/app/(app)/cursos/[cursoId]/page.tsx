@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import { NuevaEdicionDialog } from "./nueva-edicion-dialog";
 import { FileField } from "@/components/materiales/file-field";
 import { guardarManualCurso, guardarMaterialModulo } from "./materiales-actions";
@@ -54,7 +55,13 @@ export default async function CursoDetallePage({
     );
   if (!puedeVer) redirect("/dashboard");
 
-  const [{ data: modulos }, { data: ediciones }, { data: facilitadores }, { data: centros }] = await Promise.all([
+  const [
+    { data: modulos },
+    { data: ediciones },
+    { data: facilitadores },
+    { data: centros },
+    { max_mb_materiales_curso: tamanoMaximoMb, edicion_plazo_maximo_meses },
+  ] = await Promise.all([
     supabase.from("modulos").select("*").eq("curso_id", cursoId).order("orden"),
     supabase
       .from("ediciones_curso")
@@ -63,6 +70,7 @@ export default async function CursoDetallePage({
       .order("fecha_inicio", { ascending: false }),
     supabase.from("facilitadores").select("id, nombres, apellidos").eq("activo", true),
     supabase.from("centros_trabajo").select("id, nombre"),
+    obtenerConfiguracion(),
   ]);
 
   const storagePrefixCurso = `${curso.organizacion_id}/cursos/${cursoId}`;
@@ -104,6 +112,7 @@ export default async function CursoDetallePage({
               storagePathPrefix={storagePrefixCurso}
               fileName="manual-participante"
               onGuardarPath={guardarManualParticipante}
+              tamanoMaximoMb={tamanoMaximoMb}
             />
             <FileField
               label="Manual del facilitador"
@@ -111,6 +120,7 @@ export default async function CursoDetallePage({
               storagePathPrefix={storagePrefixCurso}
               fileName="manual-facilitador"
               onGuardarPath={guardarManualFacilitador}
+              tamanoMaximoMb={tamanoMaximoMb}
             />
           </div>
         </div>
@@ -126,6 +136,7 @@ export default async function CursoDetallePage({
               cursoId={cursoId}
               storagePrefixCurso={storagePrefixCurso}
               puedeGestionar={puedeGestionar}
+              tamanoMaximoMb={tamanoMaximoMb}
             />
           ))}
           {(modulos ?? []).length === 0 && (
@@ -143,6 +154,7 @@ export default async function CursoDetallePage({
               organizacionId={curso.organizacion_id!}
               facilitadores={facilitadores ?? []}
               centros={centros ?? []}
+              plazoMeses={edicion_plazo_maximo_meses}
             />
           )}
         </div>
@@ -183,6 +195,7 @@ async function ModuloRow({
   cursoId,
   storagePrefixCurso,
   puedeGestionar,
+  tamanoMaximoMb,
 }: {
   modulo: {
     id: string;
@@ -196,6 +209,7 @@ async function ModuloRow({
   cursoId: string;
   storagePrefixCurso: string;
   puedeGestionar: boolean;
+  tamanoMaximoMb: number;
 }) {
   async function guardarMaterial(path: string) {
     "use server";
@@ -223,6 +237,7 @@ async function ModuloRow({
           storagePathPrefix={`${storagePrefixCurso}/modulos/${modulo.id}`}
           fileName="material"
           onGuardarPath={guardarMaterial}
+          tamanoMaximoMb={tamanoMaximoMb}
         />
       )}
     </div>

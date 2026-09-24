@@ -12,6 +12,7 @@ import { normalizarEmail } from "@/lib/normalizar-email";
 import { generarQrDataUrl } from "@/lib/qr";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -82,7 +83,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     return { ok: false as const, mensaje: "Selecciona el sexo." };
   }
 
-  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
+  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento, (await obtenerConfiguracion()).edad_minima_trabajador)) {
     return {
       ok: false as const,
       mensaje: "La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.",
@@ -202,7 +203,7 @@ export async function actualizarTrabajador(input: {
     return { ok: false as const, mensaje: "Selecciona el sexo." };
   }
 
-  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento)) {
+  if (input.fechaNacimiento && !esFechaNacimientoValida(input.fechaNacimiento, (await obtenerConfiguracion()).edad_minima_trabajador)) {
     return {
       ok: false as const,
       mensaje: "La fecha de nacimiento no es válida: no puede ser hoy, futura, ni corresponder a un menor de edad.",
@@ -448,7 +449,7 @@ export async function crearAccesoTrabajador(input: {
   if (persona.usuario_id) return { ok: false as const, mensaje: "Esta persona ya tiene una cuenta de acceso." };
 
   const passwordTemporal = generarPasswordTemporal();
-  const expiraEn = calcularExpiracionPasswordTemporal();
+  const expiraEn = await calcularExpiracionPasswordTemporal();
 
   const { data: creado, error: errorAuth } = await admin.auth.admin.createUser({
     email,
@@ -637,6 +638,7 @@ export async function cargarTrabajadoresMasivo(input: {
 
   const supabase = await createClient();
   const admin = createAdminClient();
+  const { edad_minima_trabajador } = await obtenerConfiguracion();
 
   const [{ data: cargos }, { data: centros }, { data: subcontratos }] = await Promise.all([
     supabase.from("cargos").select("id, nombre").eq("organizacion_id", input.organizacionId),
@@ -670,7 +672,7 @@ export async function cargarTrabajadoresMasivo(input: {
     const fechaNacimientoTexto = fila.fechaNacimiento.trim();
     if (fechaNacimientoTexto) {
       fechaNacimiento = normalizarFechaNacimiento(fechaNacimientoTexto);
-      if (!fechaNacimiento || !esFechaNacimientoValida(fechaNacimiento)) {
+      if (!fechaNacimiento || !esFechaNacimientoValida(fechaNacimiento, edad_minima_trabajador)) {
         resultados.push({
           fila: numeroFila,
           ok: false,
@@ -857,6 +859,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
 
   const supabase = await createClient();
   const hoy = new Date().toISOString().slice(0, 10);
+  const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
 
   const [{ data: ediciones }, { data: inscripciones }] = await Promise.all([
     supabase
@@ -878,7 +881,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   const edicionesYaInscrito = new Set((inscripciones ?? []).map((i) => i.edicion_id));
 
   // Si la aprobación más reciente de un curso sigue plenamente vigente (a
-  // más de 60 días de vencer), no tiene sentido ofrecer inscribirlo de
+  // fuera de la ventana de aviso), no tiene sentido ofrecer inscribirlo de
   // nuevo. Pero si ya está "por vencer", sí se ofrece — es justo el caso de
   // renovarlo antes de que venza.
   const vigenciaPorCurso = new Map<string, { fechaAprobacion: string | null; vigenciaHasta: string | null }>();
@@ -892,7 +895,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
   }
   const cursosVigentes = new Set(
     [...vigenciaPorCurso.entries()]
-      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta) === "vigente")
+      .filter(([, v]) => estadoVigenciaDeCurso(v.vigenciaHasta, vigencia_por_vencer_dias) === "vigente")
       .map(([cursoId]) => cursoId),
   );
 

@@ -48,24 +48,26 @@ export function CursosView({
   cursos,
   organizaciones,
   puedeGestionar,
+  horasMinimas,
 }: {
   cursos: Curso[];
   organizaciones: { id: string; razon_social: string }[];
   puedeGestionar: boolean;
+  horasMinimas: number;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Curso art. 16 DS 44 — mínimo 8 horas
+            Curso art. 16 DS 44 — mínimo {horasMinimas} horas
           </p>
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">
             Cursos y ediciones
           </h1>
         </div>
         {puedeGestionar && organizaciones.length > 0 && (
-          <NuevoCursoDialog organizaciones={organizaciones} />
+          <NuevoCursoDialog organizaciones={organizaciones} horasMinimas={horasMinimas} />
         )}
       </div>
 
@@ -100,7 +102,13 @@ export function CursosView({
   );
 }
 
-function NuevoCursoDialog({ organizaciones }: { organizaciones: { id: string; razon_social: string }[] }) {
+function NuevoCursoDialog({
+  organizaciones,
+  horasMinimas,
+}: {
+  organizaciones: { id: string; razon_social: string }[];
+  horasMinimas: number;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
@@ -137,7 +145,7 @@ function NuevoCursoDialog({ organizaciones }: { organizaciones: { id: string; ra
           <DialogTitle>Crear curso con estructura DS 44</DialogTitle>
           <DialogDescription>
             Genera automáticamente los 7 módulos de contenido mínimo exigidos por el Anexo
-            Metodológico (8 horas totales). Podrás editar cada módulo después.
+            Metodológico ({horasMinimas} horas totales). Podrás editar cada módulo después.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">

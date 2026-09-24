@@ -2,6 +2,7 @@ import "server-only";
 import type Groq from "groq-sdk";
 import { centrosVisibles, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import type { Database } from "@/lib/database.types";
 import { buscarAyuda, temasDeAyudaDisponibles } from "./ayuda";
 
@@ -131,9 +132,11 @@ async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, esta
     .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
     .slice(0, 50);
 
+  const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
+
   return {
-    // La ventana "por vencer" es fija en 60 días — la misma que usa la Matriz de vigencia.
-    ventanaDias: 60,
+    // Misma ventana configurable que usa la Matriz de vigencia (/configuracion, super_admin).
+    ventanaDias: vigencia_por_vencer_dias,
     cantidad: relevantes.length,
     trabajadores: relevantes.map((f) => ({
       nombre: nombreCompleto(f),
@@ -342,7 +345,7 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     function: {
       name: "trabajadores_por_vencer",
       description:
-        "Lista, con nombre, RUN, centro y el curso correspondiente, los trabajadores con capacitación vencida o por vencer (dentro de los próximos 60 días), ordenados por fecha de vencimiento más próxima. Úsala también cuando pregunten quiénes son los vencidos/por vencer de un centro en particular, o qué curso tienen vencido.",
+        "Lista, con nombre, RUN, centro y el curso correspondiente, los trabajadores con capacitación vencida o por vencer (dentro de la ventana de aviso configurada, ver el campo ventanaDias de la respuesta), ordenados por fecha de vencimiento más próxima. Úsala también cuando pregunten quiénes son los vencidos/por vencer de un centro en particular, o qué curso tienen vencido.",
       parameters: {
         type: "object",
         properties: {

@@ -21,6 +21,7 @@ export function PerfilView({
   rut,
   roles,
   avatarUrl,
+  maxMbAvatar,
 }: {
   nombres: string;
   apellidos: string;
@@ -29,6 +30,7 @@ export function PerfilView({
   rut: string | null;
   roles: { rol: string; organizacion: string | null }[];
   avatarUrl: string | null;
+  maxMbAvatar: number;
 }) {
   return (
     <div className="flex flex-col gap-8 max-w-xl">
@@ -37,7 +39,7 @@ export function PerfilView({
         <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Mi perfil</h1>
       </div>
 
-      <AvatarUploader nombres={nombres} apellidos={apellidos} avatarUrl={avatarUrl} />
+      <AvatarUploader nombres={nombres} apellidos={apellidos} avatarUrl={avatarUrl} maxMb={maxMbAvatar} />
 
       <DatosPersonales nombres={nombres} apellidos={apellidos} email={email} telefono={telefono} rut={rut} />
 
@@ -64,10 +66,12 @@ function AvatarUploader({
   nombres,
   apellidos,
   avatarUrl,
+  maxMb,
 }: {
   nombres: string;
   apellidos: string;
   avatarUrl: string | null;
+  maxMb: number;
 }) {
   const [pending, startTransition] = useTransition();
   const [urlActual, setUrlActual] = useState(avatarUrl);
@@ -120,7 +124,7 @@ function AvatarUploader({
       </div>
       <div>
         <p className="text-sm font-medium">Foto de perfil</p>
-        <p className="text-xs text-muted-foreground">JPG, PNG o WEBP. Máximo 3 MB.</p>
+        <p className="text-xs text-muted-foreground">JPG, PNG o WEBP. Máximo {maxMb} MB.</p>
       </div>
     </div>
   );

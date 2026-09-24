@@ -1,9 +1,15 @@
 import type { EstadoVigencia } from "@/components/status/sign-badge";
 
-export function estadoVigenciaDeCurso(vigenciaHasta: string | null): EstadoVigencia {
+/**
+ * `ventanaDias` (por defecto 60) es configurable desde /configuracion
+ * (super_admin) — el código de servidor debe pasar el valor ya leído de
+ * ahí; el default solo aplica donde no se puede leer esa configuración
+ * (esta función también se usa desde un componente cliente).
+ */
+export function estadoVigenciaDeCurso(vigenciaHasta: string | null, ventanaDias = 60): EstadoVigencia {
   if (!vigenciaHasta) return "sin_capacitacion";
   const hoy = new Date().toISOString().slice(0, 10);
-  const limite = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const limite = new Date(Date.now() + ventanaDias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   if (vigenciaHasta < hoy) return "vencido";
   if (vigenciaHasta <= limite) return "por_vencer";
   return "vigente";

@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   // No aporta valor al usuario y sí le regala a un atacante qué framework
   // corre el servidor.
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Logo y avatar se suben vía Server Action; el tope real lo fija
+      // /configuracion. Vercel corta cualquier body sobre 4.5 MB.
+      bodySizeLimit: "4mb",
+    },
+  },
   async headers() {
     return [
       {
