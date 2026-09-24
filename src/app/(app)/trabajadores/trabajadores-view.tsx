@@ -2001,7 +2001,7 @@ function DetalleTrabajadorDialog({
                 <div>
                   <p className="text-xs text-muted-foreground">Estado</p>
                   <SignBadge
-                    estado={peorEstadoVigencia(aprobadosVigentes.map((i) => estadoVigenciaDeCurso(i.vigencia_hasta)))}
+                    estado={peorEstadoVigencia(aprobadosVigentes.map((i) => estadoVigenciaDeCurso(i.vigencia_hasta, detalle.ventanaPorVencerDias)))}
                     size="sm"
                   />
                 </div>
@@ -2056,7 +2056,9 @@ function DetalleTrabajadorDialog({
                       aprobados.length > 0
                         ? aprobados.reduce((a, b) => ((b.fecha_aprobacion ?? "") > (a.fecha_aprobacion ?? "") ? b : a))
                         : null;
-                    const estadoVigencia = ultimoAprobado ? estadoVigenciaDeCurso(ultimoAprobado.vigencia_hasta) : null;
+                    const estadoVigencia = ultimoAprobado
+                      ? estadoVigenciaDeCurso(ultimoAprobado.vigencia_hasta, detalle.ventanaPorVencerDias)
+                      : null;
                     return (
                       <div key={g.cursoNombre + g.intentos[0].id} className="border border-border p-3 text-sm flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">

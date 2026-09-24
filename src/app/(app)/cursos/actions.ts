@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { tienePermiso } from "@/lib/permisos";
 import type { AccionPermiso } from "@/lib/permisos-catalogo";
 import type { Database } from "@/lib/database.types";
@@ -56,7 +56,7 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
     };
   }
 
-  const { curso_horas_minimas } = await obtenerConfiguracion();
+  const { curso_horas_minimas } = await obtenerConfiguracionOrganizacion(input.organizacionId);
 
   const { data: curso, error: errorCurso } = await supabase
     .from("cursos")
@@ -124,7 +124,7 @@ export async function crearEdicion(input: {
 
   const fechaInicio = new Date(input.fechaInicio + "T00:00:00");
   const fechaLimite = new Date(fechaInicio);
-  const { edicion_plazo_maximo_meses } = await obtenerConfiguracion();
+  const { edicion_plazo_maximo_meses } = await obtenerConfiguracionOrganizacion(input.organizacionId);
   fechaLimite.setMonth(fechaLimite.getMonth() + edicion_plazo_maximo_meses);
 
   const { error } = await supabase.from("ediciones_curso").insert({

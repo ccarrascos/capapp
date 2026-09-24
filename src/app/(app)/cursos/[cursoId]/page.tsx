@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { obtenerConfiguracion, obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { tienePermiso } from "@/lib/permisos";
 import { NuevaEdicionDialog } from "./nueva-edicion-dialog";
 import { FileField } from "@/components/materiales/file-field";
@@ -62,7 +62,8 @@ export default async function CursoDetallePage({
     { data: ediciones },
     { data: facilitadores },
     { data: centros },
-    { max_mb_materiales_curso: tamanoMaximoMb, edicion_plazo_maximo_meses },
+    { max_mb_materiales_curso: tamanoMaximoMb },
+    { edicion_plazo_maximo_meses },
   ] = await Promise.all([
     supabase.from("modulos").select("*").eq("curso_id", cursoId).order("orden"),
     supabase
@@ -73,6 +74,7 @@ export default async function CursoDetallePage({
     supabase.from("facilitadores").select("id, nombres, apellidos").eq("activo", true),
     supabase.from("centros_trabajo").select("id, nombre"),
     obtenerConfiguracion(),
+    obtenerConfiguracionOrganizacion(curso.organizacion_id),
   ]);
 
   const storagePrefixCurso = `${curso.organizacion_id}/cursos/${cursoId}`;

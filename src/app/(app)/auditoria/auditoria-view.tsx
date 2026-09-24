@@ -34,6 +34,7 @@ const ACCION_LABEL: Record<string, string> = {
   desactivar_organizacion: "Desactivó la organización",
   dar_acceso_trabajador: "Dio acceso al trabajador",
   actualizar_configuracion: "Cambió la configuración",
+  actualizar_configuracion_organizacion: "Cambió la configuración de la organización",
   otorgar_permiso: "Restituyó un permiso",
   revocar_permiso: "Quitó un permiso",
 };

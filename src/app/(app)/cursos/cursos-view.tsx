@@ -49,11 +49,13 @@ export function CursosView({
   organizaciones,
   puedeGestionar,
   horasMinimas,
+  horasPorOrganizacion,
 }: {
   cursos: Curso[];
   organizaciones: { id: string; razon_social: string }[];
   puedeGestionar: boolean;
   horasMinimas: number;
+  horasPorOrganizacion: Record<string, number>;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -67,7 +69,7 @@ export function CursosView({
           </h1>
         </div>
         {puedeGestionar && organizaciones.length > 0 && (
-          <NuevoCursoDialog organizaciones={organizaciones} horasMinimas={horasMinimas} />
+          <NuevoCursoDialog organizaciones={organizaciones} horasPorOrganizacion={horasPorOrganizacion} horasMinimas={horasMinimas} />
         )}
       </div>
 
@@ -104,9 +106,11 @@ export function CursosView({
 
 function NuevoCursoDialog({
   organizaciones,
+  horasPorOrganizacion,
   horasMinimas,
 }: {
   organizaciones: { id: string; razon_social: string }[];
+  horasPorOrganizacion: Record<string, number>;
   horasMinimas: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -145,7 +149,7 @@ function NuevoCursoDialog({
           <DialogTitle>Crear curso con estructura DS 44</DialogTitle>
           <DialogDescription>
             Genera automáticamente los 7 módulos de contenido mínimo exigidos por el Anexo
-            Metodológico ({horasMinimas} horas totales). Podrás editar cada módulo después.
+            Metodológico ({horasPorOrganizacion[form.organizacionId] ?? horasMinimas} horas totales). Podrás editar cada módulo después.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">

@@ -26,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ["/usuarios", "usuarios.gestionar"],
     ["/subcontratos", "subcontratos.gestionar"],
     ["/ia", "ia.usar"],
+    ["/configuracion", "organizacion.configurar"],
   ];
   const rutasOcultas = (
     await Promise.all(

@@ -394,7 +394,7 @@ export function AnaliticaView({
 }: {
   filas: FilaAnalitica[];
   estadosConfig: EstadoConfig[];
-  ventanaPorVencerDias: number;
+  ventanaPorVencerDias: number | null;
 }) {
   const centros = useMemo(() => [...new Set(filas.map((f) => f.centro))].sort(), [filas]);
   const subcontratosNombres = useMemo(
@@ -732,7 +732,9 @@ export function AnaliticaView({
             icon={ESTADO_ICONOS[e.codigo] ?? CircleHelp}
             label={e.estado}
             sublabel={
-              e.codigo === "por_vencer" ? `Vence en ${ventanaPorVencerDias} días` : (ESTADO_SUBTITULO[e.codigo] ?? "")
+              e.codigo === "por_vencer" && ventanaPorVencerDias
+                ? `Vence en ${ventanaPorVencerDias} días`
+                : (ESTADO_SUBTITULO[e.codigo] ?? "")
             }
             valor={e.cantidad}
             pct={totalBaseEstado > 0 ? (e.cantidad / totalBaseEstado) * 100 : 0}

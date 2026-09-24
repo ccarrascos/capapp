@@ -107,7 +107,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/configuracion",
     label: "Configuración",
     icon: Settings,
-    roles: ["super_admin"],
+    roles: ["super_admin", "admin_organizacion"],
   },
 ];
 

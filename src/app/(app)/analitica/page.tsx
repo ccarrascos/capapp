@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { ventanaPorVencerComun } from "@/lib/configuracion";
 import { AnaliticaView } from "./analitica-view";
 
 const ROLES_PERMITIDOS = ["super_admin", "admin_organizacion", "prevencionista", "supervisor_centro", "auditor"] as const;
@@ -34,16 +34,20 @@ export default async function AnaliticaPage() {
 
   const supabase = await createClient();
 
-  const [{ data: matriz }, { vigencia_por_vencer_dias }] = await Promise.all([
-    supabase.from("matriz_vigencia_capacitacion").select("*").eq("trabajador_activo", true),
-    obtenerConfiguracion(),
-  ]);
+  const { data: matriz } = await supabase
+    .from("matriz_vigencia_capacitacion")
+    .select("*")
+    .eq("trabajador_activo", true);
 
   const filas = (matriz ?? []).filter((f) => {
     if (sesion.esSuperAdmin || !f.organizacion_id) return true;
     const cv = centrosVisibles(sesion, f.organizacion_id);
     return cv === "todos" || (f.centro_trabajo_id != null && cv.includes(f.centro_trabajo_id));
   });
+
+  const ventanaDias = await ventanaPorVencerComun(
+    filas.map((f) => f.organizacion_id).filter((id): id is string => !!id),
+  );
 
   const runs = [...new Set(filas.map((f) => f.persona_run).filter((r): r is string => !!r))];
   const { data: personas } =
@@ -76,7 +80,7 @@ export default async function AnaliticaPage() {
     <AnaliticaView
       filas={filasAnalitica}
       estadosConfig={[...ESTADOS]}
-      ventanaPorVencerDias={vigencia_por_vencer_dias}
+      ventanaPorVencerDias={ventanaDias}
     />
   );
 }

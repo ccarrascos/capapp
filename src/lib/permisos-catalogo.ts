@@ -40,6 +40,11 @@ export const CATALOGO_PERMISOS = {
     etiqueta: "Cambiar el logo de la organización",
     roles: ["admin_organizacion"],
   },
+  "organizacion.configurar": {
+    modulo: "estructura",
+    etiqueta: "Ajustar parámetros propios de la organización",
+    roles: ["admin_organizacion"],
+  },
   "trabajadores.gestionar": {
     modulo: "personas",
     etiqueta: "Agregar, editar y cargar trabajadores",

@@ -4,9 +4,18 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { invalidarCacheConfiguracion } from "@/lib/configuracion";
-import { CAMPOS_CONFIGURACION } from "@/lib/configuracion-campos";
-import { invalidarCachePermisos } from "@/lib/permisos";
+import {
+  invalidarCacheConfiguracion,
+  invalidarCacheConfiguracionOrganizaciones,
+  obtenerConfiguracion,
+} from "@/lib/configuracion";
+import {
+  CAMPOS_CONFIGURACION,
+  CAMPOS_ORGANIZACION,
+  rangoCampoOrganizacion,
+  type CampoOrganizacion,
+} from "@/lib/configuracion-campos";
+import { invalidarCachePermisos, tienePermiso } from "@/lib/permisos";
 import { CATALOGO_PERMISOS, rolPuedeTenerPermiso, type AccionPermiso } from "@/lib/permisos-catalogo";
 import type { RolNombre } from "@/lib/auth";
 
@@ -87,6 +96,54 @@ export async function actualizarPermiso(input: { rol: RolNombre; accion: string;
   });
 
   invalidarCachePermisos();
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
+export async function actualizarConfiguracionOrganizacion(input: {
+  organizacionId: string;
+  clave: string;
+  valor: number | null;
+}) {
+  const sesion = await getSesion();
+  if (!sesion || !(await tienePermiso(sesion, "organizacion.configurar", input.organizacionId))) {
+    return { ok: false as const, mensaje: "No tienes permiso para configurar esta organización." };
+  }
+
+  const campo = CAMPOS_ORGANIZACION.find((c) => c.clave === input.clave);
+  if (!campo) return { ok: false as const, mensaje: "Parámetro desconocido." };
+
+  if (input.valor !== null) {
+    const plataforma = (await obtenerConfiguracion())[campo.clave];
+    const { min, max } = rangoCampoOrganizacion(campo.clave, plataforma);
+    if (!Number.isInteger(input.valor) || input.valor < min || input.valor > max) {
+      return { ok: false as const, mensaje: `${campo.etiqueta}: debe ser un número entero entre ${min} y ${max}.` };
+    }
+  }
+
+  const supabase = await createClient();
+  const { data: anterior } = await supabase
+    .from("organizaciones")
+    .select(campo.clave)
+    .eq("id", input.organizacionId)
+    .maybeSingle();
+
+  const cambios: Partial<Record<CampoOrganizacion["clave"], number | null>> = {};
+  cambios[campo.clave] = input.valor;
+  const { error } = await supabase.from("organizaciones").update(cambios).eq("id", input.organizacionId);
+
+  if (error) return { ok: false as const, mensaje: error.message };
+
+  await registrarAuditoria(supabase, {
+    usuarioId: sesion.usuarioId,
+    accion: "actualizar_configuracion_organizacion",
+    tabla: "organizaciones",
+    registroId: input.organizacionId,
+    datosAnteriores: { clave: campo.clave, valor: (anterior as Record<string, unknown> | null)?.[campo.clave] ?? null },
+    datosNuevos: { clave: campo.clave, valor: input.valor },
+  });
+
+  invalidarCacheConfiguracionOrganizaciones();
   revalidatePath("/", "layout");
   return { ok: true as const };
 }

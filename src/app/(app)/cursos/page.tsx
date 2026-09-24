@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { obtenerConfiguracion, obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { CursosView } from "./cursos-view";
 
 const ROLES_DETALLE = [
@@ -61,12 +61,21 @@ export default async function CursosPage() {
 
   const puedeGestionar = await tienePermisoEnAlgunaOrg(sesion, "cursos.gestionar");
 
+  const horasPorOrganizacion = Object.fromEntries(
+    await Promise.all(
+      (organizaciones ?? []).map(
+        async (o) => [o.id, (await obtenerConfiguracionOrganizacion(o.id)).curso_horas_minimas] as const,
+      ),
+    ),
+  );
+
   return (
     <CursosView
       cursos={cursos ?? []}
       organizaciones={organizaciones ?? []}
       puedeGestionar={puedeGestionar}
       horasMinimas={curso_horas_minimas}
+      horasPorOrganizacion={horasPorOrganizacion}
     />
   );
 }

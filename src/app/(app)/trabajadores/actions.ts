@@ -12,7 +12,7 @@ import { normalizarEmail } from "@/lib/normalizar-email";
 import { generarQrDataUrl } from "@/lib/qr";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { obtenerConfiguracion, obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { tienePermiso } from "@/lib/permisos";
 import type { Database } from "@/lib/database.types";
 
@@ -380,6 +380,7 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
     vinculo: vinculo ?? null,
     inscripciones: inscripciones ?? [],
     historialCentro: historial ?? [],
+    ventanaPorVencerDias: (await obtenerConfiguracionOrganizacion(organizacionId)).vigencia_por_vencer_dias,
   };
 }
 
@@ -821,7 +822,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
 
   const supabase = await createClient();
   const hoy = new Date().toISOString().slice(0, 10);
-  const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
+  const { vigencia_por_vencer_dias } = await obtenerConfiguracionOrganizacion(organizacionId);
 
   const [{ data: ediciones }, { data: inscripciones }] = await Promise.all([
     supabase

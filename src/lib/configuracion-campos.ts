@@ -88,7 +88,7 @@ export const CAMPOS_CONFIGURACION: CampoConfiguracion[] = [
     clave: "vigencia_por_vencer_dias",
     grupo: "cumplimiento",
     etiqueta: "Ventana de aviso \"por vencer\"",
-    ayuda: "Días antes del vencimiento en que una capacitación pasa a mostrarse como por vencer.",
+    ayuda: "Días antes del vencimiento en que una capacitación pasa a mostrarse como por vencer. Cada organización puede definir la suya; este es el valor por defecto.",
     unidad: "días",
     min: 7,
     max: 365,
@@ -106,7 +106,7 @@ export const CAMPOS_CONFIGURACION: CampoConfiguracion[] = [
     clave: "curso_horas_minimas",
     grupo: "cursos",
     etiqueta: "Horas del curso DS 44",
-    ayuda: "Horas totales asignadas al crear un curso con estructura DS 44. El decreto exige un mínimo de 8.",
+    ayuda: "Mínimo de horas de un curso con estructura DS 44 (el decreto exige 8). Cada organización puede exigir más, nunca menos.",
     unidad: "horas",
     min: 8,
     max: 40,
@@ -115,7 +115,7 @@ export const CAMPOS_CONFIGURACION: CampoConfiguracion[] = [
     clave: "edicion_plazo_maximo_meses",
     grupo: "cursos",
     etiqueta: "Plazo de una edición",
-    ayuda: "Meses entre el inicio de una edición y su fecha límite. El Anexo Metodológico usa 3.",
+    ayuda: "Plazo máximo entre el inicio de una edición y su fecha límite (el Anexo Metodológico usa 3). Cada organización puede fijar uno menor.",
     unidad: "meses",
     min: 1,
     max: 24,
@@ -148,3 +148,38 @@ export const CAMPOS_CONFIGURACION: CampoConfiguracion[] = [
     max: 50,
   },
 ];
+
+export type CampoOrganizacion = {
+  clave: "vigencia_por_vencer_dias" | "curso_horas_minimas" | "edicion_plazo_maximo_meses";
+  etiqueta: string;
+  ayuda: string;
+  unidad: string;
+};
+
+export const CAMPOS_ORGANIZACION: CampoOrganizacion[] = [
+  {
+    clave: "vigencia_por_vencer_dias",
+    etiqueta: "Ventana de aviso \"por vencer\"",
+    ayuda: "Días antes del vencimiento en que una capacitación de esta organización pasa a mostrarse como por vencer.",
+    unidad: "días",
+  },
+  {
+    clave: "curso_horas_minimas",
+    etiqueta: "Horas del curso DS 44",
+    ayuda: "Horas asignadas a los cursos nuevos de esta organización. Puede ser más que el mínimo de la plataforma, nunca menos.",
+    unidad: "horas",
+  },
+  {
+    clave: "edicion_plazo_maximo_meses",
+    etiqueta: "Plazo de una edición",
+    ayuda: "Meses entre el inicio de una edición nueva y su fecha límite. Puede ser menor al máximo de la plataforma, nunca mayor.",
+    unidad: "meses",
+  },
+];
+
+/** Rango permitido a una organización, dado el valor vigente de la plataforma. */
+export function rangoCampoOrganizacion(clave: CampoOrganizacion["clave"], plataforma: number) {
+  if (clave === "vigencia_por_vencer_dias") return { min: 7, max: 365 };
+  if (clave === "curso_horas_minimas") return { min: plataforma, max: 40 };
+  return { min: 1, max: plataforma };
+}

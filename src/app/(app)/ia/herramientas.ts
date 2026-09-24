@@ -2,7 +2,7 @@ import "server-only";
 import type Groq from "groq-sdk";
 import { centrosVisibles, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { ventanaPorVencerComun } from "@/lib/configuracion";
 import type { Database } from "@/lib/database.types";
 import { buscarAyuda, temasDeAyudaDisponibles } from "./ayuda";
 
@@ -132,11 +132,13 @@ async function trabajadoresPorVencer(sesion: Sesion, centro: string | null, esta
     .sort((a, b) => (a.vigencia_hasta ?? "").localeCompare(b.vigencia_hasta ?? ""))
     .slice(0, 50);
 
-  const { vigencia_por_vencer_dias } = await obtenerConfiguracion();
+  const ventana = await ventanaPorVencerComun(
+    filas.map((f) => f.organizacion_id).filter((id): id is string => !!id),
+  );
 
   return {
-    // Misma ventana configurable que usa la Matriz de vigencia (/configuracion, super_admin).
-    ventanaDias: vigencia_por_vencer_dias,
+    // Misma ventana que usa la Matriz de vigencia; cada organización puede tener la suya.
+    ventanaDias: ventana ?? "varía según la organización",
     cantidad: relevantes.length,
     trabajadores: relevantes.map((f) => ({
       nombre: nombreCompleto(f),

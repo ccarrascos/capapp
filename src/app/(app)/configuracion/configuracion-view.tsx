@@ -18,10 +18,13 @@ import {
 } from "@/lib/permisos-catalogo";
 import {
   CAMPOS_CONFIGURACION,
+  CAMPOS_ORGANIZACION,
   GRUPOS_CONFIGURACION,
+  rangoCampoOrganizacion,
   type CampoConfiguracion,
+  type CampoOrganizacion,
 } from "@/lib/configuracion-campos";
-import { actualizarConfiguracion, actualizarPermiso } from "./actions";
+import { actualizarConfiguracion, actualizarConfiguracionOrganizacion, actualizarPermiso } from "./actions";
 
 export type ValorActual = {
   valor: number;
@@ -29,15 +32,51 @@ export type ValorActual = {
   actualizadoEn: string | null;
 };
 
+export type OrganizacionConfigurable = {
+  id: string;
+  razonSocial: string;
+  valores: Record<CampoOrganizacion["clave"], number | null>;
+};
+
 export function ConfiguracionView({
+  esSuperAdmin,
   valores,
   revocados,
   permisosDisponibles,
+  organizaciones,
+  organizacionesDisponibles,
 }: {
+  esSuperAdmin: boolean;
   valores: Record<ClaveConfiguracion, ValorActual>;
   revocados: string[];
   permisosDisponibles: boolean;
+  organizaciones: OrganizacionConfigurable[];
+  organizacionesDisponibles: boolean;
 }) {
+  const seccionOrganizacion = organizacionesDisponibles ? (
+    <ConfiguracionOrganizacion organizaciones={organizaciones} plataforma={valores} />
+  ) : (
+    <p className="border border-border bg-card px-5 py-8 text-sm text-muted-foreground">
+      Falta correr la migración 0031_configuracion_por_organizacion.sql en Supabase para habilitar esta sección.
+    </p>
+  );
+
+  if (!esSuperAdmin) {
+    return (
+      <div className="flex flex-col gap-6 max-w-4xl">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Administración de la organización</p>
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">Configuración</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Ajustes propios de tu organización. Si dejas un campo vacío se usa el valor de la plataforma. Cada
+            cambio queda registrado en Auditoría.
+          </p>
+        </div>
+        {seccionOrganizacion}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
       <div>
@@ -52,10 +91,14 @@ export function ConfiguracionView({
       <Tabs defaultValue="parametros">
         <TabsList>
           <TabsTrigger value="parametros">Parámetros</TabsTrigger>
+          <TabsTrigger value="organizaciones">Organizaciones</TabsTrigger>
           <TabsTrigger value="permisos">Permisos</TabsTrigger>
         </TabsList>
         <TabsContent value="parametros" className="mt-4">
           <Parametros valores={valores} />
+        </TabsContent>
+        <TabsContent value="organizaciones" className="mt-4">
+          {seccionOrganizacion}
         </TabsContent>
         <TabsContent value="permisos" className="mt-4">
           {permisosDisponibles ? (
@@ -67,6 +110,158 @@ export function ConfiguracionView({
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ConfiguracionOrganizacion({
+  organizaciones,
+  plataforma,
+}: {
+  organizaciones: OrganizacionConfigurable[];
+  plataforma: Record<ClaveConfiguracion, ValorActual>;
+}) {
+  const [organizacionId, setOrganizacionId] = useState(organizaciones[0]?.id ?? "");
+  const organizacion = organizaciones.find((o) => o.id === organizacionId);
+
+  if (!organizacion) {
+    return <p className="text-sm text-muted-foreground">No hay organizaciones para configurar.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {organizaciones.length > 1 && (
+        <div className="flex flex-col gap-1.5 max-w-sm">
+          <Label htmlFor="cfg-organizacion">Organización</Label>
+          <select
+            id="cfg-organizacion"
+            value={organizacionId}
+            onChange={(e) => setOrganizacionId(e.target.value)}
+            className="h-9 border border-input bg-transparent px-3 text-sm rounded-md"
+          >
+            {organizaciones.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.razonSocial}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <section className="border border-border bg-card">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">{organizacion.razonSocial}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Deja un campo vacío para usar el valor de la plataforma. Horas y plazo aplican a cursos y ediciones
+            que se creen desde ahora.
+          </p>
+        </div>
+        <div className="divide-y divide-border">
+          {CAMPOS_ORGANIZACION.map((campo) => (
+            <CampoOrganizacionFila
+              key={`${organizacion.id}-${campo.clave}`}
+              organizacionId={organizacion.id}
+              campo={campo}
+              propio={organizacion.valores[campo.clave]}
+              plataforma={plataforma[campo.clave].valor}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CampoOrganizacionFila({
+  organizacionId,
+  campo,
+  propio,
+  plataforma,
+}: {
+  organizacionId: string;
+  campo: CampoOrganizacion;
+  propio: number | null;
+  plataforma: number;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [guardado, setGuardado] = useState(propio);
+  const [texto, setTexto] = useState(propio === null ? "" : String(propio));
+  const { min, max } = rangoCampoOrganizacion(campo.clave, plataforma);
+
+  const vacio = texto.trim() === "";
+  const numero = Number(texto);
+  const valido = vacio || (Number.isInteger(numero) && numero >= min && numero <= max);
+  const nuevo = vacio ? null : numero;
+  const cambiado = valido && nuevo !== guardado;
+  const idInput = `cfg-org-${campo.clave}`;
+
+  function guardar(valor: number | null) {
+    startTransition(async () => {
+      const resultado = await actualizarConfiguracionOrganizacion({ organizacionId, clave: campo.clave, valor });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setGuardado(valor);
+      setTexto(valor === null ? "" : String(valor));
+      toast.success(
+        valor === null
+          ? `${campo.etiqueta}: se usa el valor de la plataforma (${plataforma} ${campo.unidad}).`
+          : `${campo.etiqueta}: ${valor} ${campo.unidad}.`,
+      );
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 sm:max-w-md">
+        <Label htmlFor={idInput} className="text-sm font-medium">
+          {campo.etiqueta}
+        </Label>
+        <p className="text-xs text-muted-foreground mt-1">{campo.ayuda}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Plataforma: {plataforma} {campo.unidad} · Rango {min}–{max}
+          {guardado === null ? " · Usando el valor de la plataforma" : ""}
+        </p>
+      </div>
+      <form
+        className="flex items-center gap-2 shrink-0"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (cambiado) guardar(nuevo);
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <Input
+            id={idInput}
+            type="number"
+            inputMode="numeric"
+            min={min}
+            max={max}
+            step={1}
+            placeholder={String(plataforma)}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            aria-invalid={!valido}
+            className="w-24 font-mono"
+            disabled={pending}
+          />
+          <span className="text-xs text-muted-foreground w-14">{campo.unidad}</span>
+        </div>
+        <Button type="submit" size="sm" disabled={!cambiado || pending}>
+          {pending ? "Guardando…" : "Guardar"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          title="Usar el valor de la plataforma"
+          aria-label="Usar el valor de la plataforma"
+          disabled={pending || guardado === null}
+          onClick={() => guardar(null)}
+        >
+          <RotateCcw className="size-3.5" />
+        </Button>
+      </form>
     </div>
   );
 }

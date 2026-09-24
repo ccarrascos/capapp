@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSesion, centrosVisibles, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { obtenerConfiguracion } from "@/lib/configuracion";
+import { ventanaPorVencerComun } from "@/lib/configuracion";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { Button } from "@/components/ui/button";
@@ -39,16 +39,20 @@ export default async function DashboardPage() {
 
 async function DashboardOrganizacion({ nombres, sesion }: { nombres: string; sesion: Sesion }) {
   const supabase = await createClient();
-  const [{ data: matriz }, { vigencia_por_vencer_dias }] = await Promise.all([
-    supabase.from("matriz_vigencia_capacitacion").select("*").eq("trabajador_activo", true),
-    obtenerConfiguracion(),
-  ]);
+  const { data: matriz } = await supabase
+    .from("matriz_vigencia_capacitacion")
+    .select("*")
+    .eq("trabajador_activo", true);
 
   const filas = (matriz ?? []).filter((f) => {
     if (sesion.esSuperAdmin || !f.organizacion_id) return true;
     const cv = centrosVisibles(sesion, f.organizacion_id);
     return cv === "todos" || (f.centro_trabajo_id != null && cv.includes(f.centro_trabajo_id));
   });
+
+  const ventanaDias = await ventanaPorVencerComun(
+    filas.map((f) => f.organizacion_id).filter((id): id is string => !!id),
+  );
   const total = filas.length;
   const conteo = (estado: EstadoVigencia) => filas.filter((f) => f.estado_vigencia === estado).length;
   const vigentes = conteo("vigente");
@@ -82,7 +86,7 @@ async function DashboardOrganizacion({ nombres, sesion }: { nombres: string; ses
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiTile label="Trabajadores" value={total} accent="steel" />
         <KpiTile label="Vigentes" value={vigentes} accent="clear" />
-        <KpiTile label={`Por vencer (${vigencia_por_vencer_dias} días)`} value={porVencer} accent="hazard" />
+        <KpiTile label={ventanaDias ? `Por vencer (${ventanaDias} días)` : "Por vencer"} value={porVencer} accent="hazard" />
         <KpiTile label="Vencidos / sin curso" value={vencidos + sinCapacitacion} accent="alert" />
         <KpiTile label="Cumplimiento" value={cumplimiento} suffix="%" accent="signal" />
       </div>

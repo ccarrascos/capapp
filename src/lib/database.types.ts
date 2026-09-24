@@ -991,6 +991,8 @@ export type Database = {
           activo: boolean
           comuna: string | null
           created_at: string
+          curso_horas_minimas: number | null
+          edicion_plazo_maximo_meses: number | null
           direccion: string | null
           email_contacto: string | null
           id: string
@@ -1004,11 +1006,14 @@ export type Database = {
           tamano_empresa: string | null
           telefono: string | null
           updated_at: string
+          vigencia_por_vencer_dias: number | null
         }
         Insert: {
           activo?: boolean
           comuna?: string | null
           created_at?: string
+          curso_horas_minimas?: number | null
+          edicion_plazo_maximo_meses?: number | null
           direccion?: string | null
           email_contacto?: string | null
           id?: string
@@ -1022,11 +1027,14 @@ export type Database = {
           tamano_empresa?: string | null
           telefono?: string | null
           updated_at?: string
+          vigencia_por_vencer_dias?: number | null
         }
         Update: {
           activo?: boolean
           comuna?: string | null
           created_at?: string
+          curso_horas_minimas?: number | null
+          edicion_plazo_maximo_meses?: number | null
           direccion?: string | null
           email_contacto?: string | null
           id?: string
@@ -1040,6 +1048,7 @@ export type Database = {
           tamano_empresa?: string | null
           telefono?: string | null
           updated_at?: string
+          vigencia_por_vencer_dias?: number | null
         }
         Relationships: [
           {
