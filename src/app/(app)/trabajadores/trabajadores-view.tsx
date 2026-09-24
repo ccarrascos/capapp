@@ -64,7 +64,7 @@ import {
   type CursoYaCubierto,
 } from "./actions";
 import { inscribirTrabajadores } from "../ediciones/actions";
-import { formatearRunInput, esRutValido } from "@/lib/rut";
+import { formatearRunInput, esRutValido, calcularDV } from "@/lib/rut";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 import { coincideBusqueda } from "@/lib/busqueda";
@@ -1072,13 +1072,17 @@ function NuevoTrabajadorDialog({
                 id="run"
                 required
                 value={form.run}
-                onChange={(e) => setForm((f) => ({ ...f, run: formatearRunInput(e.target.value) }))}
+                onChange={(e) => {
+                  const run = formatearRunInput(e.target.value);
+                  const cuerpo = run.replace(/\./g, "");
+                  setForm((f) => ({ ...f, run, dv: cuerpo ? calcularDV(cuerpo) : "" }));
+                }}
                 placeholder="12.345.678"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dv">DV</Label>
-              <Input id="dv" required maxLength={1} value={form.dv} onChange={(e) => setForm((f) => ({ ...f, dv: e.target.value }))} placeholder="K" />
+              <Input id="dv" disabled value={form.dv} placeholder="—" className="font-mono text-center" />
             </div>
           </div>
 
