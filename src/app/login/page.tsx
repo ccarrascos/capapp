@@ -72,7 +72,7 @@ function LoginForm() {
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" loading="lazy" />
           </span>
           <span className="font-heading text-2xl tracking-wide uppercase">Capapp</span>
         </div>
@@ -102,7 +102,7 @@ function LoginForm() {
           <div className="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
             <span className="flex size-9 items-center justify-center rounded-sm overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-              <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
+              <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" loading="lazy" />
             </span>
             <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
           </div>

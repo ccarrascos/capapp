@@ -3,10 +3,14 @@ import { Big_Shoulders, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
+// next/font no tiene métricas de Big Shoulders para calcular un fallback
+// ajustado; se declara uno condensado a mano.
 const display = Big_Shoulders({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["600", "700", "800", "900"],
+  adjustFontFallback: false,
+  fallback: ["Arial Narrow", "Roboto Condensed", "sans-serif"],
 });
 
 const body = IBM_Plex_Sans({

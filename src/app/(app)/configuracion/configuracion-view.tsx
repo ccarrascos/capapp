@@ -392,15 +392,17 @@ function Permisos({ revocadosIniciales }: { revocadosIniciales: string[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="text-sm text-muted-foreground flex flex-col gap-1">
+      <div className="text-sm text-muted-foreground flex flex-col gap-2">
         <p>
           Desmarca una casilla para quitarle ese permiso a un rol en todas las organizaciones. El super administrador
-          siempre tiene acceso completo y no aparece aquí.
+          siempre tiene acceso completo y no aparece aquí. Las casillas con — no se pueden activar: la base de datos
+          no permite esa acción a ese rol.
         </p>
-        <p>
-          Las casillas con — no se pueden activar: la base de datos no permite esa acción a ese rol. Quitar un
-          permiso lo bloquea en la aplicación; para un bloqueo también a nivel de base de datos hace falta un
-          cambio de esquema.
+        <p className="border border-hazard/40 bg-hazard/10 px-3 py-2 text-foreground">
+          <strong>Importante:</strong> quitar un permiso lo bloquea en la aplicación (botones, pantallas y
+          acciones), pero no es una restricción de la base de datos. Alguien con conocimientos técnicos que use la
+          API de Supabase directamente con su propia sesión aún podría hacer esa acción. Úsalo para ordenar
+          responsabilidades, no como barrera de seguridad contra un usuario malintencionado.
         </p>
       </div>
 

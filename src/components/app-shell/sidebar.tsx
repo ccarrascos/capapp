@@ -23,7 +23,7 @@ export function Sidebar({
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border">
         <span className="flex size-8 items-center justify-center rounded-sm overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-          <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
+          <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" loading="lazy" />
         </span>
         <div className="leading-tight">
           <p className="font-heading text-lg tracking-wide uppercase">Capapp</p>

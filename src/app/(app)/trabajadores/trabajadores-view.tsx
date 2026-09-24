@@ -13,6 +13,7 @@ import {
   Check,
   QrCode,
   Printer,
+  Link2,
   FileSpreadsheet,
   ArrowRight,
   Upload,
@@ -410,8 +411,8 @@ export function TrabajadoresView({
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <Tabs value={estado} onValueChange={(v) => setEstado(v as EstadoVigencia | "todos")}>
-          <TabsList>
+        <Tabs value={estado} onValueChange={(v) => setEstado(v as EstadoVigencia | "todos")} className="min-w-0">
+          <TabsList className="h-auto flex-wrap justify-start group-data-horizontal/tabs:h-auto">
             {ESTADOS.map((e) => (
               <TabsTrigger key={e.value} value={e.value} className="gap-1.5">
                 {e.value !== "todos" && <SignDot estado={e.value} />}
@@ -1108,7 +1109,7 @@ function NuevoTrabajadorDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Cargo</Label>
+              <Label>Cargo (opcional)</Label>
               <Select
                 items={Object.fromEntries(cargosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.cargoId}
@@ -1154,7 +1155,7 @@ function NuevoTrabajadorDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Centro de trabajo</Label>
+              <Label>Centro de trabajo (opcional)</Label>
               <Select
                 items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.centroTrabajoId}
@@ -1171,10 +1172,16 @@ function NuevoTrabajadorDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {centrosDeLaOrg.length === 0 && (
+              {centrosDeLaOrg.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No hay centros registrados para esta organización — agrégalos en el módulo Centros de trabajo.
                 </p>
+              ) : (
+                !form.centroTrabajoId && (
+                  <p className="text-xs text-muted-foreground">
+                    Sin centro, ningún supervisor de centro lo verá en su matriz.
+                  </p>
+                )
               )}
             </div>
             <div className="flex flex-col gap-1.5">
@@ -1439,7 +1446,7 @@ function EditarTrabajadorDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Cargo</Label>
+              <Label>Cargo (opcional)</Label>
               <Select
                 items={Object.fromEntries(cargosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.cargoId}
@@ -1481,7 +1488,7 @@ function EditarTrabajadorDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Centro de trabajo</Label>
+              <Label>Centro de trabajo (opcional)</Label>
               <Select
                 items={Object.fromEntries(centrosDeLaOrg.map((c) => [c.id, c.nombre]))}
                 value={form.centroTrabajoId}
@@ -2199,6 +2206,20 @@ function CredencialQrDialog({
               <p className="font-mono text-xs text-muted-foreground">{runDv}</p>
             </div>
             <DialogFooter className="no-print">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(credencial.url);
+                    toast.success("Enlace de la credencial copiado.");
+                  } catch {
+                    toast.error("No se pudo copiar el enlace.");
+                  }
+                }}
+              >
+                <Link2 className="size-4" />
+                Copiar enlace
+              </Button>
               <Button variant="outline" onClick={() => window.print()}>
                 <Printer className="size-4" />
                 Imprimir etiqueta

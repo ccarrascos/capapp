@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OPCIONES_TAMANO_PAGINA, type TamanoPagina } from "@/lib/use-paginacion";
 
+function pluralizar(palabra: string): string {
+  if (/ión$/.test(palabra)) return palabra.replace(/ión$/, "iones");
+  if (/z$/.test(palabra)) return palabra.replace(/z$/, "ces");
+  if (/[aeiouáéíóú]$/i.test(palabra)) return `${palabra}s`;
+  return `${palabra}es`;
+}
+
 export function Paginacion({
   pagina,
   totalPaginas,
@@ -80,8 +87,7 @@ export function Paginacion({
           </div>
         )}
         <p className="text-sm text-muted-foreground whitespace-nowrap">
-          {totalItems} {etiqueta}
-          {totalItems === 1 ? "" : "s"}
+          {totalItems} {totalItems === 1 ? etiqueta : pluralizar(etiqueta)}
         </p>
       </div>
     </div>

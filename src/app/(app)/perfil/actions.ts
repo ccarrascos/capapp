@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { obtenerConfiguracion } from "@/lib/configuracion";
 
 const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
@@ -88,21 +89,43 @@ export async function exportarMisDatos() {
     supabase
       .from("personas")
       .select(
-        "run, dv, nombres, apellido_paterno, apellido_materno, email, telefono, fecha_nacimiento, created_at",
+        "run, dv, nombres, apellido_paterno, apellido_materno, email, telefono, fecha_nacimiento, sexo, created_at",
       )
       .eq("usuario_id", user.id)
       .maybeSingle(),
   ]);
 
+  // Derecho de acceso (Ley 21.719): todo lo que la plataforma guarda de la
+  // persona. Se usa el cliente admin, acotado a su propio RUN, porque RLS no
+  // le deja leer a un trabajador sus vínculos o su historial de centros.
+  let vinculos: unknown = null;
   let capacitacion: unknown = null;
+  let historialCentros: unknown = null;
   if (persona) {
-    const { data } = await supabase
-      .from("inscripciones")
-      .select(
-        "fecha_inscripcion, estado, fecha_aprobacion, vigencia_hasta, manual_entregado, ediciones_curso(cursos(nombre)), certificados(numero_certificado, fecha_emision, fecha_vigencia_hasta)",
-      )
-      .eq("persona_run", persona.run);
-    capacitacion = data;
+    const admin = createAdminClient();
+    const [{ data: v }, { data: c }, { data: h }] = await Promise.all([
+      admin
+        .from("vinculos_laborales")
+        .select(
+          "fecha_ingreso, activo, modalidad_contractual, unidad, tipo_vinculo, organizaciones(razon_social), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre)",
+        )
+        .eq("persona_run", persona.run),
+      admin
+        .from("inscripciones")
+        .select(
+          "fecha_inscripcion, estado, fecha_aprobacion, vigencia_hasta, manual_entregado, ediciones_curso(fecha_inicio, fecha_limite, cursos(nombre)), asistencias_modulo(fecha, presente, tiempo_permanencia_min, modulos(nombre)), evaluaciones_resultado(fecha, puntaje, aprobado, intento_numero), certificados(numero_certificado, fecha_emision, fecha_vigencia_hasta)",
+        )
+        .eq("persona_run", persona.run),
+      admin
+        .from("historial_centro_trabajo")
+        .select(
+          "cambiado_en, centro_anterior:centros_trabajo!historial_centro_trabajo_centro_anterior_id_fkey(nombre), centro_nuevo:centros_trabajo!historial_centro_trabajo_centro_nuevo_id_fkey(nombre)",
+        )
+        .eq("persona_run", persona.run),
+    ]);
+    vinculos = v;
+    capacitacion = c;
+    historialCentros = h;
   }
 
   return {
@@ -111,8 +134,10 @@ export async function exportarMisDatos() {
       exportado_en: new Date().toISOString(),
       cuenta: usuario,
       roles,
-      identidad_laboral: persona,
+      identidad: persona,
+      vinculos_laborales: vinculos,
       capacitacion,
+      historial_centros: historialCentros,
     },
   };
 }

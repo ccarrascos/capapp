@@ -25,7 +25,7 @@ export function CuentaSuspendida() {
         <div className="flex items-center justify-center gap-3 mb-8">
           <span className="flex size-9 items-center justify-center rounded-sm overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" />
+            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" loading="lazy" />
           </span>
           <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
         </div>

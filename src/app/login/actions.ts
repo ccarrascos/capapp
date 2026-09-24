@@ -36,14 +36,34 @@ async function estaBloqueado(admin: SupabaseClient<Database>, run: string, dv: s
 
 async function registrarIntentoFallido(admin: SupabaseClient<Database>, run: string, dv: string) {
   const { login_max_intentos, login_bloqueo_minutos } = await obtenerConfiguracion();
-  const { data: actual } = await admin.from("intentos_login").select("intentos").eq("run", run).eq("dv", dv).maybeSingle();
-  const intentos = (actual?.intentos ?? 0) + 1;
+  const ventanaMs = login_bloqueo_minutos * 60 * 1000;
+  const ahora = Date.now();
+
+  // Retención mínima (Ley 21.719): los RUT de intentos fallidos sólo se
+  // guardan mientras sirven para el bloqueo.
+  await admin
+    .from("intentos_login")
+    .delete()
+    .lt("ultimo_intento", new Date(ahora - 24 * 60 * 60 * 1000).toISOString());
+
+  const { data: actual } = await admin
+    .from("intentos_login")
+    .select("intentos, ultimo_intento, bloqueado_hasta")
+    .eq("run", run)
+    .eq("dv", dv)
+    .maybeSingle();
+  // Fallos viejos o un bloqueo ya cumplido no deben seguir sumando.
+  const vigente =
+    actual &&
+    new Date(actual.ultimo_intento).getTime() > ahora - ventanaMs &&
+    !(actual.bloqueado_hasta && new Date(actual.bloqueado_hasta).getTime() <= ahora);
+  const intentos = (vigente ? actual.intentos : 0) + 1;
   const bloqueadoHasta =
-    intentos >= login_max_intentos ? new Date(Date.now() + login_bloqueo_minutos * 60 * 1000).toISOString() : null;
+    intentos >= login_max_intentos ? new Date(ahora + ventanaMs).toISOString() : null;
 
   await admin
     .from("intentos_login")
-    .upsert({ run, dv, intentos, ultimo_intento: new Date().toISOString(), bloqueado_hasta: bloqueadoHasta });
+    .upsert({ run, dv, intentos, ultimo_intento: new Date(ahora).toISOString(), bloqueado_hasta: bloqueadoHasta });
 }
 
 async function limpiarIntentos(admin: SupabaseClient<Database>, run: string, dv: string) {
