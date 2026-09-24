@@ -85,18 +85,20 @@ function plantillaBienvenida(params: {
         <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #4b545a; margin: 0 0 4px;">Contraseña temporal</p>
         <p style="font-family: monospace; font-size: 16px; font-weight: 700; margin: 0;">${escaparHtml(params.password)}</p>
       </div>
-      <a href="${APP_URL}/login" style="display: inline-block; background: #004e90; color: #f6f9fc; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 18px;">
-        Iniciar sesión
-      </a>
+      <p style="font-size: 13px; color: #4b545a; margin: 0 0 20px; line-height: 1.6;">
+        Ingresa a Capapp como sueles hacerlo — no hace falta hacer clic en ningún enlace de este
+        correo. Usa tu RUT y la contraseña temporal de arriba.
+      </p>
       <div style="border: 1px solid #e3a0a6; background: #fbeaec; padding: 12px 14px; margin-top: 20px;">
         <p style="font-size: 12px; color: #b71824; margin: 0; line-height: 1.5;">
           Esta contraseña es válida hasta el <strong>${expiraTexto}</strong> (72 horas desde el envío).
-          Si no alcanzas a ingresar antes, ve a la página de inicio de sesión y usa la opción
+          Si no alcanzas a ingresar antes, entra a Capapp y usa la opción
           «¿Olvidaste tu contraseña?» para solicitar una nueva.
         </p>
       </div>
       <p style="font-size: 12px; color: #4b545a; margin-top: 20px; line-height: 1.5;">
         Por seguridad, cambia esta contraseña apenas ingreses (Mi perfil → Cambiar contraseña).
+        Este correo nunca incluye enlaces para iniciar sesión — si ves uno, no lo abras.
         Si no esperabas este correo, contacta a quien administra tu organización en Capapp.
       </p>
     </div>
