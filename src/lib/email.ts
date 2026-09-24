@@ -61,23 +61,20 @@ function plantillaBienvenida(params: {
   <div style="max-width: 480px; margin: 0 auto; color: #0e151a;">
     ${bannerPrueba}
     <div style="background:#e5b400; height: 4px; line-height:4px; font-size:0;">&nbsp;</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #050c12;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #fafcfb; border: 1px solid #bcc7c7; border-bottom: none;">
       <tr>
-        <td style="padding: 20px 24px;">
-          <table role="presentation" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="padding-right: 10px;">
-                <img src="${APP_URL}/logo-icon.png" width="28" height="28" alt="" style="display:block; width:28px; height:28px;" />
-              </td>
-              <td style="color: #e5e9e6; font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;">
-                Capapp
-              </td>
-            </tr>
-          </table>
+        <td align="center" style="padding: 24px 24px 20px;">
+          <img
+            src="${APP_URL}/logo-full.png"
+            width="140"
+            height="159"
+            alt="Capapp"
+            style="display:block; width:140px; height:159px;"
+          />
         </td>
       </tr>
     </table>
-    <div style="background:#fafcfb; padding: 28px 24px; border: 1px solid #bcc7c7; border-top: none;">
+    <div style="background:#fafcfb; padding: 4px 24px 28px; border: 1px solid #bcc7c7; border-top: none;">
       <p style="font-size: 15px; margin: 0 0 16px;">Hola ${escaparHtml(params.nombres)},</p>
       <p style="font-size: 14px; line-height: 1.6; color: #4b545a; margin: 0 0 20px;">
         ${introTexto}
