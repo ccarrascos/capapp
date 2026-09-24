@@ -239,18 +239,28 @@ export async function actualizarTrabajador(input: {
 
   if (personaActual?.usuario_id && nuevoEmail && nuevoEmail !== personaActual.email) {
     const admin = createAdminClient();
+
+    // Supabase Auth responde "Error updating user" genérico (sin código
+    // distintivo) tanto para un correo duplicado como para casi cualquier
+    // otra falla — no es confiable para detectar el caso. Se revisa el
+    // conflicto de antemano en vez de interpretar su mensaje de error.
+    const { data: otroUsuarioConEseCorreo } = await admin
+      .from("usuarios")
+      .select("id")
+      .eq("email", nuevoEmail)
+      .neq("id", personaActual.usuario_id)
+      .maybeSingle();
+
+    if (otroUsuarioConEseCorreo) {
+      return { ok: false as const, mensaje: "Ese correo ya está en uso por otra cuenta de acceso en Capapp." };
+    }
+
     const { error: errorAuthEmail } = await admin.auth.admin.updateUserById(personaActual.usuario_id, {
       email: nuevoEmail,
       email_confirm: true,
     });
     if (errorAuthEmail) {
-      const yaExiste = errorAuthEmail.code === "email_exists" || /already.*registered/i.test(errorAuthEmail.message);
-      return {
-        ok: false as const,
-        mensaje: yaExiste
-          ? "Ese correo ya está en uso por otra cuenta de acceso en Capapp."
-          : `No se pudo actualizar el correo de acceso: ${errorAuthEmail.message}`,
-      };
+      return { ok: false as const, mensaje: `No se pudo actualizar el correo de acceso: ${errorAuthEmail.message}` };
     }
     const { error: errorUsuarioEmail } = await admin
       .from("usuarios")
