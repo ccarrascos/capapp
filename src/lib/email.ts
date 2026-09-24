@@ -5,6 +5,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM_EMAIL ?? "Capapp <onboarding@resend.dev>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+// Mientras no haya un dominio verificado en Resend, el remitente sandbox
+// sólo puede entregar al correo de la propia cuenta de Resend. Con esta
+// variable seteada, todo correo real se redirige ahí igual — pensado
+// puramente para probar el flujo completo con destinatarios "reales"
+// mientras se verifica un dominio. Quitar la variable apaga la redirección.
+const REDIRIGIR_A_PRUEBA = process.env.EMAIL_REDIRIGIR_A_PRUEBA || null;
+
 function escaparHtml(valor: string) {
   return valor
     .replaceAll("&", "&amp;")
@@ -32,8 +39,14 @@ function plantillaBienvenida(params: {
   rut: string;
   expiraEn: Date;
   motivo: "cuenta_nueva" | "nuevo_acceso";
+  destinatarioReal?: string;
 }) {
   const expiraTexto = escaparHtml(formatearFechaHora(params.expiraEn));
+  const bannerPrueba = params.destinatarioReal
+    ? `<div style="background:#004e90; color:#f6f9fc; padding: 8px 24px; font-size: 12px; text-align: center;">
+        Modo de prueba: este correo era en realidad para <strong>${escaparHtml(params.destinatarioReal)}</strong>.
+      </div>`
+    : "";
   const introTexto =
     params.motivo === "cuenta_nueva"
       ? `Se creó tu cuenta en <strong>Capapp</strong>, el sistema de gestión de capacitación en
@@ -46,6 +59,7 @@ function plantillaBienvenida(params: {
   return `
 <div style="background:#f0f5f2; padding: 32px 16px; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;">
   <div style="max-width: 480px; margin: 0 auto; color: #0e151a;">
+    ${bannerPrueba}
     <div style="background:#e5b400; height: 4px; line-height:4px; font-size:0;">&nbsp;</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #050c12;">
       <tr>
@@ -103,13 +117,17 @@ export async function enviarCorreoBienvenida(params: {
   motivo?: "cuenta_nueva" | "nuevo_acceso";
 }) {
   const motivo = params.motivo ?? "cuenta_nueva";
-  const subject = motivo === "cuenta_nueva" ? "Tu cuenta en Capapp" : "Nuevo acceso temporal a tu cuenta en Capapp";
+  const destinoReal = REDIRIGIR_A_PRUEBA && params.email !== REDIRIGIR_A_PRUEBA ? params.email : undefined;
+  const destino = REDIRIGIR_A_PRUEBA ?? params.email;
+
+  const subjectBase = motivo === "cuenta_nueva" ? "Tu cuenta en Capapp" : "Nuevo acceso temporal a tu cuenta en Capapp";
+  const subject = destinoReal ? `[PRUEBA → ${destinoReal}] ${subjectBase}` : subjectBase;
 
   const { error } = await resend.emails.send({
     from: FROM,
-    to: params.email,
+    to: destino,
     subject,
-    html: plantillaBienvenida({ ...params, motivo }),
+    html: plantillaBienvenida({ ...params, motivo, destinatarioReal: destinoReal }),
   });
 
   if (error) {
