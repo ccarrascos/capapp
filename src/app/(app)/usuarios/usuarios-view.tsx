@@ -632,6 +632,15 @@ function GestionarRolesDialog({
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId);
 
+  // supervisor_centro puede repetirse con distinto centro; el resto, una vez por organización.
+  const yaAsignado = (r: RolNombre) =>
+    r !== "supervisor_centro" &&
+    cuenta.asignaciones.some(
+      (a) => a.roles?.nombre === r && a.organizacion_id === (r === "super_admin" ? null : organizacionId),
+    );
+  const rolesParaAgregar = rolesDisponibles.filter((r) => !yaAsignado(r));
+  const rolEfectivo = rolesParaAgregar.includes(rol) ? rol : rolesParaAgregar[0];
+
   const puedeGestionar = (a: Asignacion) =>
     a.roles?.nombre !== "trabajador" &&
     (!esPropia || a.roles?.nombre === "facilitador") &&
@@ -650,6 +659,8 @@ function GestionarRolesDialog({
 
   function agregar(e: React.FormEvent) {
     e.preventDefault();
+    if (!rolEfectivo) return;
+    const rol = rolEfectivo;
     startTransition(async () => {
       const resultado = await agregarRolUsuario({
         usuarioId: cuenta.usuario.id,
@@ -664,6 +675,7 @@ function GestionarRolesDialog({
       toast.success(`Se agregó el rol ${ROL_LABEL[rol]}.`);
       if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
       setCentroTrabajoId("");
+      setOpen(false);
     });
   }
 
@@ -712,79 +724,85 @@ function GestionarRolesDialog({
           )}
         </div>
 
-        <form onSubmit={agregar} className="flex flex-col gap-3 border-t border-border pt-4">
-          <Label>Agregar rol</Label>
-          {rol !== "super_admin" && organizaciones.length > 1 && (
-            <Select
-              items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
-              value={organizacionId}
-              onValueChange={(v) => {
-                setOrganizacionId(v ?? "");
-                setCentroTrabajoId("");
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Organización" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizaciones.map((o) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Select
-            items={Object.fromEntries(rolesDisponibles.map((r) => [r, ROL_LABEL[r]]))}
-            value={rol}
-            onValueChange={(v) => setRol((v ?? rolesDisponibles[0]) as RolNombre)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {rolesDisponibles.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {ROL_LABEL[r]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {rol === "supervisor_centro" && (
-            <div className="flex flex-col gap-1.5">
+        {rolesParaAgregar.length === 0 ? (
+          <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+            {esPropia ? "Ya tienes el rol de facilitador." : "Esta cuenta ya tiene todos los roles que puedes asignarle."}
+          </p>
+        ) : (
+          <form onSubmit={agregar} className="flex flex-col gap-3 border-t border-border pt-4">
+            <Label>Agregar rol</Label>
+            {rolEfectivo !== "super_admin" && organizaciones.length > 1 && (
               <Select
-                items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
-                value={centroTrabajoId}
-                onValueChange={(v) => setCentroTrabajoId(v ?? "")}
+                items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
+                value={organizacionId}
+                onValueChange={(v) => {
+                  setOrganizacionId(v ?? "");
+                  setCentroTrabajoId("");
+                }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Todos los centros (sin acotar)" />
+                  <SelectValue placeholder="Organización" />
                 </SelectTrigger>
                 <SelectContent>
-                  {centrosDeOrg.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nombre}
+                  {organizaciones.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.razon_social}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            )}
+            <Select
+              items={Object.fromEntries(rolesParaAgregar.map((r) => [r, ROL_LABEL[r]]))}
+              value={rolEfectivo}
+              onValueChange={(v) => setRol((v ?? rolesParaAgregar[0]) as RolNombre)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rolesParaAgregar.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {ROL_LABEL[r]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {rolEfectivo === "supervisor_centro" && (
+              <div className="flex flex-col gap-1.5">
+                <Select
+                  items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
+                  value={centroTrabajoId}
+                  onValueChange={(v) => setCentroTrabajoId(v ?? "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos los centros (sin acotar)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {centrosDeOrg.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Si no eliges un centro, verá el cumplimiento de toda la organización.
+                </p>
+              </div>
+            )}
+            {rolEfectivo === "facilitador" && (
               <p className="text-xs text-muted-foreground">
-                Si no eliges un centro, verá el cumplimiento de toda la organización.
+                Se vincula con su ficha en Facilitadores (mismo RUT) para que vea y gestione sus ediciones.
               </p>
-            </div>
-          )}
-          {rol === "facilitador" && (
-            <p className="text-xs text-muted-foreground">
-              Se vincula con su ficha en Facilitadores (mismo RUT) para que vea y gestione sus ediciones.
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="submit" disabled={pending || (rol !== "super_admin" && !organizacionId)}>
-              {pending ? "Guardando…" : "Agregar rol"}
-            </Button>
-          </DialogFooter>
-        </form>
+            )}
+            <DialogFooter>
+              <Button type="submit" disabled={pending || (rolEfectivo !== "super_admin" && !organizacionId)}>
+                {pending ? "Guardando…" : "Agregar rol"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
