@@ -81,9 +81,9 @@ function plantillaBienvenida(params: {
       </p>
       <div style="border: 1px solid #bcc7c7; padding: 16px; margin-bottom: 20px;">
         <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #4b545a; margin: 0 0 4px;">RUT de acceso</p>
-        <p style="font-family: monospace; font-size: 14px; margin: 0 0 14px;">${escaparHtml(params.rut)}</p>
+        <p style="font-family: monospace; font-size: 13px; font-weight: 400; margin: 0 0 14px;">${escaparHtml(params.rut)}</p>
         <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #4b545a; margin: 0 0 4px;">Contraseña temporal</p>
-        <p style="font-family: monospace; font-size: 16px; font-weight: 700; margin: 0;">${escaparHtml(params.password)}</p>
+        <p style="font-family: monospace; font-size: 13px; font-weight: 400; margin: 0;">${escaparHtml(params.password)}</p>
       </div>
       <p style="font-size: 13px; color: #4b545a; margin: 0 0 20px; line-height: 1.6;">
         Ingresa a Capapp como sueles hacerlo — no hace falta hacer clic en ningún enlace de este
