@@ -64,9 +64,10 @@ import {
   type CursoYaCubierto,
 } from "./actions";
 import { inscribirTrabajadores } from "../ediciones/actions";
-import { formatearRunInput, esRutValido, calcularDV, formatearRut } from "@/lib/rut";
+import { formatearRunInput, esRutValido } from "@/lib/rut";
 import { crearUsuario } from "../usuarios/actions";
 import { CrearCuentaDialog } from "@/components/cuentas/crear-cuenta-dialog";
+import { CamposIdentidad, dvDe } from "@/components/cuentas/campos-identidad";
 import type { RolNombre } from "@/lib/auth";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
@@ -502,9 +503,12 @@ export function TrabajadoresView({
                       rolesDisponibles={rolesCuenta}
                       identidadFija
                       inicial={{
-                        rut: f.run && f.dv ? formatearRut(f.run, f.dv) : "",
-                        nombres: f.nombres ?? "",
-                        apellidos: `${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.trim(),
+                        identidad: {
+                          run: formatearRunInput(f.run ?? ""),
+                          nombres: f.nombres ?? "",
+                          apellidoPaterno: f.apellido_paterno ?? "",
+                          apellidoMaterno: f.apellido_materno ?? "",
+                        },
                         email: f.personaEmail ?? "",
                         organizacionId: f.organizacion_id,
                         roles: ["trabajador"],
@@ -1100,42 +1104,27 @@ function NuevoTrabajadorDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="run">RUN</Label>
-              <Input
-                id="run"
-                required
-                value={form.run}
-                onChange={(e) => {
-                  const run = formatearRunInput(e.target.value);
-                  const cuerpo = run.replace(/\./g, "");
-                  setForm((f) => ({ ...f, run, dv: cuerpo ? calcularDV(cuerpo) : "" }));
-                }}
-                placeholder="12.345.678"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dv">DV</Label>
-              <Input id="dv" disabled value={form.dv} placeholder="-" className="font-mono text-center" />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="nombres">Nombres</Label>
-            <Input id="nombres" required value={form.nombres} onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="apellidoPaterno">Apellido paterno</Label>
-              <Input id="apellidoPaterno" required value={form.apellidoPaterno} onChange={(e) => setForm((f) => ({ ...f, apellidoPaterno: e.target.value }))} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="apellidoMaterno">Apellido materno</Label>
-              <Input id="apellidoMaterno" value={form.apellidoMaterno} onChange={(e) => setForm((f) => ({ ...f, apellidoMaterno: e.target.value }))} />
-            </div>
-          </div>
+          <CamposIdentidad
+            valor={{
+              run: form.run,
+              nombres: form.nombres,
+              apellidoPaterno: form.apellidoPaterno,
+              apellidoMaterno: form.apellidoMaterno,
+            }}
+            onChange={(identidad) => setForm((f) => ({ ...f, ...identidad, dv: dvDe(identidad.run) }))}
+            onEncontrada={(encontrada) => {
+              if (!encontrada) return;
+              if (encontrada.enMatrizDe.includes(form.organizacionId)) {
+                toast.warning("Esta persona ya está en la matriz de esta organización.");
+              }
+              setForm((f) => ({
+                ...f,
+                email: f.email || encontrada.email || "",
+                fechaNacimiento: f.fechaNacimiento || encontrada.fechaNacimiento || "",
+                sexo: f.sexo || encontrada.sexo || "",
+              }));
+            }}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">

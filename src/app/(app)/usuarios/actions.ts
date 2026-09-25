@@ -177,6 +177,8 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     };
   }
 
+  if (!email) return { ok: false as const, mensaje: "Ingresa un correo para enviar las credenciales." };
+
   const passwordTemporal = generarPasswordTemporal();
   const expiraEn = await calcularExpiracionPasswordTemporal();
 

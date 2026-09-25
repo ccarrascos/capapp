@@ -23,7 +23,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { crearFacilitador, actualizarFacilitador, actualizarEstadoFacilitador, buscarPersonaPorRun } from "./actions";
-import { formatearRunInput, esRutValido } from "@/lib/rut";
+import {
+  CamposIdentidad,
+  IDENTIDAD_VACIA,
+  apellidosJuntos,
+  cuerpoRun,
+  dvDe,
+  type Identidad,
+} from "@/components/cuentas/campos-identidad";
+import { esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 
 type TipoProveedor = Database["public"]["Enums"]["tipo_proveedor"];
@@ -137,49 +145,20 @@ export function FacilitadoresView({
 function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: string; razon_social: string }[] }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [datosBloqueados, setDatosBloqueados] = useState(false);
+  const [identidad, setIdentidad] = useState<Identidad>(IDENTIDAD_VACIA);
   const [form, setForm] = useState({
     organizacionId: organizaciones[0]?.id ?? "",
-    run: "",
-    dv: "",
-    nombres: "",
-    apellidos: "",
     tituloProfesional: "",
     esExpertoPrevencion: false,
     tipoProveedor: "interno" as TipoProveedor,
     entidadNombre: "",
   });
 
-  async function onRunBlur() {
-    if (form.tipoProveedor !== "interno") return;
-
-    const run = form.run.replace(/\./g, "").trim();
-    if (!/^\d{6,9}$/.test(run)) return;
-
-    const persona = await buscarPersonaPorRun(run);
-    if (persona) {
-      setForm((f) => ({
-        ...f,
-        nombres: persona.nombres,
-        apellidos: persona.apellidos,
-        tituloProfesional: persona.tituloProfesional ?? f.tituloProfesional,
-        esExpertoPrevencion: persona.esExpertoPrevencion ?? f.esExpertoPrevencion,
-      }));
-      setDatosBloqueados(true);
-      toast.success("Datos completados desde el registro existente (puede ser de otra organización). Ya no se pueden editar, para evitar que un mismo RUT quede con nombres distintos.");
-    }
-  }
-
-  function onRunChange(value: string) {
-    setDatosBloqueados(false);
-    setForm((f) => ({ ...f, run: formatearRunInput(value) }));
-  }
-
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const run = form.run.replace(/\./g, "").trim();
-    const dv = form.dv.trim().toUpperCase();
+    const run = cuerpoRun(identidad.run);
+    const dv = dvDe(identidad.run);
     if (!esRutValido(run, dv)) {
       toast.error("El RUT ingresado no es válido.");
       return;
@@ -195,8 +174,8 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
         organizacionId: form.organizacionId,
         run,
         dv,
-        nombres: form.nombres.trim(),
-        apellidos: form.apellidos.trim(),
+        nombres: identidad.nombres.trim(),
+        apellidos: apellidosJuntos(identidad),
         tituloProfesional: form.tituloProfesional.trim() || null,
         esExpertoPrevencion: form.esExpertoPrevencion,
         tipoProveedor: form.tipoProveedor,
@@ -208,13 +187,9 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
       }
       toast.success("Facilitador agregado.");
       setOpen(false);
-      setDatosBloqueados(false);
+      setIdentidad(IDENTIDAD_VACIA);
       setForm((f) => ({
         ...f,
-        run: "",
-        dv: "",
-        nombres: "",
-        apellidos: "",
         tituloProfesional: "",
         esExpertoPrevencion: false,
         tipoProveedor: "interno",
@@ -288,49 +263,20 @@ function NuevoFacilitadorDialog({ organizaciones }: { organizaciones: { id: stri
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="run">RUN</Label>
-              <Input
-                id="run"
-                required
-                value={form.run}
-                onChange={(e) => onRunChange(e.target.value)}
-                onBlur={onRunBlur}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dv">DV</Label>
-              <Input id="dv" required maxLength={1} value={form.dv} onChange={(e) => setForm((f) => ({ ...f, dv: e.target.value }))} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="nombres">Nombres</Label>
-              <Input
-                id="nombres"
-                required
-                disabled={datosBloqueados}
-                value={form.nombres}
-                onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="apellidos">Apellidos</Label>
-              <Input
-                id="apellidos"
-                required
-                disabled={datosBloqueados}
-                value={form.apellidos}
-                onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))}
-              />
-            </div>
-          </div>
-          {datosBloqueados && (
-            <p className="text-xs text-muted-foreground -mt-2">
-              Nombres y apellidos vienen del registro existente para este RUT y no se pueden editar aquí.
-            </p>
-          )}
+          <CamposIdentidad
+            valor={identidad}
+            onChange={setIdentidad}
+            buscar={form.tipoProveedor === "interno"}
+            onEncontrada={(encontrada) => {
+              if (!encontrada?.facilitador) return;
+              const { tituloProfesional, esExpertoPrevencion } = encontrada.facilitador;
+              setForm((f) => ({
+                ...f,
+                tituloProfesional: f.tituloProfesional || tituloProfesional || "",
+                esExpertoPrevencion: f.esExpertoPrevencion || esExpertoPrevencion,
+              }));
+            }}
+          />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="titulo">Título profesional</Label>
             <Input id="titulo" value={form.tituloProfesional} onChange={(e) => setForm((f) => ({ ...f, tituloProfesional: e.target.value }))} />

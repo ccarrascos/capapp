@@ -19,15 +19,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { crearUsuario } from "@/app/(app)/usuarios/actions";
 import type { RolNombre } from "@/lib/auth";
 import { ROL_LABEL } from "@/lib/roles";
-import { parsearRut, esRutValido, formatearRut, formatearRutInput } from "@/lib/rut";
+import { esRutValido, formatearRut } from "@/lib/rut";
+import {
+  CamposIdentidad,
+  IDENTIDAD_VACIA,
+  apellidosJuntos,
+  cuerpoRun,
+  dvDe,
+  type Identidad,
+} from "@/components/cuentas/campos-identidad";
 
 export type Centro = { id: string; nombre: string; organizacion_id: string };
 
 
 export type DatosInicialesCuenta = {
-  rut?: string;
-  nombres?: string;
-  apellidos?: string;
+  identidad?: Identidad;
   email?: string;
   organizacionId?: string;
   roles?: RolNombre[];
@@ -62,11 +68,10 @@ export function CrearCuentaDialog({
     { email: string; rut: string; emailEnviado: boolean; password?: string; expiraEn?: Date } | null
   >(null);
   const [copiado, setCopiado] = useState(false);
+  const [cuentaExistente, setCuentaExistente] = useState(false);
   const formularioInicial = () => ({
-    nombres: inicial?.nombres ?? "",
-    apellidos: inicial?.apellidos ?? "",
+    identidad: inicial?.identidad ?? IDENTIDAD_VACIA,
     email: inicial?.email ?? "",
-    rut: inicial?.rut ?? "",
     roles: (inicial?.roles ?? []).filter((r) => rolesDisponibles.includes(r)),
     organizacionId: inicial?.organizacionId ?? organizaciones[0]?.id ?? "",
     centrosTrabajoIds: [] as string[],
@@ -78,21 +83,19 @@ export function CrearCuentaDialog({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const parsed = parsearRut(form.rut);
-    if (!parsed) {
-      toast.error("Ingresa un RUT válido, por ejemplo 12.345.678-9.");
+    const run = cuerpoRun(form.identidad.run);
+    const dv = dvDe(form.identidad.run);
+    if (!run || !esRutValido(run, dv)) {
+      toast.error("Ingresa un RUN válido.");
       return;
     }
-    if (!esRutValido(parsed.run, parsed.dv)) {
-      toast.error("El dígito verificador del RUT no es correcto.");
-      return;
-    }
+    const parsed = { run, dv };
 
     startTransition(async () => {
       const resultado = await crearUsuario({
-        nombres: form.nombres.trim(),
-        apellidos: form.apellidos.trim(),
-        email: form.email.trim(),
+        nombres: form.identidad.nombres.trim(),
+        apellidos: apellidosJuntos(form.identidad),
+        email: cuentaExistente ? "" : form.email.trim(),
         run: parsed.run,
         dv: parsed.dv,
         roles: form.roles,
@@ -147,6 +150,7 @@ export function CrearCuentaDialog({
       onOpenChange={(v) => {
         if (v) {
           setForm(formularioInicial());
+          setCuentaExistente(false);
           setOpen(true);
         } else {
           cerrarYLimpiar();
@@ -203,37 +207,35 @@ export function CrearCuentaDialog({
             <DialogHeader>
               <DialogTitle>{titulo}</DialogTitle>
               <DialogDescription>
-                Si el RUT ya tiene cuenta, se le suman los roles marcados y sigue entrando con su contraseña actual.
+                Si el RUN ya está registrado (en la matriz, como facilitador o con cuenta), sus datos se completan
+                solos.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="nombres">Nombres</Label>
-                  <Input id="nombres" required readOnly={identidadFija} value={form.nombres} onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="apellidos">Apellidos</Label>
-                  <Input id="apellidos" required readOnly={identidadFija} value={form.apellidos} onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="rut">RUT (acceso)</Label>
+              <CamposIdentidad
+                valor={form.identidad}
+                fija={identidadFija}
+                onChange={(identidad) => setForm((f) => ({ ...f, identidad }))}
+                onEncontrada={(encontrada) => {
+                  setCuentaExistente(!!encontrada?.tieneCuenta);
+                  if (encontrada?.email) setForm((f) => ({ ...f, email: f.email || encontrada.email! }));
+                }}
+              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="email">Correo</Label>
+                {cuentaExistente ? (
+                  <p className="text-xs text-muted-foreground">
+                    Ya tiene cuenta: se le suman los roles marcados y mantiene su correo y contraseña actuales.
+                  </p>
+                ) : (
                   <Input
-                    id="rut"
+                    id="email"
+                    type="email"
                     required
-                    readOnly={identidadFija}
-                    value={form.rut}
-                    onChange={(e) => setForm((f) => ({ ...f, rut: formatearRutInput(e.target.value) }))}
-                    placeholder="12.345.678-9"
-                    className="font-mono"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="email">Correo</Label>
-                  <Input id="email" type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-                </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Roles</Label>
