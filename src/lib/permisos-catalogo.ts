@@ -103,7 +103,7 @@ export const CATALOGO_PERMISOS = {
   "certificados.ver": {
     modulo: "capacitacion",
     etiqueta: "Ver certificados de la organización",
-    roles: ["admin_organizacion", "prevencionista", "auditor"],
+    roles: ["admin_organizacion", "prevencionista", "supervisor_centro", "auditor"],
   },
   "ia.usar": {
     modulo: "herramientas",

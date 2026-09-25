@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSesion } from "@/lib/auth";
-import { tienePermiso } from "@/lib/permisos";
+import { puedeVerCertificado } from "@/lib/permisos";
 import { createClient } from "@/lib/supabase/server";
 import { generarQrDataUrl } from "@/lib/qr";
 import { CertificadoView } from "./certificado-view";
@@ -54,10 +54,11 @@ export default async function CertificadoPage({
   }
 
   const organizacionId = certificado.cursos.organizacion_id;
-  const puedeVer =
-    sesion.esSuperAdmin ||
-    certificado.personas.usuario_id === sesion.usuarioId ||
-    (await tienePermiso(sesion, "certificados.ver", organizacionId));
+  const puedeVer = await puedeVerCertificado(sesion, supabase, {
+    organizacionId,
+    personaRun: certificado.personas.run,
+    duenoUsuarioId: certificado.personas.usuario_id,
+  });
 
   if (!puedeVer) notFound();
 

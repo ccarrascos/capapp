@@ -1,7 +1,7 @@
 "use server";
 
 import { getSesion } from "@/lib/auth";
-import { tienePermiso } from "@/lib/permisos";
+import { puedeVerCertificado } from "@/lib/permisos";
 import { createClient } from "@/lib/supabase/server";
 import { generarQrDataUrl } from "@/lib/qr";
 import type { CertificadoDatos } from "./[certificadoId]/certificado-view";
@@ -33,10 +33,11 @@ export async function obtenerCertificado(certificadoId: string) {
   }
 
   const organizacionId = certificado.cursos.organizacion_id;
-  const puedeVer =
-    sesion.esSuperAdmin ||
-    certificado.personas.usuario_id === sesion.usuarioId ||
-    (await tienePermiso(sesion, "certificados.ver", organizacionId));
+  const puedeVer = await puedeVerCertificado(sesion, supabase, {
+    organizacionId,
+    personaRun: certificado.personas.run,
+    duenoUsuarioId: certificado.personas.usuario_id,
+  });
 
   if (!puedeVer) return { ok: false as const, mensaje: "No tienes permiso para ver este certificado." };
 
