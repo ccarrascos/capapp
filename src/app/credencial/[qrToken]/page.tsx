@@ -55,7 +55,7 @@ export default async function CredencialPage({
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-sm">
         {vinculo?.organizaciones?.logo_url && (
-          <div className="flex items-center justify-center mb-5">
+          <div className="flex items-center justify-center mb-8">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo subido a Storage, no requiere optimización de next/image */}
             <img
               src={vinculo.organizaciones.logo_url}
@@ -65,10 +65,6 @@ export default async function CredencialPage({
           </div>
         )}
 
-        <div className="flex justify-center mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-          <img src="/logo-full.png" alt="CapApp" className="h-14 w-auto" loading="lazy" />
-        </div>
 
         {!vinculo || !persona ? (
           <div className="border border-alert/30 bg-alert/10 p-6 text-center">
@@ -154,6 +150,11 @@ export default async function CredencialPage({
             </div>
           </div>
         )}
+        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span>Powered by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+          <img src="/logo-full.png" alt="CapApp" className="h-9 w-auto" loading="lazy" />
+        </div>
       </div>
     </div>
   );
