@@ -53,7 +53,8 @@ export function CamposIdentidad({
   const [encontrada, setEncontrada] = useState<IdentidadEncontrada | null>(null);
   const [buscando, setBuscando] = useState(false);
   const ultimaBusqueda = useRef("");
-  const nombresBloqueados = fija || (!!encontrada && encontrada.fuente === "persona");
+  const nombresBloqueados = fija || !!encontrada;
+  const estiloBloqueado = nombresBloqueados ? "bg-muted text-muted-foreground cursor-not-allowed" : undefined;
   const dv = dvDe(valor.run);
 
   async function buscarSiCorresponde(run: string) {
@@ -103,7 +104,7 @@ export function CamposIdentidad({
             onChange={(e) => onRunChange(e.target.value)}
             onBlur={() => buscarSiCorresponde(valor.run)}
             placeholder="12.345.678"
-            className="font-mono"
+            className={fija ? "font-mono bg-muted text-muted-foreground cursor-not-allowed" : "font-mono"}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -119,6 +120,7 @@ export function CamposIdentidad({
         <Label htmlFor="identidad-nombres">Nombres</Label>
         <Input
           id="identidad-nombres"
+          className={estiloBloqueado}
           required
           readOnly={nombresBloqueados}
           value={valor.nombres}
@@ -131,6 +133,7 @@ export function CamposIdentidad({
           <Label htmlFor="identidad-paterno">Apellido paterno</Label>
           <Input
             id="identidad-paterno"
+            className={estiloBloqueado}
             required
             readOnly={nombresBloqueados}
             value={valor.apellidoPaterno}
@@ -141,6 +144,7 @@ export function CamposIdentidad({
           <Label htmlFor="identidad-materno">Apellido materno</Label>
           <Input
             id="identidad-materno"
+            className={estiloBloqueado}
             readOnly={nombresBloqueados}
             value={valor.apellidoMaterno}
             onChange={(e) => onChange({ ...valor, apellidoMaterno: e.target.value })}
@@ -157,9 +161,5 @@ function descripcionEncontrada(e: IdentidadEncontrada): string {
   if (e.tieneCuenta) partes.push(e.roles.length > 0 ? `con cuenta (${e.roles.join(", ")})` : "con cuenta de acceso");
   if (e.facilitador) partes.push("como facilitador");
   const donde = partes.length > 0 ? `Ya registrado ${partes.join(", ")}.` : "Ya registrado en otra organización.";
-  const nota =
-    e.fuente === "persona"
-      ? " Nombre tomado de su ficha; no se edita aquí."
-      : " Nombre completado desde su registro; revisa que los apellidos queden bien separados.";
-  return donde + nota;
+  return `${donde} Nombre tomado de su registro; no se edita aquí.`;
 }
