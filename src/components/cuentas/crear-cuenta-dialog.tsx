@@ -234,8 +234,8 @@ export function CrearCuentaDialog({
               />
               {yaEnOrganizacion && (
                 <p role="alert" className="border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-alert">
-                  Este usuario ya tiene una cuenta en esta organización. Para agregar o quitar roles, usa el lápiz
-                  en su fila de Usuarios y roles.
+                  Ya existe una cuenta con este RUN en esta organización. Para modificarla, edítala desde Usuarios y
+                  roles.
                 </p>
               )}
               <fieldset disabled={yaEnOrganizacion} className="flex min-w-0 flex-col gap-4 disabled:opacity-50">

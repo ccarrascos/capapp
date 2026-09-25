@@ -1130,8 +1130,8 @@ function NuevoTrabajadorDialog({
 
           {yaEnMatriz && (
             <p role="alert" className="border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-alert">
-              Este trabajador ya está ingresado en la matriz de esta organización. Para cambiar sus datos, búscalo en
-              la matriz y usa Editar.
+              Ya existe un trabajador con este RUN en esta organización. Para modificarlo, edítalo desde la Matriz de
+              vigencia.
             </p>
           )}
 
