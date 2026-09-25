@@ -900,6 +900,8 @@ function NuevoTrabajadorDialog({
     subcontratoId: "",
   });
   const [darAccesoInmediato, setDarAccesoInmediato] = useState(false);
+  const [matrizDe, setMatrizDe] = useState<string[]>([]);
+  const yaEnMatriz = matrizDe.includes(form.organizacionId);
   const [accesoPendiente, setAccesoPendiente] = useState<{ password: string; expiraEn: Date } | null>(null);
   const [copiado, setCopiado] = useState(false);
 
@@ -1032,6 +1034,7 @@ function NuevoTrabajadorDialog({
       subcontratoId: "",
     }));
     setDarAccesoInmediato(false);
+    setMatrizDe([]);
   }
 
   function cerrarYLimpiar() {
@@ -1113,10 +1116,8 @@ function NuevoTrabajadorDialog({
             }}
             onChange={(identidad) => setForm((f) => ({ ...f, ...identidad, dv: dvDe(identidad.run) }))}
             onEncontrada={(encontrada) => {
+              setMatrizDe(encontrada?.enMatrizDe ?? []);
               if (!encontrada) return;
-              if (encontrada.enMatrizDe.includes(form.organizacionId)) {
-                toast.warning("Esta persona ya está en la matriz de esta organización.");
-              }
               setForm((f) => ({
                 ...f,
                 email: f.email || encontrada.email || "",
@@ -1126,6 +1127,14 @@ function NuevoTrabajadorDialog({
             }}
           />
 
+          {yaEnMatriz && (
+            <p role="alert" className="border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-alert">
+              Este trabajador ya está ingresado en la matriz de esta organización. Para cambiar sus datos, búscalo en
+              la matriz y usa Editar.
+            </p>
+          )}
+
+          <fieldset disabled={yaEnMatriz} className="flex min-w-0 flex-col gap-4 disabled:opacity-50">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label>Cargo (opcional)</Label>
@@ -1315,9 +1324,10 @@ function NuevoTrabajadorDialog({
               </span>
             </span>
           </label>
+          </fieldset>
 
           <DialogFooter>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || yaEnMatriz}>
               {pending ? "Guardando…" : "Agregar trabajador"}
             </Button>
           </DialogFooter>
