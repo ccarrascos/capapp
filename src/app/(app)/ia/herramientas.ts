@@ -214,6 +214,59 @@ async function demografiaTrabajadores(sesion: Sesion) {
 }
 
 /**
+ * Cambios de centro de trabajo. Sólo de trabajadores que el usuario ve hoy
+ * en la matriz (mismo filtro por centro que el resto del asistente), y sólo
+ * los registrados en la organización de ese vínculo.
+ */
+async function historialCambiosCentro(sesion: Sesion, trabajador: string | null, centro: string | null) {
+  const filas = await filasVisibles(sesion);
+  const q = trabajador ? sinAcentos(trabajador.trim()) : "";
+  const runBuscado = q.replace(/[^0-9k]/gi, "");
+  const candidatas = q
+    ? filas.filter(
+        (f) =>
+          sinAcentos(nombreCompleto(f)).includes(q) || (runBuscado.length >= 4 && (f.run ?? "").includes(runBuscado)),
+      )
+    : filas;
+
+  const filaPorVinculo = new Map(candidatas.map((f) => [`${f.persona_run}|${f.organizacion_id}`, f]));
+  const runs = [...new Set(candidatas.map((f) => f.persona_run).filter((r): r is string => !!r))];
+  if (runs.length === 0) return { cantidad: 0, cambios: [], mensaje: "No hay trabajadores visibles que coincidan." };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("historial_centro_trabajo")
+    .select(
+      "persona_run, organizacion_id, cambiado_en, centro_anterior:centros_trabajo!historial_centro_trabajo_centro_anterior_id_fkey(nombre), centro_nuevo:centros_trabajo!historial_centro_trabajo_centro_nuevo_id_fkey(nombre)",
+    )
+    .in("persona_run", runs)
+    .order("cambiado_en", { ascending: false })
+    .limit(200);
+
+  const centroBuscado = centro ? sinAcentos(centro.trim()) : null;
+  const cambios = (data ?? [])
+    .map((h) => ({ h, f: filaPorVinculo.get(`${h.persona_run}|${h.organizacion_id}`) }))
+    .filter(({ f }) => !!f)
+    .map(({ h, f }) => ({
+      nombre: nombreCompleto(f!),
+      run: f!.run && f!.dv ? `${f!.run}-${f!.dv}` : null,
+      fecha: h.cambiado_en.slice(0, 10),
+      desde: h.centro_anterior?.nombre ?? "Sin asignar",
+      hacia: h.centro_nuevo?.nombre ?? "Sin asignar",
+    }))
+    .filter(
+      (c) => !centroBuscado || sinAcentos(c.desde).includes(centroBuscado) || sinAcentos(c.hacia).includes(centroBuscado),
+    )
+    .slice(0, 50);
+
+  return {
+    cantidad: cambios.length,
+    trabajadoresDistintos: new Set(cambios.map((c) => c.run)).size,
+    cambios,
+  };
+}
+
+/**
  * Tablas que el asistente puede consultar libremente más allá del dominio
  * de trabajadores. Se restringe a tablas cuyo RLS ya alcanza por sí solo
  * (organizacion_id = any(app_organizaciones_usuario()), sin excepciones) -
@@ -417,6 +470,24 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
   {
     type: "function",
     function: {
+      name: "historial_cambios_centro",
+      description:
+        "Lista los cambios de centro de trabajo de los trabajadores (fecha, centro de origen y de destino), del más reciente al más antiguo. Úsala para preguntas como qué trabajadores cambiaron de centro, quién llegó o salió de un centro, o el historial de centros de una persona.",
+      parameters: {
+        type: "object",
+        properties: {
+          trabajador: { type: "string", description: "Opcional: nombre (o parte) o RUN de un trabajador específico." },
+          centro: {
+            type: "string",
+            description: "Opcional: nombre (o parte) de un centro, para ver sólo los cambios desde o hacia ese centro.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_tabla",
       description:
         `Consulta directa a otras tablas del sistema, para preguntas fuera del dominio de trabajadores: ${TABLAS_PERMITIDAS.join(", ")}. ` +
@@ -492,6 +563,12 @@ export async function ejecutarHerramienta(
         cargo: argumentos.cargo ? String(argumentos.cargo) : undefined,
         estado: argumentos.estado ? String(argumentos.estado) : undefined,
       });
+    case "historial_cambios_centro":
+      return historialCambiosCentro(
+        sesion,
+        argumentos.trabajador ? String(argumentos.trabajador) : null,
+        argumentos.centro ? String(argumentos.centro) : null,
+      );
     case "consultar_tabla": {
       const filtros = Array.isArray(argumentos.filtros)
         ? (argumentos.filtros as { columna?: unknown; valor?: unknown; contiene?: unknown }[])
