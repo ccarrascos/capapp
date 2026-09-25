@@ -15,7 +15,7 @@ export default async function CredencialPage({
   const { data: vinculo } = await admin
     .from("vinculos_laborales")
     .select(
-      "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv, usuarios(activo)), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
+      "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv, usuarios(activo, avatar_url)), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
     )
     .eq("qr_token", qrToken)
     .maybeSingle();
@@ -94,15 +94,32 @@ export default async function CredencialPage({
               <SignBadge estado={estadoGeneral} />
             </div>
             <div className="p-6 flex flex-col gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Trabajador</p>
-                <p className="font-medium">
-                  {persona.nombres} {persona.apellido_paterno}
-                  {persona.apellido_materno ? ` ${persona.apellido_materno}` : ""}
-                </p>
-                <p className="font-mono text-sm text-muted-foreground">
-                  {persona.run}-{persona.dv}
-                </p>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Trabajador</p>
+                  <p className="font-medium">
+                    {persona.nombres} {persona.apellido_paterno}
+                    {persona.apellido_materno ? ` ${persona.apellido_materno}` : ""}
+                  </p>
+                  <p className="font-mono text-sm text-muted-foreground">
+                    {persona.run}-{persona.dv}
+                  </p>
+                </div>
+                {persona.usuarios?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- foto subida a Storage, no requiere optimización de next/image
+                  <img
+                    src={persona.usuarios.avatar_url}
+                    alt={`Foto de ${persona.nombres}`}
+                    className="size-20 shrink-0 rounded-full border border-border object-cover object-center"
+                  />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="flex size-20 shrink-0 items-center justify-center rounded-full border border-border bg-muted font-heading text-2xl uppercase text-muted-foreground"
+                  >
+                    {`${persona.nombres[0] ?? ""}${persona.apellido_paterno[0] ?? ""}`}
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
                 <div>

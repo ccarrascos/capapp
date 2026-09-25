@@ -75,8 +75,8 @@ export default function PoliticaPrivacidadPage() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Con tu empleador y quienes administran la capacitación dentro de tu organización. Quien escanee el código
             QR de tu credencial o de tu certificado ve tu nombre, RUT y estado de capacitación (y, en la credencial,
-            tu cargo y centro de trabajo), igual que lo permitiría un documento físico, para efectos de
-            fiscalización.
+            tu cargo, centro de trabajo y foto de perfil si subiste una), igual que lo permitiría un documento
+            físico, para efectos de fiscalización.
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Para funcionar, Capapp usa proveedores tecnológicos que procesan datos por su cuenta, con servidores
