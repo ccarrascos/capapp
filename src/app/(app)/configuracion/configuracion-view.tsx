@@ -219,7 +219,7 @@ function CampoOrganizacionFila({
         </Label>
         <p className="text-xs text-muted-foreground mt-1">{campo.ayuda}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Plataforma: {plataforma} {campo.unidad} · Rango {min}–{max}
+          Plataforma: {plataforma} {campo.unidad} · Rango {min}-{max}
           {guardado === null ? " · Usando el valor de la plataforma" : ""}
         </p>
       </div>
@@ -317,7 +317,7 @@ function CampoFila({ campo, actual }: { campo: CampoConfiguracion; actual: Valor
         </Label>
         <p className="text-xs text-muted-foreground mt-1">{campo.ayuda}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Por defecto: {actual.porDefecto} {campo.unidad} · Rango {campo.min}–{campo.max}
+          Por defecto: {actual.porDefecto} {campo.unidad} · Rango {campo.min}-{campo.max}
         </p>
       </div>
       <form
@@ -395,7 +395,7 @@ function Permisos({ revocadosIniciales }: { revocadosIniciales: string[] }) {
       <div className="text-sm text-muted-foreground flex flex-col gap-2">
         <p>
           Desmarca una casilla para quitarle ese permiso a un rol en todas las organizaciones. El super administrador
-          siempre tiene acceso completo y no aparece aquí. Las casillas con — no se pueden activar: la base de datos
+          siempre tiene acceso completo y no aparece aquí. Las casillas con - no se pueden activar: la base de datos
           no permite esa acción a ese rol.
         </p>
         <p className="border border-hazard/40 bg-hazard/10 px-3 py-2 text-foreground">
@@ -442,7 +442,7 @@ function Permisos({ revocadosIniciales }: { revocadosIniciales: string[] }) {
                             className="px-3 py-2.5 text-center text-muted-foreground/50"
                             title="La base de datos no permite esta acción a este rol"
                           >
-                            —
+                            -
                           </td>
                         );
                       }

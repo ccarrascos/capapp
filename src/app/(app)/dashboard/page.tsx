@@ -32,7 +32,7 @@ export default async function DashboardPage() {
 
   if (esRolOrg) return <DashboardOrganizacion nombres={sesion.nombres} sesion={sesion} />;
   if (esFacilitador) return <DashboardFacilitador nombres={sesion.nombres} />;
-  // Quien solo tiene el rol trabajador no tiene un panel propio — "Mi capacitación"
+  // Quien solo tiene el rol trabajador no tiene un panel propio - "Mi capacitación"
   // ya muestra ese mismo resumen más el historial completo, sin duplicar destino.
   redirect("/mi-capacitacion");
 }
@@ -62,7 +62,7 @@ async function DashboardOrganizacion({ nombres, sesion }: { nombres: string; ses
   const cumplimiento = total > 0 ? Math.round((vigentes / total) * 100) : 0;
 
   // Prioriza lo que aún se puede evitar (por vencer, ordenado por lo más próximo)
-  // y solo completa con lo ya vencido si sobra espacio — así el bloque muestra
+  // y solo completa con lo ya vencido si sobra espacio - así el bloque muestra
   // primero lo accionable, no solo lo que ya se pasó.
   const porVencerOrdenados = filas
     .filter((f) => f.estado_vigencia === "por_vencer")
@@ -125,8 +125,8 @@ async function DashboardOrganizacion({ nombres, sesion }: { nombres: string; ses
                   <TableCell className="font-mono text-sm">
                     {f.run}-{f.dv}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{f.cargo ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.cargo ?? "-"}</TableCell>
+                  <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "-"}</TableCell>
                   <TableCell>
                     <SignBadge estado={f.estado_vigencia as EstadoVigencia} size="sm" />
                   </TableCell>

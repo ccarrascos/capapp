@@ -234,15 +234,15 @@ export function EdicionView({
               return (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">
-                    {i.personas ? `${i.personas.nombres} ${i.personas.apellido_paterno}` : "—"}
+                    {i.personas ? `${i.personas.nombres} ${i.personas.apellido_paterno}` : "-"}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {i.personas ? `${i.personas.run}-${i.personas.dv}` : "—"}
+                    {i.personas ? `${i.personas.run}-${i.personas.dv}` : "-"}
                   </TableCell>
                   <TableCell className={estado.className}>{estado.label}</TableCell>
-                  <TableCell className="font-mono text-sm">{i.vigencia_hasta ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-sm">{i.vigencia_hasta ?? "-"}</TableCell>
                   <TableCell className="font-mono text-xs">
-                    {i.certificados?.numero_certificado ?? "—"}
+                    {i.certificados?.numero_certificado ?? "-"}
                   </TableCell>
                   <TableCell>
                     {puedeGestionarAsistencia && !bloqueado && (
@@ -257,7 +257,7 @@ export function EdicionView({
                         size="sm"
                         variant="outline"
                         disabled
-                        title="El plazo de esta edición venció — ya no se puede gestionar."
+                        title="El plazo de esta edición venció - ya no se puede gestionar."
                       >
                         Gestionar
                       </Button>
@@ -388,7 +388,7 @@ function GestionarSheet({
 
   const asistenciaGuardada = new Map(inscripcion.asistencias_modulo.map((a) => [a.modulo_id, a.presente]));
   // Los checkboxes se marcan al instante (sin esperar a que cada llamada al
-  // servidor termine) y sólo se "revierten" si alguna falla — antes había
+  // servidor termine) y sólo se "revierten" si alguna falla - antes había
   // que esperar a que las 7 solicitudes en paralelo y el refresco de la
   // página terminaran para ver cualquier cambio, lo que se sentía lento
   // aunque las llamadas fueran rápidas.

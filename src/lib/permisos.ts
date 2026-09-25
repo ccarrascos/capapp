@@ -24,7 +24,7 @@ export function invalidarCachePermisos() {
 
 /**
  * ¿La sesión puede hacer `accion` en esa organización? super_admin siempre
- * puede — así nadie queda sin forma de revertir una revocación.
+ * puede - así nadie queda sin forma de revertir una revocación.
  */
 export async function tienePermiso(
   sesion: Sesion,

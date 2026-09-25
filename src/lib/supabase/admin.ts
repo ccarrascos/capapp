@@ -3,7 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
 /**
- * Cliente con service_role — solo para Server Actions que necesitan la
+ * Cliente con service_role - solo para Server Actions que necesitan la
  * Admin API de Auth (crear usuarios). Nunca importar desde código de cliente.
  */
 export function createAdminClient() {

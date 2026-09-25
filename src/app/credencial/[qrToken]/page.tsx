@@ -92,7 +92,7 @@ export default async function CredencialPage({
               {persona.apellido_materno ? ` ${persona.apellido_materno}` : ""}
             </p>
             <p className="text-sm text-muted-foreground">
-              Esta credencial ya no está vigente — la cuenta asociada fue desactivada.
+              Esta credencial ya no está vigente - la cuenta asociada fue desactivada.
             </p>
           </div>
         ) : (
@@ -114,17 +114,17 @@ export default async function CredencialPage({
               <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Cargo</p>
-                  <p className="text-sm">{vinculo.cargos?.nombre ?? "—"}</p>
+                  <p className="text-sm">{vinculo.cargos?.nombre ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Centro</p>
-                  <p className="text-sm">{vinculo.centros_trabajo?.nombre ?? "—"}</p>
+                  <p className="text-sm">{vinculo.centros_trabajo?.nombre ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Vínculo</p>
                   <p className="text-sm">
                     {vinculo.tipo_vinculo === "subcontrato"
-                      ? `Subcontrato - ${vinculo.subcontratos?.nombre ?? "—"}`
+                      ? `Subcontrato - ${vinculo.subcontratos?.nombre ?? "-"}`
                       : "Directo"}
                   </p>
                 </div>

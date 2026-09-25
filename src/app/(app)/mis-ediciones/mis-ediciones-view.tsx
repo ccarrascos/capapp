@@ -54,7 +54,7 @@ export function MisEdicionesView({ ediciones }: { ediciones: Edicion[] }) {
               </TableCell>
               <TableCell className="font-mono text-sm">{e.fecha_inicio}</TableCell>
               <TableCell className="font-mono text-sm">{e.fecha_limite}</TableCell>
-              <TableCell className="font-mono text-sm">{e.fecha_termino ?? "—"}</TableCell>
+              <TableCell className="font-mono text-sm">{e.fecha_termino ?? "-"}</TableCell>
               <TableCell className="capitalize">{e.estado.replace(/_/g, " ")}</TableCell>
             </TableRow>
           ))}

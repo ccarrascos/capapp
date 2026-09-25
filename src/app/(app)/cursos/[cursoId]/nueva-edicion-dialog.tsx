@@ -109,7 +109,7 @@ export function NuevaEdicionDialog({
             </Select>
             {facilitadores.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No hay facilitadores registrados — puedes crear la edición sin asignar uno todavía.
+                No hay facilitadores registrados - puedes crear la edición sin asignar uno todavía.
               </p>
             )}
           </div>

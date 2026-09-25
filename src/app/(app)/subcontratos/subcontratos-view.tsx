@@ -94,7 +94,7 @@ export function SubcontratosView({
                   key={sc.centro_trabajo_id}
                   className="text-xs bg-muted px-2 py-0.5 text-muted-foreground"
                 >
-                  {sc.centros_trabajo?.nombre ?? "—"}
+                  {sc.centros_trabajo?.nombre ?? "-"}
                 </span>
               ))}
             </div>
@@ -158,7 +158,7 @@ function NuevoSubcontratoDialog({
           <DialogTitle>Registrar subcontrato</DialogTitle>
           <DialogDescription>
             Se crea asociado a un centro. Si más adelante necesita operar en otro centro, se asigna desde su
-            tarjeta — no vuelvas a crearlo.
+            tarjeta - no vuelvas a crearlo.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -216,7 +216,7 @@ function NuevoSubcontratoDialog({
             </Select>
             {centrosDeLaOrg.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No hay centros registrados para esta organización — agrégalos en Centros de trabajo.
+                No hay centros registrados para esta organización - agrégalos en Centros de trabajo.
               </p>
             )}
           </div>
@@ -336,7 +336,7 @@ function EditarSubcontratoDialog({
             </DropdownMenu>
             {centrosDeLaOrg.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No hay centros registrados para esta organización — agrégalos en Centros de trabajo.
+                No hay centros registrados para esta organización - agrégalos en Centros de trabajo.
               </p>
             )}
           </div>

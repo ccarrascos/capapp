@@ -9,14 +9,14 @@ export const OPCIONES_TAMANO_PAGINA: number[] = [10, 25, 50, 100];
 /**
  * Pagina un arreglo ya filtrado/ordenado. La búsqueda y los filtros deben
  * aplicarse ANTES de pasar `items` aquí, para que operen sobre el conjunto
- * completo — la paginación sólo decide qué porción de ese resultado se
+ * completo - la paginación sólo decide qué porción de ese resultado se
  * muestra.
  */
 export function usePaginacion<T>(items: T[], tamanoInicial: TamanoPagina = 25) {
   const [tamano, setTamanoInterno] = useState<TamanoPagina>(tamanoInicial);
   const [pagina, setPagina] = useState(1);
 
-  // La búsqueda/filtro produce un arreglo nuevo cada vez que cambia — volver
+  // La búsqueda/filtro produce un arreglo nuevo cada vez que cambia - volver
   // a página 1 evita quedar "varado" en una página que ya no tiene datos.
   // Se ajusta durante el render (no en un efecto) siguiendo el patrón de
   // React para derivar estado de un prop que cambió.

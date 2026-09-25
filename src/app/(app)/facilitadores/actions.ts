@@ -54,7 +54,7 @@ export async function buscarPersonaPorRun(run: string) {
 
   // Se usa el cliente admin (sólo lectura de nombre, nada sensible) porque
   // esta búsqueda debe encontrar a la persona sin importar en qué
-  // organización quedó registrada primero — igual que un facilitador o un
+  // organización quedó registrada primero - igual que un facilitador o un
   // trabajador puede repetirse en varias organizaciones. Con el cliente
   // normal, RLS sólo deja ver personas/facilitadores de organizaciones que
   // el actor ya administra, y el mismo RUT podía terminar registrado con

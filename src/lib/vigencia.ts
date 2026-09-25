@@ -2,7 +2,7 @@ import type { EstadoVigencia } from "@/components/status/sign-badge";
 
 /**
  * `ventanaDias` (por defecto 60) es configurable desde /configuracion
- * (super_admin) — el código de servidor debe pasar el valor ya leído de
+ * (super_admin) - el código de servidor debe pasar el valor ya leído de
  * ahí; el default solo aplica donde no se puede leer esa configuración
  * (esta función también se usa desde un componente cliente).
  */
@@ -29,7 +29,7 @@ export function peorEstadoVigencia(estados: EstadoVigencia[]): EstadoVigencia {
 
 /**
  * Cuando un trabajador aprueba el mismo curso más de una vez (renovación),
- * la aprobación más reciente reemplaza a la anterior — sólo esa cuenta
+ * la aprobación más reciente reemplaza a la anterior - sólo esa cuenta
  * para el estado de vigencia y para la lista de cursos.
  */
 export function ultimoAprobadoPorCurso<T extends { cursoId: string; fechaAprobacion: string | null }>(

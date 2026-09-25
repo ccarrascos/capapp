@@ -10,7 +10,7 @@ import { tienePermiso } from "@/lib/permisos";
  * Gestionar una edición (inscribir, tomar asistencia, evaluar, certificar) requiere
  * ser admin/prevencionista de la organización dueña de la edición, o el facilitador
  * a cargo de esa edición puntual. Se verifica en la app además de en RLS porque estas
- * acciones producen el registro de cumplimiento del DS 44 — no basta con confiar en
+ * acciones producen el registro de cumplimiento del DS 44 - no basta con confiar en
  * la política de base de datos como única barrera.
  */
 async function autorizadoParaEdicion(
@@ -43,12 +43,12 @@ async function autorizadoParaEdicion(
 
 /**
  * Igual que autorizadoParaEdicion, pero además exige que el plazo de la
- * edición no haya vencido — se verifica en el servidor y no sólo ocultando
+ * edición no haya vencido - se verifica en el servidor y no sólo ocultando
  * el botón en la interfaz, porque de lo contrario cualquiera podría seguir
  * llamando a la acción directamente después del plazo.
  *
  * Si se pasa inscripcionId, también confirma que esa inscripción realmente
- * pertenece a esta edición — sin eso, alguien autorizado en la Edición A
+ * pertenece a esta edición - sin eso, alguien autorizado en la Edición A
  * (por ejemplo por ser su facilitador) podía pasar el id de una inscripción
  * de la Edición B y modificar asistencia/evaluación/manual de otra parte.
  */
@@ -71,7 +71,7 @@ async function verificarGestion(
   if (!edicion) return { ok: false, mensaje: "No se encontró la edición." };
 
   if (edicion.fecha_limite < new Date().toISOString().slice(0, 10)) {
-    return { ok: false, mensaje: "El plazo de esta edición venció — ya no se puede gestionar." };
+    return { ok: false, mensaje: "El plazo de esta edición venció - ya no se puede gestionar." };
   }
 
   if (inscripcionId) {
@@ -87,7 +87,7 @@ async function verificarGestion(
   return { ok: true, cursoId: edicion.curso_id };
 }
 
-/** Sólo admin/prevencionista deciden quién toma un curso — no el facilitador que lo dicta. */
+/** Sólo admin/prevencionista deciden quién toma un curso - no el facilitador que lo dicta. */
 async function autorizadoParaInscribir(
   sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
   edicionId: string,
@@ -115,7 +115,7 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
     return { ok: false as const, mensaje: "No tienes permiso para inscribir trabajadores en esta edición." };
   }
 
-  // Las personas son identidades globales (portabilidad DS44) — sin este
+  // Las personas son identidades globales (portabilidad DS44) - sin este
   // chequeo, cualquier RUN conocido podía inscribirse en una edición sin
   // tener vínculo laboral alguno con la organización que la dicta.
   const { data: vinculosDeLaOrg } = await supabase
@@ -159,7 +159,7 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
 
   // Quien tiene portal propio se entera de que lo inscribieron en un curso.
   // Se usa el cliente admin porque la notificación queda a nombre del
-  // trabajador, no de quien inscribe — ins_notificaciones sólo permite que
+  // trabajador, no de quien inscribe - ins_notificaciones sólo permite que
   // cada quien inserte las suyas.
   const admin = createAdminClient();
   const { data: personasConAcceso } = await admin
@@ -399,7 +399,7 @@ export async function emitirCertificado(input: {
   }
 
   // persona_run y curso_id se derivan de la inscripción real, nunca del
-  // cliente — de lo contrario se podía emitir un certificado válido para
+  // cliente - de lo contrario se podía emitir un certificado válido para
   // un trabajador o un curso distinto al que efectivamente aprobó.
   const { data: inscripcion } = await supabase
     .from("inscripciones")
@@ -430,7 +430,7 @@ export async function emitirCertificado(input: {
 
   if (error) return { ok: false as const, mensaje: error.message };
 
-  // Le avisamos al trabajador que su certificado ya está disponible —
+  // Le avisamos al trabajador que su certificado ya está disponible -
   // aparte del aviso de aprobación, porque la emisión suele pasar más tarde.
   const admin = createAdminClient();
   const { data: persona } = await admin

@@ -89,7 +89,7 @@ function LoginForm() {
             de riesgos
           </h1>
           <p className="mt-5 text-sm text-sidebar-foreground/70 leading-relaxed">
-            Matriz de vigencia, cursos, evaluaciones y certificación — trazable y verificable
+            Matriz de vigencia, cursos, evaluaciones y certificación - trazable y verificable
             para fiscalización, conforme a la Guía Técnica del Ministerio del Trabajo.
           </p>
         </div>

@@ -40,7 +40,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
-  /* Lenguaje de señalética — estados de vigencia y acentos de marca */
+  /* Lenguaje de señalética - estados de vigencia y acentos de marca */
   --color-hazard: var(--hazard);
   --color-hazard-foreground: var(--hazard-foreground);
   --color-signal: var(--signal);
@@ -168,7 +168,7 @@
 }
 
 @layer utilities {
-  /* Franja de peligro — motivo de acento, uso restringido */
+  /* Franja de peligro - motivo de acento, uso restringido */
   .hazard-stripe {
     background-image: repeating-linear-gradient(
       135deg,
@@ -179,7 +179,7 @@
     );
   }
 
-  /* Misma franja, en movimiento — para estados de carga/búsqueda. */
+  /* Misma franja, en movimiento - para estados de carga/búsqueda. */
   .hazard-stripe-cargando {
     background-image: repeating-linear-gradient(
       135deg,

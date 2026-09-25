@@ -46,7 +46,7 @@ export async function getSesion(): Promise<Sesion | null> {
   if (!usuario) return null;
 
   // Una organización desactivada (ej. por falta de pago) le retira el
-  // acceso a todos sus roles — no sólo visualmente, acá mismo, para que
+  // acceso a todos sus roles - no sólo visualmente, acá mismo, para que
   // toda verificación de rol/organización en cualquier página deje de
   // encontrar ese rol automáticamente, sin tener que tocar cada página.
   const roles: AsignacionRol[] = (asignaciones ?? [])
@@ -90,7 +90,7 @@ export function tieneRol(sesion: Sesion, rol: RolNombre) {
  * prevencionista, auditor o super_admin), o la lista puntual de centros si
  * sólo tiene el rol supervisor_centro. Una asignación de supervisor_centro
  * sin centro asignado (legado, o creada sin especificar uno) se trata como
- * "todos" — no restringe hasta que se le asigne un centro puntual.
+ * "todos" - no restringe hasta que se le asigne un centro puntual.
  */
 export function centrosVisibles(sesion: Sesion, organizacionId: string): "todos" | string[] {
   if (sesion.esSuperAdmin) return "todos";

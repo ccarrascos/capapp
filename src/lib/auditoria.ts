@@ -5,10 +5,10 @@ import type { Database, Json } from "@/lib/database.types";
 /**
  * Deja rastro de un cambio sensible (rol, acceso, activación) en
  * auditoria_log, atribuido a quien lo hizo. Se usa el mismo cliente con
- * RLS de la acción que llama — ins_auditoria sólo permite insertar filas
+ * RLS de la acción que llama - ins_auditoria sólo permite insertar filas
  * con `usuario_id = auth.uid()`, así que nadie puede registrar una acción
  * a nombre de otra persona. Si la escritura falla (ej. sesión ya cerrada
- * a mitad de la función), no se interrumpe la acción principal — la
+ * a mitad de la función), no se interrumpe la acción principal - la
  * auditoría es un registro adicional, no una condición para que el
  * cambio en sí sea válido.
  */

@@ -4,7 +4,7 @@ const EDAD_MINIMA_DEFECTO = 18;
  * Acepta AAAA-MM-DD (ya válido) o DD-MM-AAAA / DD/MM/AAAA (formato chileno,
  * el que suele exportar Excel según la configuración regional) y siempre
  * devuelve AAAA-MM-DD. Devuelve null si el texto no calza con ninguno de
- * los dos formatos — no intenta adivinar formatos ambiguos como AAAA/DD/MM.
+ * los dos formatos - no intenta adivinar formatos ambiguos como AAAA/DD/MM.
  */
 export function normalizarFechaNacimiento(valor: string): string | null {
   const texto = valor.trim();
@@ -28,7 +28,7 @@ export function normalizarFechaNacimiento(valor: string): string | null {
 /**
  * Valida que una fecha de nacimiento (YYYY-MM-DD) no sea hoy, futura, ni
  * corresponda a un menor de edad. `edadMinima` es configurable desde
- * /configuracion (super_admin) — el código de servidor debe pasar el valor
+ * /configuracion (super_admin) - el código de servidor debe pasar el valor
  * ya leído de ahí; el default de 18 solo aplica donde no se puede leer esa
  * configuración (validación en el cliente, antes de enviar al servidor).
  */

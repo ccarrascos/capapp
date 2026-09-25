@@ -31,7 +31,7 @@ function filaANotificacion(usuarioId: string, f: FilaVigencia, mensaje: string) 
  * toda la organización si no tiene uno asignado, igual que el resto de la
  * app). No depende de un cron: se ejecuta al pedir las notificaciones, y el
  * índice único (usuario_id, inscripcion_id, tipo) evita duplicar la misma
- * alerta en cada visita — sólo se crea una vez por destinatario y por
+ * alerta en cada visita - sólo se crea una vez por destinatario y por
  * ciclo de aprobación del curso.
  */
 async function sincronizarNotificacionesGestion(supabase: SupabaseClient<Database>, sesion: Sesion) {
@@ -74,7 +74,7 @@ async function sincronizarNotificacionesGestion(supabase: SupabaseClient<Databas
     filaANotificacion(
       sesion.usuarioId,
       f,
-      `${f.nombres} ${f.apellido_paterno} — ${f.cursos?.nombre ?? "su curso"} ${
+      `${f.nombres} ${f.apellido_paterno} - ${f.cursos?.nombre ?? "su curso"} ${
         f.estado_vigencia === "vencido" ? "venció" : "está por vencer"
       }.`,
     ),

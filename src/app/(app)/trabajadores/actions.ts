@@ -96,18 +96,18 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
   );
   if (errorSubcontrato) return { ok: false as const, mensaje: errorSubcontrato };
 
-  // La persona (identidad, por RUT) es global al sistema — si ya existe
+  // La persona (identidad, por RUT) es global al sistema - si ya existe
   // porque trabajó en otra organización, reutilizamos su registro y
   // reconocemos su capacitación previa (portabilidad, DS 44 punto 6.4).
   //
   // La comprobación de existencia se hace con el cliente admin (bypassa
   // RLS) porque sel_personas sólo deja ver a una persona con la que el
-  // actor ya comparte una organización — si esta organización es la
+  // actor ya comparte una organización - si esta organización es la
   // primera con la que se vincula, el cliente normal la vería como
   // inexistente y el INSERT de abajo chocaría contra la llave primaria
   // (personas.run), mostrando un "ya existe" que el usuario no podría
   // resolver. Cuando la persona ya existe se conserva su identidad tal
-  // cual está — no se sobrescribe con lo tipeado en este formulario, que
+  // cual está - no se sobrescribe con lo tipeado en este formulario, que
   // puede pertenecer a una organización sin ningún vínculo con ella
   // todavía (evita que cualquiera pise el nombre/fecha de nacimiento de
   // alguien que no gestiona). Si hace falta corregir un dato suyo, se
@@ -215,7 +215,7 @@ export async function actualizarTrabajador(input: {
 
   // El correo es uno solo por persona: si ya tiene cuenta de acceso, el
   // correo de contacto y el de login (usuarios/auth.users) deben quedar
-  // idénticos — nunca dos correos distintos en dos lugares.
+  // idénticos - nunca dos correos distintos en dos lugares.
   const { data: personaActual } = await supabase
     .from("personas")
     .select("usuario_id, email")
@@ -234,7 +234,7 @@ export async function actualizarTrabajador(input: {
 
     // Supabase Auth responde "Error updating user" genérico (sin código
     // distintivo) tanto para un correo duplicado como para casi cualquier
-    // otra falla — no es confiable para detectar el caso. Se revisa el
+    // otra falla - no es confiable para detectar el caso. Se revisa el
     // conflicto de antemano en vez de interpretar su mensaje de error.
     const { data: otroUsuarioConEseCorreo } = await admin
       .from("usuarios")
@@ -366,7 +366,7 @@ export async function obtenerDetalleTrabajador(personaRun: string, organizacionI
   if (!persona) return { ok: false as const, mensaje: "No se encontró a esta persona." };
 
   // Un supervisor_centro sólo debe ver el detalle de trabajadores de su
-  // propio centro — el listado ya filtraba por esto, pero esta acción no
+  // propio centro - el listado ya filtraba por esto, pero esta acción no
   // volvía a revisarlo, así que se podía pedir el detalle de cualquiera de
   // la organización con sólo conocer su RUT.
   const cv = centrosVisibles(sesion, organizacionId);
@@ -487,7 +487,7 @@ export async function crearAccesoTrabajador(input: {
   revalidatePath("/usuarios");
 
   // Se deja registro explícito de a qué correo se enviaron las
-  // credenciales (y del correo que tenía la persona antes, si difiere) —
+  // credenciales (y del correo que tenía la persona antes, si difiere) -
   // ese correo lo escribe quien da el acceso, no necesariamente coincide
   // con el que la persona tenía registrado, y sin este rastro no quedaba
   // forma de auditar a dónde terminó yendo la contraseña temporal.
@@ -580,7 +580,7 @@ const MAX_FILAS_CARGA_MASIVA = 300;
 /**
  * Alta masiva de trabajadores desde un CSV. Procesa las filas de forma
  * secuencial (no en paralelo) porque el mismo RUT puede repetirse dentro
- * del propio archivo — así la segunda aparición ve que la primera ya
+ * del propio archivo - así la segunda aparición ve que la primera ya
  * insertó la persona, en vez de que ambas intenten crearla a la vez.
  */
 export async function cargarTrabajadoresMasivo(input: {
@@ -734,7 +734,7 @@ export async function cargarTrabajadoresMasivo(input: {
 
     // Misma lógica de portabilidad que crearTrabajador: se busca con el
     // cliente admin (visibilidad global) y, si ya existe, no se sobrescribe
-    // su identidad — sólo se agrega el vínculo con esta organización.
+    // su identidad - sólo se agrega el vínculo con esta organización.
     const { data: personaExistente } = await admin.from("personas").select("run").eq("run", run).maybeSingle();
 
     if (!personaExistente) {
@@ -811,7 +811,7 @@ export type CursoYaCubierto = {
 };
 
 /** Cursos con ediciones abiertas donde este trabajador aún no está inscrito
- * ni tiene ese mismo curso vigente — para ofrecerlos desde la Matriz de
+ * ni tiene ese mismo curso vigente - para ofrecerlos desde la Matriz de
  * vigencia cuando está sin capacitación o vencido. */
 export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string, organizacionId: string) {
   const sesion = await getSesion();
@@ -845,7 +845,7 @@ export async function obtenerCursosDisponiblesParaInscripcion(personaRun: string
 
   // Si la aprobación más reciente de un curso sigue plenamente vigente (a
   // fuera de la ventana de aviso), no tiene sentido ofrecer inscribirlo de
-  // nuevo. Pero si ya está "por vencer", sí se ofrece — es justo el caso de
+  // nuevo. Pero si ya está "por vencer", sí se ofrece - es justo el caso de
   // renovarlo antes de que venza.
   const vigenciaPorCurso = new Map<string, { fechaAprobacion: string | null; vigenciaHasta: string | null }>();
   for (const i of inscripciones ?? []) {

@@ -31,7 +31,7 @@ export async function crearSubcontrato(input: {
 
   if (error) {
     const mensaje = error.message.includes("duplicate key")
-      ? "Ya existe un subcontrato con ese nombre en esta organización — asígnalo a otro centro en vez de crearlo de nuevo."
+      ? "Ya existe un subcontrato con ese nombre en esta organización - asígnalo a otro centro en vez de crearlo de nuevo."
       : error.message;
     return { ok: false as const, mensaje };
   }

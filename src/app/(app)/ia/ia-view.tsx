@@ -77,7 +77,7 @@ export function IaView() {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
             <Sparkles className="size-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground max-w-sm">
-              Pregunta en lenguaje natural sobre la matriz de cumplimiento — el asistente consulta tus datos y
+              Pregunta en lenguaje natural sobre la matriz de cumplimiento - el asistente consulta tus datos y
               responde. No inventa cifras: si no puede saberlo, lo dice.
             </p>
             <div className="flex flex-wrap justify-center gap-2">

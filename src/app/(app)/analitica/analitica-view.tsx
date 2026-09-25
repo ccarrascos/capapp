@@ -148,7 +148,7 @@ function TarjetaGrafico({
   );
 }
 
-/** Medidor semicircular — aguja implícita vía un arco de 180°, al estilo "% to target" de un panel ejecutivo. */
+/** Medidor semicircular - aguja implícita vía un arco de 180°, al estilo "% to target" de un panel ejecutivo. */
 function SemiGauge({ pct, color }: { pct: number; color: string }) {
   const valor = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
   const datos = [
@@ -219,7 +219,7 @@ function KpiGaugeCard({
         atenuado && "opacity-45",
       )}
     >
-      <div className="flex items-center gap-2 min-w-0" title={`${label} — ${sublabel}`}>
+      <div className="flex items-center gap-2 min-w-0" title={`${label} - ${sublabel}`}>
         <span
           className="flex size-7 items-center justify-center shrink-0"
           style={{ backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)` }}
@@ -428,7 +428,7 @@ export function AnaliticaView({
       a.download = `analitica-${new Date().toISOString().slice(0, 10)}.png`;
       a.click();
     } catch {
-      toast.error("No se pudo generar la imagen — intenta de nuevo.");
+      toast.error("No se pudo generar la imagen - intenta de nuevo.");
     } finally {
       setExportando(false);
     }
@@ -486,7 +486,7 @@ export function AnaliticaView({
 
   // Cada gráfico se calcula excluyendo su propia dimensión de los filtros
   // (para seguir mostrando todas sus categorías) pero aplicando los filtros
-  // de las demás dimensiones — así un clic en cualquier gráfico refina a
+  // de las demás dimensiones - así un clic en cualquier gráfico refina a
   // los demás, al estilo de un cross-filter de Power BI.
 
   const baseEdad = useMemo(() => aplicarFiltros(filas, filtros, { excluirRango: true }), [filas, filtros]);

@@ -64,7 +64,7 @@ export default async function EdicionDetallePage({
         .eq("organizacion_id", edicion.organizacion_id)
         .eq("activo", true)
         .order("persona_run"),
-      // Vigencia de este mismo curso en cualquiera de sus ediciones — para no
+      // Vigencia de este mismo curso en cualquiera de sus ediciones - para no
       // ofrecer inscribir a quien ya lo tiene vigente (ver más abajo).
       supabase
         .from("inscripciones")
@@ -106,7 +106,7 @@ export default async function EdicionDetallePage({
   // Tomar asistencia y calificar es responsabilidad de quien dicta el curso.
   const puedeGestionarAsistencia = puedeGestionarEdicion || esFacilitadorDeEstaEdicion;
   // Pasado el plazo, ya no tiene sentido seguir gestionando a quien nunca
-  // completó el curso — queda como "curso no realizado" en vez de "inscrito".
+  // completó el curso - queda como "curso no realizado" en vez de "inscrito".
   const edicionVencida = edicion.fecha_limite < new Date().toISOString().slice(0, 10);
 
   return (

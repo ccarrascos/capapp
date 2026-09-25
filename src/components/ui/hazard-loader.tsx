@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Estado de carga/búsqueda — misma franja de peligro que el acento del sidebar y el login, en movimiento. */
+/** Estado de carga/búsqueda - misma franja de peligro que el acento del sidebar y el login, en movimiento. */
 export function HazardLoader({
   label,
   className,

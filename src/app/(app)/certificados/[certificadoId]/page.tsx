@@ -78,7 +78,7 @@ export default async function CertificadoPage({
       rut={`${certificado.personas.run}-${certificado.personas.dv}`}
       cursoNombre={certificado.cursos.nombre}
       cursoHoras={certificado.cursos.horas_totales}
-      organizacionNombre={certificado.cursos.organizaciones?.razon_social ?? "—"}
+      organizacionNombre={certificado.cursos.organizaciones?.razon_social ?? "-"}
       organizacionLogoUrl={certificado.cursos.organizaciones?.logo_url ?? null}
     />
   );

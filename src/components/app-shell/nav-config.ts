@@ -113,7 +113,7 @@ export const NAV_ITEMS: NavItem[] = [
 
 export function navParaRoles(rolesUsuario: RolNombre[], esSuperAdmin: boolean, rutasOcultas: string[] = []): NavItem[] {
   // Para quien solo tiene el rol trabajador, "Panel" (/dashboard) muestra un subconjunto
-  // de lo que ya ve en "Mi capacitación" — se omite para no duplicar el destino.
+  // de lo que ya ve en "Mi capacitación" - se omite para no duplicar el destino.
   const soloTrabajador =
     !esSuperAdmin && rolesUsuario.length > 0 && rolesUsuario.every((r) => r === "trabajador");
 

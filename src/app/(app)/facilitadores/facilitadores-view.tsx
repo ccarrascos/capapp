@@ -383,7 +383,7 @@ function EditarFacilitadorDialog({
     buscarPersonaPorRun(facilitador.run).then((persona) => {
       if (persona) {
         // El nombre pertenece a un registro existente (persona o cuenta de
-        // usuario) — se bloquea aquí y se refresca con el valor vigente,
+        // usuario) - se bloquea aquí y se refresca con el valor vigente,
         // para que una corrección hecha en el origen (ej. agregar el
         // segundo apellido) se propague en vez de quedar una copia obsoleta.
         setForm((f) => ({ ...f, nombres: persona.nombres, apellidos: persona.apellidos }));
@@ -499,7 +499,7 @@ function EditarFacilitadorDialog({
           {datosBloqueados && (
             <p className="text-xs text-muted-foreground -mt-2">
               Nombres y apellidos vienen del registro existente para este RUT (persona o cuenta de usuario) y no se
-              pueden editar aquí — se actualizan automáticamente si cambian en el origen.
+              pueden editar aquí - se actualizan automáticamente si cambian en el origen.
             </p>
           )}
           <div className="flex flex-col gap-1.5">

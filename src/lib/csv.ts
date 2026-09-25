@@ -1,5 +1,5 @@
 /**
- * CSV separado por ";" (punto y coma) — así lo abre Excel en configuración
+ * CSV separado por ";" (punto y coma) - así lo abre Excel en configuración
  * regional latinoamericana sin pedir "convertir texto en columnas". Mismo
  * formato que ya usa la exportación de la matriz de vigencia.
  */

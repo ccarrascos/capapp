@@ -374,7 +374,7 @@ export function TrabajadoresView({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Registro de cumplimiento — art. 16 DS 44
+            Registro de cumplimiento - art. 16 DS 44
           </p>
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">
             Matriz de vigencia
@@ -474,19 +474,19 @@ export function TrabajadoresView({
                 <TableCell>
                   <SignBadge estado={(f.estado_vigencia ?? "sin_capacitacion") as EstadoVigencia} size="sm" />
                 </TableCell>
-                <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "—"}</TableCell>
+                <TableCell className="font-mono text-sm">{f.vigencia_hasta ?? "-"}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {f.run}-{f.dv}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{f.cargo ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{f.centroNombre ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{f.cargo ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{f.centroNombre ?? "-"}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {f.tipo_vinculo === "subcontrato" ? (f.subcontrato_nombre ?? "Subcontrato") : "Directo"}
                 </TableCell>
                 <TableCell className="text-muted-foreground capitalize">
-                  {f.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
+                  {f.modalidad_contractual?.replace(/_/g, " ") ?? "-"}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{calcularEdad(f.fechaNacimiento) ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{calcularEdad(f.fechaNacimiento) ?? "-"}</TableCell>
                 <TableCell>
                   {f.usuarioId ? (
                     <span className="text-xs text-clear">Con acceso</span>
@@ -721,7 +721,7 @@ function CargaMasivaDialog({
           <DialogTitle>Carga masiva de trabajadores</DialogTitle>
           <DialogDescription>
             Sube un CSV con la nómina completa. Descarga la plantilla, complétala sin cambiar los encabezados y
-            súbela de vuelta — hasta 300 filas por archivo.
+            súbela de vuelta - hasta 300 filas por archivo.
           </DialogDescription>
         </DialogHeader>
 
@@ -800,7 +800,7 @@ function CargaMasivaDialog({
             <Input type="file" accept=".csv,text/csv" onChange={onArchivoSeleccionado} />
             {nombreArchivo && !errorArchivo && (
               <p className="text-xs text-muted-foreground">
-                {nombreArchivo} — {filas.length} fila{filas.length === 1 ? "" : "s"} detectada
+                {nombreArchivo} - {filas.length} fila{filas.length === 1 ? "" : "s"} detectada
                 {filas.length === 1 ? "" : "s"}.
               </p>
             )}
@@ -946,11 +946,11 @@ function NuevoTrabajadorDialog({
       }
 
       const mensajeBase = resultado.personaYaExistia
-        ? `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) — se usaron sus datos actuales.`
+        ? `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) - se usaron sus datos actuales.`
         : "Trabajador agregado a la matriz.";
 
       if (!darAccesoInmediato || resultado.personaYaExistia) {
-        // Si la persona ya existía, puede ya tener cuenta — dar acceso queda para el flujo normal de la fila.
+        // Si la persona ya existía, puede ya tener cuenta - dar acceso queda para el flujo normal de la fila.
         toast.success(mensajeBase);
         setOpen(false);
         reiniciarFormulario();
@@ -975,7 +975,7 @@ function NuevoTrabajadorDialog({
         setOpen(false);
         reiniciarFormulario();
       } else {
-        // El correo no salió — se muestra la contraseña temporal antes de cerrar, igual que en "Dar acceso".
+        // El correo no salió - se muestra la contraseña temporal antes de cerrar, igual que en "Dar acceso".
         setAccesoPendiente({ password: resultadoAcceso.passwordTemporal, expiraEn: resultadoAcceso.expiraEn });
       }
     });
@@ -1017,10 +1017,10 @@ function NuevoTrabajadorDialog({
         {accesoPendiente ? (
           <>
             <DialogHeader>
-              <DialogTitle>Trabajador agregado — correo no enviado</DialogTitle>
+              <DialogTitle>Trabajador agregado - correo no enviado</DialogTitle>
               <DialogDescription>
                 Se creó su acceso, pero no se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal
-                de forma segura — no volverá a mostrarse. Caduca el{" "}
+                de forma segura - no volverá a mostrarse. Caduca el{" "}
                 {accesoPendiente.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.
               </DialogDescription>
             </DialogHeader>
@@ -1087,7 +1087,7 @@ function NuevoTrabajadorDialog({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dv">DV</Label>
-              <Input id="dv" disabled value={form.dv} placeholder="—" className="font-mono text-center" />
+              <Input id="dv" disabled value={form.dv} placeholder="-" className="font-mono text-center" />
             </div>
           </div>
 
@@ -1128,7 +1128,7 @@ function NuevoTrabajadorDialog({
               </Select>
               {cargosDeLaOrg.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No hay cargos registrados para esta organización — agrégalos en el módulo Cargos.
+                  No hay cargos registrados para esta organización - agrégalos en el módulo Cargos.
                 </p>
               )}
             </div>
@@ -1174,7 +1174,7 @@ function NuevoTrabajadorDialog({
               </Select>
               {centrosDeLaOrg.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  No hay centros registrados para esta organización — agrégalos en el módulo Centros de trabajo.
+                  No hay centros registrados para esta organización - agrégalos en el módulo Centros de trabajo.
                 </p>
               ) : (
                 !form.centroTrabajoId && (
@@ -1238,7 +1238,7 @@ function NuevoTrabajadorDialog({
                 {subcontratosDelCentro.length === 0 && (
                   <p className="text-xs text-muted-foreground">
                     {form.centroTrabajoId
-                      ? "Ningún subcontrato está asignado a este centro — agrégalo en el módulo Subcontratos."
+                      ? "Ningún subcontrato está asignado a este centro - agrégalo en el módulo Subcontratos."
                       : "Primero selecciona el centro de trabajo."}
                   </p>
                 )}
@@ -1583,7 +1583,7 @@ function EditarTrabajadorDialog({
               {fila.usuarioId && (
                 <p className="text-xs text-muted-foreground">
                   Esta persona ya tiene acceso al portal. Ingresa con su RUT, pero este correo es al que le
-                  llegan sus credenciales — se actualiza también ahí.
+                  llegan sus credenciales - se actualiza también ahí.
                 </p>
               )}
             </div>
@@ -1668,9 +1668,9 @@ function DarAccesoDialog({
         {resultado ? (
           <>
             <DialogHeader>
-              <DialogTitle>Acceso creado — correo no enviado</DialogTitle>
+              <DialogTitle>Acceso creado - correo no enviado</DialogTitle>
               <DialogDescription>
-                No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura — no
+                No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura - no
                 volverá a mostrarse.
                 {resultado.expiraEn && (
                   <> Caduca el {resultado.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.</>
@@ -1731,7 +1731,7 @@ function DarAccesoDialog({
 }
 
 /** El popup de Select no envuelve ni encoge su texto (fuerza whitespace-nowrap),
- * así que un nombre largo hay que acortarlo aquí — el título completo queda
+ * así que un nombre largo hay que acortarlo aquí - el título completo queda
  * disponible al pasar el mouse por encima. */
 function truncarTexto(texto: string, maxLargo = 46): string {
   return texto.length > maxLargo ? `${texto.slice(0, maxLargo - 1).trimEnd()}…` : texto;
@@ -1816,7 +1816,7 @@ function InscribirCursoDialog({
             {yaCubiertos.length > 0 ? (
               <>
                 <p className="text-sm text-muted-foreground text-center">
-                  No hay más ediciones que ofrecerle — ya está cubierta en todos los cursos con ediciones abiertas de
+                  No hay más ediciones que ofrecerle - ya está cubierta en todos los cursos con ediciones abiertas de
                   esta organización:
                 </p>
                 <ul className="flex flex-col gap-1.5">
@@ -1837,7 +1837,7 @@ function InscribirCursoDialog({
               </>
             ) : (
               <p className="text-sm text-muted-foreground text-center max-w-xs mx-auto">
-                No hay ediciones abiertas para ofrecerle — crea una nueva edición en el módulo Cursos.
+                No hay ediciones abiertas para ofrecerle - crea una nueva edición en el módulo Cursos.
               </p>
             )}
           </div>
@@ -1957,14 +1957,14 @@ function DetalleTrabajadorDialog({
       <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{nombreCompleto}</DialogTitle>
-          <DialogDescription>Vistazo rápido — capacitación, centros y evaluaciones.</DialogDescription>
+          <DialogDescription>Vistazo rápido - capacitación, centros y evaluaciones.</DialogDescription>
         </DialogHeader>
         {pending || !detalle ? (
           <HazardLoader label="Cargando…" />
         ) : (
           (() => {
             // Si el mismo curso se aprobó más de una vez (renovación), la
-            // aprobación más reciente reemplaza a la anterior — sólo esa
+            // aprobación más reciente reemplaza a la anterior - sólo esa
             // cuenta para el estado y aparece en la lista.
             const aprobadosVigentes = ultimoAprobadoPorCurso(
               detalle.inscripciones
@@ -1977,7 +1977,7 @@ function DetalleTrabajadorDialog({
             ).map((x) => x.original);
             // Agrupa todos los intentos (aprobados o no) por curso, para
             // poder mostrar cuántas veces lo ha tomado sin perder el
-            // historial — pero la vigencia mostrada siempre sale de la
+            // historial - pero la vigencia mostrada siempre sale de la
             // última aprobación de ese curso.
             const gruposPorCurso = new Map<
               string,
@@ -2020,23 +2020,23 @@ function DetalleTrabajadorDialog({
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Cargo</p>
-                  <p>{detalle.vinculo?.cargos?.nombre ?? "—"}</p>
+                  <p>{detalle.vinculo?.cargos?.nombre ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Centro</p>
-                  <p>{detalle.vinculo?.centros_trabajo?.nombre ?? "—"}</p>
+                  <p>{detalle.vinculo?.centros_trabajo?.nombre ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Modalidad</p>
                   <p className="capitalize">
-                    {detalle.vinculo?.modalidad_contractual?.replace(/_/g, " ") ?? "—"}
+                    {detalle.vinculo?.modalidad_contractual?.replace(/_/g, " ") ?? "-"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Vínculo</p>
                   <p>
                     {detalle.vinculo?.tipo_vinculo === "subcontrato"
-                      ? `Subcontrato - ${detalle.vinculo.subcontratos?.nombre ?? "—"}`
+                      ? `Subcontrato - ${detalle.vinculo.subcontratos?.nombre ?? "-"}`
                       : "Directo"}
                   </p>
                 </div>
@@ -2102,8 +2102,8 @@ function DetalleTrabajadorDialog({
                                 className="flex items-center justify-between gap-3 text-xs border-l-2 border-border pl-2"
                               >
                                 <span className="text-muted-foreground">
-                                  {i.ediciones_curso?.fecha_inicio ?? "—"}
-                                  {i.ediciones_curso?.fecha_termino ? ` – ${i.ediciones_curso.fecha_termino}` : ""}
+                                  {i.ediciones_curso?.fecha_inicio ?? "-"}
+                                  {i.ediciones_curso?.fecha_termino ? ` - ${i.ediciones_curso.fecha_termino}` : ""}
                                   {i.ediciones_curso?.centros_trabajo?.nombre
                                     ? ` · ${i.ediciones_curso.centros_trabajo.nombre}`
                                     : ""}
@@ -2192,7 +2192,7 @@ function CredencialQrDialog({
           <DialogTitle>Credencial QR</DialogTitle>
           <DialogDescription>
             Para imprimir en la credencial o el casco. Al escanearlo, cualquiera ve el estado de
-            capacitación vigente — sin necesidad de iniciar sesión.
+            capacitación vigente - sin necesidad de iniciar sesión.
           </DialogDescription>
         </DialogHeader>
         {pending || !credencial ? (

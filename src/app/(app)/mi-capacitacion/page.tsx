@@ -89,7 +89,7 @@ export default async function MiCapacitacionPage() {
               return (
                 <div key={h.id} className="border border-border bg-card p-4 flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-sm">{h.ediciones_curso?.cursos?.nombre ?? "—"}</p>
+                    <p className="font-medium text-sm">{h.ediciones_curso?.cursos?.nombre ?? "-"}</p>
                     <span className={cn("text-xs font-medium shrink-0", estadoInfo.className)}>
                       {estadoInfo.label}
                     </span>
@@ -101,11 +101,11 @@ export default async function MiCapacitacionPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Aprobación</p>
-                      <p className="font-mono">{h.fecha_aprobacion ?? "—"}</p>
+                      <p className="font-mono">{h.fecha_aprobacion ?? "-"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Vigente hasta</p>
-                      <p className="font-mono">{h.vigencia_hasta ?? "—"}</p>
+                      <p className="font-mono">{h.vigencia_hasta ?? "-"}</p>
                     </div>
                   </div>
                   {h.certificados && (

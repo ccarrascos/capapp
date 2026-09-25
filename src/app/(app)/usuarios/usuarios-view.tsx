@@ -274,7 +274,7 @@ export function UsuariosView({
                     {c.usuario.nombres} {c.usuario.apellidos}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {c.usuario.run && c.usuario.dv ? formatearRut(c.usuario.run, c.usuario.dv) : "—"}
+                    {c.usuario.run && c.usuario.dv ? formatearRut(c.usuario.run, c.usuario.dv) : "-"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{c.usuario.email}</TableCell>
                   <TableCell>
@@ -447,11 +447,11 @@ function NuevaCuentaDialog({
         {resultado ? (
           <>
             <DialogHeader>
-              <DialogTitle>{resultado.emailEnviado ? "Cuenta creada" : "Cuenta creada — correo no enviado"}</DialogTitle>
+              <DialogTitle>{resultado.emailEnviado ? "Cuenta creada" : "Cuenta creada - correo no enviado"}</DialogTitle>
               <DialogDescription>
                 {resultado.emailEnviado
                   ? `Enviamos las credenciales de acceso directamente a ${resultado.email}.`
-                  : `No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura — no volverá a mostrarse.${
+                  : `No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura - no volverá a mostrarse.${
                       resultado.expiraEn
                         ? ` Caduca el ${resultado.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.`
                         : ""
@@ -619,7 +619,7 @@ function SelectorRoles({
 }
 
 function etiquetaAsignacion(a: Asignacion, mostrarOrganizacion: boolean) {
-  const partes = [a.roles ? ROL_LABEL[a.roles.nombre] : "—"];
+  const partes = [a.roles ? ROL_LABEL[a.roles.nombre] : "-"];
   if (a.roles?.nombre === "supervisor_centro" && a.centros_trabajo) partes.push(a.centros_trabajo.nombre);
   if (mostrarOrganizacion && a.organizaciones) partes.push(a.organizaciones.razon_social);
   return partes.join(" · ");

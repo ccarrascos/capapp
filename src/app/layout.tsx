@@ -26,7 +26,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Capapp — Capacitación DS 44",
+  title: "Capapp - Capacitación DS 44",
   description:
     "Gestión de capacitación en prevención de riesgos laborales (art. 16, DS N.º 44/2023).",
 };

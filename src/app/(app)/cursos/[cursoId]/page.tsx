@@ -107,7 +107,7 @@ export default async function CursoDetallePage({
             Materiales del curso
           </h2>
           <p className="text-xs text-muted-foreground mb-3">
-            Anexo Metodológico, punto 5 — deben entregarse a cada participante antes del inicio.
+            Anexo Metodológico, punto 5 - deben entregarse a cada participante antes del inicio.
           </p>
           <div className="flex flex-col gap-2">
             <FileField

@@ -101,7 +101,7 @@ export default async function ValidarCertificadoPage({
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Curso</p>
                 <p className="font-medium">{certificado.cursos.nombre}</p>
                 <p className="text-sm text-muted-foreground">
-                  {certificado.cursos.horas_totales} horas · {certificado.cursos.organizaciones?.razon_social ?? "—"}
+                  {certificado.cursos.horas_totales} horas · {certificado.cursos.organizaciones?.razon_social ?? "-"}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">

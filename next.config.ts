@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
-          // Directiva sola (sin bloquear scripts/estilos) — mismo efecto
+          // Directiva sola (sin bloquear scripts/estilos) - mismo efecto
           // anti-clickjacking que X-Frame-Options, como respaldo en
           // navegadores que priorizan CSP sobre el header legado.
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },

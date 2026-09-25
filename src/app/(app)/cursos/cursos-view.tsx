@@ -62,7 +62,7 @@ export function CursosView({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Curso art. 16 DS 44 — mínimo {horasMinimas} horas
+            Curso art. 16 DS 44 - mínimo {horasMinimas} horas
           </p>
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">
             Cursos y ediciones

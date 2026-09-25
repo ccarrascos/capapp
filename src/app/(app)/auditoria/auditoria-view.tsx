@@ -119,7 +119,7 @@ export function AuditoriaView({ entradas }: { entradas: Entrada[] }) {
                   {new Date(e.created_at).toLocaleString("es-CL")}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {e.usuarios ? `${e.usuarios.nombres} ${e.usuarios.apellidos}` : "—"}
+                  {e.usuarios ? `${e.usuarios.nombres} ${e.usuarios.apellidos}` : "-"}
                 </TableCell>
                 <TableCell className="text-sm font-medium">{ACCION_LABEL[e.accion] ?? e.accion}</TableCell>
                 <TableCell className="text-xs text-muted-foreground max-w-md">

@@ -214,7 +214,7 @@ async function rolYaAsignado(
 
 /**
  * RLS de ediciones/asistencias reconoce al facilitador por
- * facilitadores.usuario_id — sin este vínculo, una cuenta con rol
+ * facilitadores.usuario_id - sin este vínculo, una cuenta con rol
  * facilitador no ve ni puede gestionar sus ediciones.
  */
 async function vincularFichaFacilitador(usuarioId: string, organizacionId: string) {
@@ -414,7 +414,7 @@ export async function actualizarEstadoUsuario(input: {
   }
 
   // upd_usuarios_propio (RLS) sólo permite que cada quien edite su propio
-  // perfil o que un super_admin edite cualquiera — un admin_organizacion no
+  // perfil o que un super_admin edite cualquiera - un admin_organizacion no
   // puede tocar usuarios.activo de terceros con el cliente normal, así que
   // se usa el cliente admin. Como el cliente admin bypassa RLS, hay que
   // verificar aquí mismo que el usuario objetivo realmente pertenece a la

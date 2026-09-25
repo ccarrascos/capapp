@@ -25,7 +25,7 @@ const ROL_LABEL: Record<RolNombre, string> = {
 const MENSAJE_CREDENCIALES_INCORRECTAS = "RUT o contraseña incorrectos.";
 
 // Se registra por (run, dv) tal cual se recibe, exista o no la cuenta, y
-// el mensaje de vuelta es siempre el mismo genérico de arriba — nunca uno
+// el mensaje de vuelta es siempre el mismo genérico de arriba - nunca uno
 // distinto tipo "cuenta bloqueada", porque eso delataría que el RUT
 // existe. Así el bloqueo por fuerza bruta no abre un canal de enumeración
 // nuevo.
@@ -129,13 +129,13 @@ export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
   const dv = input.dv.trim().toUpperCase();
 
   // El trabajo real (buscar la cuenta, resetear la clave, enviar el
-  // correo) se agenda para después de responder — nunca se espera acá.
+  // correo) se agenda para después de responder - nunca se espera acá.
   // Si se esperara, el tiempo de respuesta sería en sí mismo una forma de
   // distinguir un RUT que existe de uno que no (una solicitud a un RUT
   // inexistente termina de inmediato; una real hace varias llamadas a la
   // base y a Resend y tarda notoriamente más). Al responder siempre lo
-  // mismo y de inmediato, no queda ningún canal — ni el contenido de la
-  // respuesta ni cuánto demora — para comprobar qué RUT tiene cuenta.
+  // mismo y de inmediato, no queda ningún canal - ni el contenido de la
+  // respuesta ni cuánto demora - para comprobar qué RUT tiene cuenta.
   if (esRutValido(run, dv)) {
     after(() => procesarSolicitudNuevoAcceso(run, dv));
   }
@@ -197,7 +197,7 @@ async function procesarSolicitudNuevoAcceso(run: string, dv: string) {
   });
 
   // Nadie ve esto de vuelta (ya se respondió el mensaje genérico antes de
-  // llegar aquí), pero queda en el log de auditoría — si no, un envío
+  // llegar aquí), pero queda en el log de auditoría - si no, un envío
   // rechazado por el proveedor de correo (ej. dominio no verificado)
   // queda invisible y parece que "sí se envió".
   await registrarAuditoria(admin, {

@@ -7,7 +7,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 // Mientras no haya un dominio verificado en Resend, el remitente sandbox
 // sólo puede entregar al correo de la propia cuenta de Resend. Con esta
-// variable seteada, todo correo real se redirige ahí igual — pensado
+// variable seteada, todo correo real se redirige ahí igual - pensado
 // puramente para probar el flujo completo con destinatarios "reales"
 // mientras se verifica un dominio. Quitar la variable apaga la redirección.
 const REDIRIGIR_A_PRUEBA = process.env.EMAIL_REDIRIGIR_A_PRUEBA || null;
@@ -86,7 +86,7 @@ function plantillaBienvenida(params: {
         <p style="font-family: monospace; font-size: 13px; font-weight: 400; margin: 0;">${escaparHtml(params.password)}</p>
       </div>
       <p style="font-size: 13px; color: #4b545a; margin: 0 0 20px; line-height: 1.6;">
-        Ingresa a Capapp como sueles hacerlo — no hace falta hacer clic en ningún enlace de este
+        Ingresa a Capapp como sueles hacerlo - no hace falta hacer clic en ningún enlace de este
         correo. Usa tu RUT y la contraseña temporal de arriba.
       </p>
       <div style="border: 1px solid #e3a0a6; background: #fbeaec; padding: 12px 14px; margin-top: 20px;">
@@ -98,7 +98,7 @@ function plantillaBienvenida(params: {
       </div>
       <p style="font-size: 12px; color: #4b545a; margin-top: 20px; line-height: 1.5;">
         Por seguridad, cambia esta contraseña apenas ingreses (Mi perfil → Cambiar contraseña).
-        Este correo nunca incluye enlaces para iniciar sesión — si ves uno, no lo abras.
+        Este correo nunca incluye enlaces para iniciar sesión - si ves uno, no lo abras.
         Si no esperabas este correo, contacta a quien administra tu organización en Capapp.
       </p>
     </div>

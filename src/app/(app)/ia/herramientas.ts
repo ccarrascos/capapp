@@ -11,7 +11,7 @@ type Sexo = "masculino" | "femenino" | "otro";
 
 /**
  * Mismo filtro de visibilidad que usan Panel, Matriz de vigencia y Analítica
- * (ver centrosVisibles en src/lib/auth.ts) — el asistente nunca ve datos que
+ * (ver centrosVisibles en src/lib/auth.ts) - el asistente nunca ve datos que
  * el usuario no podría ver navegando la app normalmente.
  */
 async function filasVisibles(sesion: Sesion): Promise<FilaMatriz[]> {
@@ -52,7 +52,7 @@ function nombreCompleto(f: FilaMatriz): string {
   return `${f.nombres ?? ""} ${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.replace(/\s+/g, " ").trim();
 }
 
-/** El LLM extrae texto de una conversación libre y no siempre respeta tildes — se compara sin acentos. */
+/** El LLM extrae texto de una conversación libre y no siempre respeta tildes - se compara sin acentos. */
 function sinAcentos(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
@@ -178,7 +178,7 @@ async function distribucionPorCentro(sesion: Sesion) {
 
 /**
  * curso_id en la matriz es el último curso APROBADO de cada persona (o null
- * si nunca aprobó uno) — así que esto agrupa por "el curso cuya vigencia
+ * si nunca aprobó uno) - así que esto agrupa por "el curso cuya vigencia
  * está corriendo/vencida para cada trabajador", que es lo que alguien
  * pregunta con "qué cursos tienen gente vencida".
  */
@@ -216,12 +216,12 @@ async function demografiaTrabajadores(sesion: Sesion) {
 /**
  * Tablas que el asistente puede consultar libremente más allá del dominio
  * de trabajadores. Se restringe a tablas cuyo RLS ya alcanza por sí solo
- * (organizacion_id = any(app_organizaciones_usuario()), sin excepciones) —
+ * (organizacion_id = any(app_organizaciones_usuario()), sin excepciones) -
  * quedan afuera inscripciones, certificados, asistencias_modulo,
  * evaluaciones_resultado y la propia matriz de trabajadores porque su
  * visibilidad real depende ADEMÁS de centrosVisibles() a nivel de
  * aplicación (un supervisor_centro ve solo su centro en esas pantallas,
- * pero el RLS de esas tablas permite ver toda la organización) — exponerlas
+ * pero el RLS de esas tablas permite ver toda la organización) - exponerlas
  * aquí sin ese filtro extra sería una fuga entre centros de la misma
  * empresa. También quedan afuera personas/usuarios/auditoria_log por ser
  * datos personales o administrativos que no vienen al caso en este chat.
@@ -247,7 +247,7 @@ async function consultarTabla(tabla: string, filtros: { columna: string; valor: 
     };
   }
 
-  const supabase = await createClient(); // cliente con RLS de la sesión — nunca el admin client
+  const supabase = await createClient(); // cliente con RLS de la sesión - nunca el admin client
   // `tabla` ya se validó arriba contra TABLAS_PERMITIDAS; el cast solo evita que
   // TypeScript exija una unión literal para un nombre de tabla que llega en runtime.
   let query = supabase.from(tabla as (typeof TABLAS_PERMITIDAS)[number]).select("*").limit(LIMITE_TABLA);
@@ -267,8 +267,8 @@ const LIMITE_CONSULTA_COMPLETA = 250;
 /**
  * Catch-all: vuelca la lista completa (acotada) de trabajadores visibles con
  * todos sus atributos, para que el asistente pueda responder preguntas que
- * ninguna herramienta específica cubre — cruces, conteos ad hoc, listados
- * por cargo/vínculo/modalidad, etc. — razonando sobre los datos crudos en
+ * ninguna herramienta específica cubre - cruces, conteos ad hoc, listados
+ * por cargo/vínculo/modalidad, etc. - razonando sobre los datos crudos en
  * vez de fallar por falta de una herramienta a medida.
  */
 async function consultarTrabajadores(
@@ -296,7 +296,7 @@ async function consultarTrabajadores(
     totalCoincidencias: filtradas.length,
     truncado,
     ...(truncado
-      ? { nota: `Se muestran solo los primeros ${LIMITE_CONSULTA_COMPLETA} de ${filtradas.length} — pide un filtro más específico (centro, cargo o estado) si necesitas ver el resto.` }
+      ? { nota: `Se muestran solo los primeros ${LIMITE_CONSULTA_COMPLETA} de ${filtradas.length} - pide un filtro más específico (centro, cargo o estado) si necesitas ver el resto.` }
       : {}),
     trabajadores: filtradas.slice(0, LIMITE_CONSULTA_COMPLETA).map((f) => {
       const persona = f.persona_run ? personaPorRun.get(f.persona_run) : null;
@@ -398,7 +398,7 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       name: "consultar_trabajadores",
       description:
         "Herramienta general: devuelve la lista completa de trabajadores visibles (nombre, RUN, cargo, centro, unidad, vínculo, modalidad contractual, edad, sexo, estado y fecha de vencimiento), opcionalmente filtrada. " +
-        "Úsala SIEMPRE que ninguna otra herramienta responda directamente la pregunta — por ejemplo listados por cargo, cruces entre varias dimensiones, o cualquier cálculo que debas hacer tú mismo sobre los datos crudos.",
+        "Úsala SIEMPRE que ninguna otra herramienta responda directamente la pregunta - por ejemplo listados por cargo, cruces entre varias dimensiones, o cualquier cálculo que debas hacer tú mismo sobre los datos crudos.",
       parameters: {
         type: "object",
         properties: {
@@ -452,7 +452,7 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
     function: {
       name: "buscar_ayuda",
       description:
-        `Explica CÓMO usar la plataforma (en qué pantalla, qué botón) — no datos, sino instrucciones de uso. Temas cubiertos: ${temasDeAyudaDisponibles().join("; ")}.`,
+        `Explica CÓMO usar la plataforma (en qué pantalla, qué botón) - no datos, sino instrucciones de uso. Temas cubiertos: ${temasDeAyudaDisponibles().join("; ")}.`,
       parameters: {
         type: "object",
         properties: {

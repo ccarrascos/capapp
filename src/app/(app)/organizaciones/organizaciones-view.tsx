@@ -297,7 +297,7 @@ function NuevaOrganizacionDialog() {
             <DialogHeader>
               <DialogTitle>Logo de {organizacionCreada.nombre}</DialogTitle>
               <DialogDescription>
-                Opcional — se muestra en el encabezado de la app y en los certificados. Puedes agregarlo después desde
+                Opcional - se muestra en el encabezado de la app y en los certificados. Puedes agregarlo después desde
                 esta misma pantalla.
               </DialogDescription>
             </DialogHeader>
