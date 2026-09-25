@@ -47,12 +47,9 @@ export default async function ValidarCertificadoPage({
   return (
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <span className="flex size-9 items-center justify-center rounded-sm overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-            <img src="/logo-icon.png" alt="Capapp" className="size-full object-contain" loading="lazy" />
-          </span>
-          <span className="font-heading text-xl tracking-wide uppercase">Capapp</span>
+        <div className="flex justify-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+          <img src="/logo-full.png" alt="CapApp" className="h-24 w-auto" loading="lazy" />
         </div>
 
         {certificado?.cursos?.organizaciones?.logo_url && (
