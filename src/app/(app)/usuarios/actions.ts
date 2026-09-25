@@ -32,7 +32,8 @@ export type CrearUsuarioInput = {
   dv: string;
   roles: RolNombre[];
   organizacionId: string | null;
-  centroTrabajoId: string | null;
+  /** Centros del rol supervisor_centro; vacío = toda la organización. */
+  centrosTrabajoIds: string[];
 };
 
 export async function crearUsuario(input: CrearUsuarioInput) {
@@ -78,23 +79,39 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     .select("id, nombres, apellidos")
     .eq("run", run)
     .maybeSingle();
+  const centrosSupervisor: (string | null)[] =
+    input.centrosTrabajoIds.length > 0 ? [...new Set(input.centrosTrabajoIds)] : [null];
+  if (roles.includes("supervisor_centro") && input.centrosTrabajoIds.length > 0) {
+    const { data: centrosValidos } = await admin
+      .from("centros_trabajo")
+      .select("id")
+      .eq("organizacion_id", input.organizacionId!)
+      .in("id", input.centrosTrabajoIds);
+    if ((centrosValidos ?? []).length !== new Set(input.centrosTrabajoIds).size) {
+      return { ok: false as const, mensaje: "Algún centro no pertenece a esta organización." };
+    }
+  }
+
   if (rutExistente) {
     // La persona ya tiene cuenta (por ejemplo, en otra organización o con
     // otro rol): se le suma el rol, sin tocar su identidad ni su contraseña.
-    const resultados: Awaited<ReturnType<typeof agregarRolUsuario>>[] = [];
+    const resultados: { rol: RolNombre; resultado: Awaited<ReturnType<typeof agregarRolUsuario>> }[] = [];
     for (const rol of roles) {
-      resultados.push(
-        await agregarRolUsuario({
-          usuarioId: rutExistente.id,
-          organizacionId: rol === "super_admin" ? null : input.organizacionId,
+      for (const centroTrabajoId of rol === "supervisor_centro" ? centrosSupervisor : [null]) {
+        resultados.push({
           rol,
-          centroTrabajoId: input.centroTrabajoId,
-        }),
-      );
+          resultado: await agregarRolUsuario({
+            usuarioId: rutExistente.id,
+            organizacionId: rol === "super_admin" ? null : input.organizacionId,
+            rol,
+            centroTrabajoId,
+          }),
+        });
+      }
     }
-    const agregados = roles.filter((_, i) => resultados[i].ok);
+    const agregados = roles.filter((rol) => resultados.some((r) => r.rol === rol && r.resultado.ok));
     if (agregados.length === 0) {
-      const primerError = resultados.find((r) => !r.ok);
+      const primerError = resultados.find((r) => !r.resultado.ok)?.resultado;
       return { ok: false as const, mensaje: primerError && !primerError.ok ? primerError.mensaje : "No se pudo asignar." };
     }
     return {
@@ -102,7 +119,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
       cuentaExistente: true as const,
       nombreExistente: `${rutExistente.nombres} ${rutExistente.apellidos}`,
       rolesAgregados: agregados,
-      avisoFacilitador: resultados.map((r) => (r.ok ? r.avisoFacilitador : null)).find(Boolean) ?? null,
+      avisoFacilitador: resultados.map(({ resultado: r }) => (r.ok ? r.avisoFacilitador : null)).find(Boolean) ?? null,
     };
   }
 
@@ -144,12 +161,14 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   }
 
   const { error: errorRol } = await admin.from("usuario_roles").insert(
-    rolRows.map((r) => ({
-      usuario_id: creado.user.id,
-      rol_id: r.id,
-      organizacion_id: r.nombre === "super_admin" ? null : input.organizacionId,
-      centro_trabajo_id: r.nombre === "supervisor_centro" ? input.centroTrabajoId : null,
-    })),
+    rolRows.flatMap((r) =>
+      (r.nombre === "supervisor_centro" ? centrosSupervisor : [null]).map((centroTrabajoId) => ({
+        usuario_id: creado.user.id,
+        rol_id: r.id,
+        organizacion_id: r.nombre === "super_admin" ? null : input.organizacionId,
+        centro_trabajo_id: centroTrabajoId,
+      })),
+    ),
   );
 
   if (errorRol) {

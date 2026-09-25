@@ -350,7 +350,7 @@ function NuevaCuentaDialog({
     rut: "",
     roles: [] as RolNombre[],
     organizacionId: organizaciones[0]?.id ?? "",
-    centroTrabajoId: "",
+    centrosTrabajoIds: [] as string[],
   });
   const requiereOrganizacion = form.roles.length === 0 || form.roles.some((r) => r !== "super_admin");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
@@ -377,7 +377,7 @@ function NuevaCuentaDialog({
         dv: parsed.dv,
         roles: form.roles,
         organizacionId: requiereOrganizacion ? form.organizacionId : null,
-        centroTrabajoId: form.roles.includes("supervisor_centro") ? form.centroTrabajoId || null : null,
+        centrosTrabajoIds: form.roles.includes("supervisor_centro") ? form.centrosTrabajoIds : [],
       });
 
       if (!resultado.ok) {
@@ -400,7 +400,7 @@ function NuevaCuentaDialog({
           rut: "",
           roles: [] as RolNombre[],
           organizacionId: organizaciones[0]?.id ?? "",
-          centroTrabajoId: "",
+          centrosTrabajoIds: [] as string[],
         });
         cerrarYLimpiar();
         return;
@@ -426,7 +426,7 @@ function NuevaCuentaDialog({
         rut: "",
         roles: [] as RolNombre[],
         organizacionId: organizaciones[0]?.id ?? "",
-        centroTrabajoId: "",
+        centrosTrabajoIds: [] as string[],
       });
     });
   }
@@ -535,7 +535,7 @@ function NuevaCuentaDialog({
                   <Select
                     items={Object.fromEntries(organizaciones.map((o) => [o.id, o.razon_social]))}
                     value={form.organizacionId}
-                    onValueChange={(v) => setForm((f) => ({ ...f, organizacionId: v ?? "" }))}
+                    onValueChange={(v) => setForm((f) => ({ ...f, organizacionId: v ?? "", centrosTrabajoIds: [] }))}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Selecciona una organización" />
@@ -551,28 +551,11 @@ function NuevaCuentaDialog({
                 </div>
               )}
               {form.roles.includes("supervisor_centro") && (
-                <div className="flex flex-col gap-1.5">
-                  <Label>Centro de trabajo</Label>
-                  <Select
-                    items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
-                    value={form.centroTrabajoId}
-                    onValueChange={(v) => setForm((f) => ({ ...f, centroTrabajoId: v ?? "" }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Todos los centros (sin acotar)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {centrosDeOrg.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Si no eliges un centro, verá el cumplimiento de toda la organización.
-                  </p>
-                </div>
+                <SelectorCentros
+                  centros={centrosDeOrg}
+                  seleccionados={form.centrosTrabajoIds}
+                  onChange={(ids) => setForm((f) => ({ ...f, centrosTrabajoIds: ids }))}
+                />
               )}
               <DialogFooter>
                 <Button type="submit" disabled={pending || form.roles.length === 0}>
@@ -618,6 +601,49 @@ function SelectorRoles({
   );
 }
 
+function SelectorCentros({
+  centros,
+  seleccionados,
+  onChange,
+  disabled,
+}: {
+  centros: Centro[];
+  seleccionados: string[];
+  onChange: (ids: string[]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>Centros que supervisa</Label>
+      {centros.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No hay centros disponibles; supervisará toda la organización.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 border border-border p-3">
+          {centros.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                disabled={disabled}
+                checked={seleccionados.includes(c.id)}
+                onChange={(e) =>
+                  onChange(e.target.checked ? [...seleccionados, c.id] : seleccionados.filter((x) => x !== c.id))
+                }
+              />
+              {c.nombre}
+            </label>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Puedes marcar varios. Si no marcas ninguno, verá el cumplimiento de toda la organización.
+      </p>
+    </div>
+  );
+}
+
 function etiquetaAsignacion(a: Asignacion, mostrarOrganizacion: boolean) {
   const partes = [a.roles ? ROL_LABEL[a.roles.nombre] : "-"];
   if (a.roles?.nombre === "supervisor_centro" && a.centros_trabajo) partes.push(a.centros_trabajo.nombre);
@@ -654,15 +680,21 @@ function GestionarRolesDialog({
     "";
   const [organizacionId, setOrganizacionId] = useState(orgInicial);
   const [seleccion, setSeleccion] = useState<RolNombre[]>([]);
-  const [centroTrabajoId, setCentroTrabajoId] = useState("");
+  const [centrosSeleccionados, setCentrosSeleccionados] = useState<string[]>([]);
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === organizacionId);
 
-  // supervisor_centro puede repetirse con distinto centro; el resto, una vez por organización.
+  // supervisor_centro se repite una vez por centro; el resto, una vez por organización.
+  const supervisionesEnOrg = cuenta.asignaciones.filter(
+    (a) => a.roles?.nombre === "supervisor_centro" && a.organizacion_id === organizacionId,
+  );
+  const supervisaTodaLaOrg = supervisionesEnOrg.some((a) => !a.centro_trabajo_id);
+  const centrosLibres = centrosDeOrg.filter((c) => !supervisionesEnOrg.some((a) => a.centro_trabajo_id === c.id));
   const yaAsignado = (r: RolNombre) =>
-    r !== "supervisor_centro" &&
-    cuenta.asignaciones.some(
-      (a) => a.roles?.nombre === r && a.organizacion_id === (r === "super_admin" ? null : organizacionId),
-    );
+    r === "supervisor_centro"
+      ? supervisaTodaLaOrg || (centrosDeOrg.length > 0 && centrosLibres.length === 0)
+      : cuenta.asignaciones.some(
+          (a) => a.roles?.nombre === r && a.organizacion_id === (r === "super_admin" ? null : organizacionId),
+        );
   const rolesParaAgregar = rolesDisponibles.filter((r) => !yaAsignado(r));
   const aAgregar = seleccion.filter((r) => rolesParaAgregar.includes(r));
   const requiereOrganizacion = aAgregar.length === 0 || aAgregar.some((r) => r !== "super_admin");
@@ -689,25 +721,30 @@ function GestionarRolesDialog({
     startTransition(async () => {
       const agregados: RolNombre[] = [];
       for (const rol of aAgregar) {
-        const resultado = await agregarRolUsuario({
-          usuarioId: cuenta.usuario.id,
-          organizacionId: rol === "super_admin" ? null : organizacionId,
-          rol,
-          centroTrabajoId: rol === "supervisor_centro" ? centroTrabajoId || null : null,
-        });
-        if (!resultado.ok) {
-          toast.error(`${ROL_LABEL[rol]}: ${resultado.mensaje}`);
-          continue;
+        const centrosMarcados = centrosSeleccionados.filter((id) => centrosLibres.some((c) => c.id === id));
+        const centrosDelRol: (string | null)[] =
+          rol === "supervisor_centro" && centrosMarcados.length > 0 ? centrosMarcados : [null];
+        for (const centroTrabajoId of centrosDelRol) {
+          const resultado = await agregarRolUsuario({
+            usuarioId: cuenta.usuario.id,
+            organizacionId: rol === "super_admin" ? null : organizacionId,
+            rol,
+            centroTrabajoId,
+          });
+          if (!resultado.ok) {
+            toast.error(`${ROL_LABEL[rol]}: ${resultado.mensaje}`);
+            continue;
+          }
+          if (!agregados.includes(rol)) agregados.push(rol);
+          if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
         }
-        agregados.push(rol);
-        if (resultado.avisoFacilitador) toast.warning(resultado.avisoFacilitador, { duration: 10000 });
       }
       if (agregados.length === 0) return;
       toast.success(
         `${agregados.length > 1 ? "Se agregaron los roles" : "Se agregó el rol"} ${agregados.map((r) => ROL_LABEL[r]).join(", ")}.`,
       );
       setSeleccion([]);
-      setCentroTrabajoId("");
+      setCentrosSeleccionados([]);
       setOpen(false);
     });
   }
@@ -776,7 +813,7 @@ function GestionarRolesDialog({
                 value={organizacionId}
                 onValueChange={(v) => {
                   setOrganizacionId(v ?? "");
-                  setCentroTrabajoId("");
+                  setCentrosSeleccionados([]);
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -792,27 +829,12 @@ function GestionarRolesDialog({
               </Select>
             )}
             {aAgregar.includes("supervisor_centro") && (
-              <div className="flex flex-col gap-1.5">
-                <Select
-                  items={Object.fromEntries(centrosDeOrg.map((c) => [c.id, c.nombre]))}
-                  value={centroTrabajoId}
-                  onValueChange={(v) => setCentroTrabajoId(v ?? "")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos los centros (sin acotar)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {centrosDeOrg.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Supervisor de centro: si no eliges un centro, verá el cumplimiento de toda la organización.
-                </p>
-              </div>
+              <SelectorCentros
+                centros={centrosLibres}
+                seleccionados={centrosSeleccionados.filter((id) => centrosLibres.some((c) => c.id === id))}
+                onChange={setCentrosSeleccionados}
+                disabled={pending}
+              />
             )}
             {aAgregar.includes("facilitador") && (
               <p className="text-xs text-muted-foreground">
