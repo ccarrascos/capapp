@@ -24,6 +24,62 @@ const ROL_LABEL: Record<RolNombre, string> = {
 const AVISO_SIN_FICHA_FACILITADOR =
   "No hay una ficha de facilitador con este RUT en la organización. Regístralo en Facilitadores para que pueda dictar ediciones; quedará vinculado automáticamente.";
 
+/**
+ * Rol trabajador: lo puede dar quien tenga trabajadores.dar_acceso (admin o
+ * prevencionista); el resto de los roles, sólo quien gestiona usuarios.
+ */
+async function validarPermisoRoles(
+  sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>,
+  roles: RolNombre[],
+  organizacionId: string,
+): Promise<string | null> {
+  if (roles.includes("trabajador") && !(await tienePermiso(sesion, "trabajadores.dar_acceso", organizacionId))) {
+    return "No tienes permiso para dar acceso a trabajadores en esta organización.";
+  }
+  const rolesGestion = roles.filter((r) => r !== "trabajador" && r !== "super_admin");
+  if (rolesGestion.length > 0 && !(await tienePermiso(sesion, "usuarios.gestionar", organizacionId))) {
+    return "Sólo puedes asignar el rol Trabajador en esta organización.";
+  }
+  return null;
+}
+
+/** El rol trabajador exige que la persona esté en la matriz de esa organización. */
+async function validarEnMatriz(
+  admin: ReturnType<typeof createAdminClient>,
+  run: string,
+  organizacionId: string,
+): Promise<string | null> {
+  const { data: vinculo } = await admin
+    .from("vinculos_laborales")
+    .select("persona_run")
+    .eq("persona_run", run)
+    .eq("organizacion_id", organizacionId)
+    .eq("activo", true)
+    .limit(1);
+  return (vinculo ?? []).length > 0
+    ? null
+    : "Para darle el rol Trabajador, primero agrégalo a la matriz de vigencia de esta organización.";
+}
+
+/**
+ * Enlaza la cuenta con su ficha en la matriz (personas.usuario_id), sin
+ * importar desde dónde se creó: así la matriz la muestra con acceso y la
+ * persona ve "Mi capacitación". Si se pasa email, queda también como correo
+ * de contacto de la ficha (es a donde se enviaron las credenciales).
+ */
+async function vincularPersona(
+  admin: ReturnType<typeof createAdminClient>,
+  usuarioId: string,
+  run: string,
+  email: string | null,
+) {
+  await admin
+    .from("personas")
+    .update(email ? { usuario_id: usuarioId, email } : { usuario_id: usuarioId })
+    .eq("run", run)
+    .is("usuario_id", null);
+}
+
 export type CrearUsuarioInput = {
   nombres: string;
   apellidos: string;
@@ -52,16 +108,8 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     if (!input.organizacionId) {
       return { ok: false as const, mensaje: "Selecciona una organización para estos roles." };
     }
-    if (!(await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId))) {
-      return { ok: false as const, mensaje: "No tienes permiso para crear esta cuenta." };
-    }
-  }
-
-  if (roles.includes("trabajador")) {
-    return {
-      ok: false as const,
-      mensaje: "El acceso de un trabajador se otorga desde el módulo Trabajadores (botón «Dar acceso»), para que quede vinculado a su registro en la matriz de vigencia.",
-    };
+    const error = await validarPermisoRoles(sesion, rolesDeOrganizacion, input.organizacionId);
+    if (error) return { ok: false as const, mensaje: error };
   }
 
   const run = input.run.trim();
@@ -73,6 +121,11 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   }
 
   const admin = createAdminClient();
+
+  if (roles.includes("trabajador")) {
+    const error = await validarEnMatriz(admin, run, input.organizacionId!);
+    if (error) return { ok: false as const, mensaje: error };
+  }
 
   const { data: rutExistente } = await admin
     .from("usuarios")
@@ -110,6 +163,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
       }
     }
     const agregados = roles.filter((rol) => resultados.some((r) => r.rol === rol && r.resultado.ok));
+    if (agregados.length > 0) await vincularPersona(admin, rutExistente.id, run, null);
     if (agregados.length === 0) {
       const primerError = resultados.find((r) => !r.resultado.ok)?.resultado;
       return { ok: false as const, mensaje: primerError && !primerError.ok ? primerError.mensaje : "No se pudo asignar." };
@@ -176,6 +230,8 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     return { ok: false as const, mensaje: errorRol.message };
   }
 
+  await vincularPersona(admin, creado.user.id, run, email);
+
   let avisoFacilitador: string | null = null;
   if (roles.includes("facilitador") && input.organizacionId) {
     if (!(await vincularFichaFacilitador(creado.user.id, input.organizacionId))) {
@@ -184,6 +240,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   }
 
   revalidatePath("/usuarios");
+  revalidatePath("/trabajadores");
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,
@@ -278,22 +335,23 @@ export async function agregarRolUsuario(input: {
     }
   } else {
     if (!input.organizacionId) return { ok: false as const, mensaje: "Selecciona una organización para este rol." };
-    if (!(await tienePermiso(sesion, "usuarios.gestionar", input.organizacionId))) {
-      return { ok: false as const, mensaje: "No tienes permiso para asignar roles en esta organización." };
-    }
-  }
-
-  if (input.rol === "trabajador") {
-    return {
-      ok: false as const,
-      mensaje: "El rol de trabajador se otorga desde el módulo Trabajadores (botón «Dar acceso»), no desde aquí.",
-    };
+    const error = await validarPermisoRoles(sesion, [input.rol], input.organizacionId);
+    if (error) return { ok: false as const, mensaje: error };
   }
 
   const organizacionId = input.rol === "super_admin" ? null : input.organizacionId;
   const centroTrabajoId = input.rol === "supervisor_centro" ? (input.centroTrabajoId ?? null) : null;
 
   const admin = createAdminClient();
+
+  let runPersona: string | null = null;
+  if (input.rol === "trabajador") {
+    const { data: usuario } = await admin.from("usuarios").select("run").eq("id", input.usuarioId).maybeSingle();
+    if (!usuario?.run) return { ok: false as const, mensaje: "Esta cuenta no tiene RUT registrado." };
+    const error = await validarEnMatriz(admin, usuario.run, organizacionId!);
+    if (error) return { ok: false as const, mensaje: error };
+    runPersona = usuario.run;
+  }
 
   const { data: rolRow } = await admin.from("roles").select("id").eq("nombre", input.rol).single();
   if (!rolRow) return { ok: false as const, mensaje: "Rol inválido." };
@@ -313,7 +371,10 @@ export async function agregarRolUsuario(input: {
   }
 
   const supabase = await createClient();
-  const { data: creado, error } = await supabase
+  // RLS de usuario_roles sólo deja escribir al admin_organizacion; el rol
+  // trabajador también lo da el prevencionista (permiso validado arriba).
+  const cliente = input.rol === "trabajador" ? admin : supabase;
+  const { data: creado, error } = await cliente
     .from("usuario_roles")
     .insert({
       usuario_id: input.usuarioId,
@@ -325,6 +386,8 @@ export async function agregarRolUsuario(input: {
     .single();
 
   if (error || !creado) return { ok: false as const, mensaje: error?.message ?? "No se pudo asignar el rol." };
+
+  if (runPersona) await vincularPersona(admin, input.usuarioId, runPersona, null);
 
   let avisoFacilitador: string | null = null;
   if (input.rol === "facilitador" && organizacionId) {
@@ -343,6 +406,7 @@ export async function agregarRolUsuario(input: {
   });
 
   revalidatePath("/usuarios");
+  revalidatePath("/trabajadores");
   return { ok: true as const, avisoFacilitador };
 }
 

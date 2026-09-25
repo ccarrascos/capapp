@@ -53,7 +53,6 @@ import {
 import { SignBadge, SignDot, type EstadoVigencia } from "@/components/status/sign-badge";
 import {
   crearTrabajador,
-  crearAccesoTrabajador,
   actualizarTrabajador,
   obtenerDetalleTrabajador,
   obtenerCredencialQr,
@@ -65,7 +64,10 @@ import {
   type CursoYaCubierto,
 } from "./actions";
 import { inscribirTrabajadores } from "../ediciones/actions";
-import { formatearRunInput, esRutValido, calcularDV } from "@/lib/rut";
+import { formatearRunInput, esRutValido, calcularDV, formatearRut } from "@/lib/rut";
+import { crearUsuario } from "../usuarios/actions";
+import { CrearCuentaDialog } from "@/components/cuentas/crear-cuenta-dialog";
+import type { RolNombre } from "@/lib/auth";
 import { esFechaNacimientoValida } from "@/lib/fecha-nacimiento";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 import { coincideBusqueda } from "@/lib/busqueda";
@@ -304,6 +306,7 @@ export function TrabajadoresView({
   puedeDarAcceso,
   puedeInscribir,
   puedeVerDetalle,
+  rolesCuenta,
 }: {
   filas: FilaMatriz[];
   organizaciones: { id: string; razon_social: string }[];
@@ -314,6 +317,7 @@ export function TrabajadoresView({
   puedeDarAcceso: boolean;
   puedeInscribir: boolean;
   puedeVerDetalle: boolean;
+  rolesCuenta: RolNombre[];
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState<EstadoVigencia | "todos">("todos");
@@ -491,10 +495,26 @@ export function TrabajadoresView({
                   {f.usuarioId ? (
                     <span className="text-xs text-clear">Con acceso</span>
                   ) : puedeDarAcceso && f.persona_run && f.organizacion_id ? (
-                    <DarAccesoDialog
-                      personaRun={f.persona_run}
-                      organizacionId={f.organizacion_id}
-                      emailSugerido={f.personaEmail ?? ""}
+                    <CrearCuentaDialog
+                      titulo="Dar acceso a la plataforma"
+                      organizaciones={organizaciones.filter((o) => o.id === f.organizacion_id)}
+                      centros={centros}
+                      rolesDisponibles={rolesCuenta}
+                      identidadFija
+                      inicial={{
+                        rut: f.run && f.dv ? formatearRut(f.run, f.dv) : "",
+                        nombres: f.nombres ?? "",
+                        apellidos: `${f.apellido_paterno ?? ""} ${f.apellido_materno ?? ""}`.trim(),
+                        email: f.personaEmail ?? "",
+                        organizacionId: f.organizacion_id,
+                        roles: ["trabajador"],
+                      }}
+                      trigger={
+                        <Button size="sm" variant="outline">
+                          <KeyRound className="size-3.5" />
+                          Dar acceso
+                        </Button>
+                      }
                     />
                   ) : (
                     <span className="text-xs text-muted-foreground">Sin acceso</span>
@@ -949,18 +969,24 @@ function NuevoTrabajadorDialog({
         ? `Trabajador agregado a la matriz. Ya existía como ${resultado.nombreExistente} (registrado antes en otra organización) - se usaron sus datos actuales.`
         : "Trabajador agregado a la matriz.";
 
-      if (!darAccesoInmediato || resultado.personaYaExistia) {
-        // Si la persona ya existía, puede ya tener cuenta - dar acceso queda para el flujo normal de la fila.
+      if (!darAccesoInmediato) {
         toast.success(mensajeBase);
         setOpen(false);
         reiniciarFormulario();
         return;
       }
 
-      const resultadoAcceso = await crearAccesoTrabajador({
-        personaRun: run,
-        organizacionId: form.organizacionId,
+      // Mismo camino que "Dar acceso" y "Nueva cuenta": si el RUT ya tiene
+      // cuenta, sólo se le suma el rol trabajador.
+      const resultadoAcceso = await crearUsuario({
+        nombres: form.nombres.trim(),
+        apellidos: `${form.apellidoPaterno.trim()} ${form.apellidoMaterno.trim()}`.trim(),
         email,
+        run,
+        dv,
+        roles: ["trabajador"],
+        organizacionId: form.organizacionId,
+        centrosTrabajoIds: [],
       });
 
       if (!resultadoAcceso.ok) {
@@ -970,7 +996,11 @@ function NuevoTrabajadorDialog({
         return;
       }
 
-      if (resultadoAcceso.emailEnviado) {
+      if ("cuentaExistente" in resultadoAcceso) {
+        toast.success(`${mensajeBase} Ya tenía cuenta: se le sumó el rol Trabajador y sigue entrando con su contraseña actual.`);
+        setOpen(false);
+        reiniciarFormulario();
+      } else if (resultadoAcceso.emailEnviado) {
         toast.success(`${mensajeBase} Le enviamos las credenciales a ${email}.`);
         setOpen(false);
         reiniciarFormulario();
@@ -1618,121 +1648,6 @@ function EditarTrabajadorDialog({
   );
 }
 
-function DarAccesoDialog({
-  personaRun,
-  organizacionId,
-  emailSugerido,
-}: {
-  personaRun: string;
-  organizacionId: string;
-  emailSugerido: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [email, setEmail] = useState(emailSugerido);
-  const [resultado, setResultado] = useState<{ emailEnviado: boolean; password?: string; expiraEn?: Date } | null>(
-    null,
-  );
-  const [copiado, setCopiado] = useState(false);
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    startTransition(async () => {
-      const res = await crearAccesoTrabajador({ personaRun, organizacionId, email: email.trim() });
-      if (!res.ok) {
-        toast.error(res.mensaje);
-        return;
-      }
-      if (res.emailEnviado) {
-        toast.success(`Enviamos las credenciales a ${email.trim()}.`);
-        setOpen(false);
-      } else {
-        setResultado({ emailEnviado: false, password: res.passwordTemporal, expiraEn: res.expiraEn });
-      }
-    });
-  }
-
-  function cerrarYLimpiar() {
-    setOpen(false);
-    setResultado(null);
-    setCopiado(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : cerrarYLimpiar())}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        <KeyRound className="size-3.5" />
-        Dar acceso
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        {resultado ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Acceso creado - correo no enviado</DialogTitle>
-              <DialogDescription>
-                No se pudo enviar el correo de bienvenida. Comparte esta contraseña temporal de forma segura - no
-                volverá a mostrarse.
-                {resultado.expiraEn && (
-                  <> Caduca el {resultado.expiraEn.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}.</>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            {resultado.password && (
-              <div className="border border-border bg-muted p-4 font-mono text-sm flex items-center justify-between gap-2">
-                <span>{resultado.password}</span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    navigator.clipboard.writeText(resultado.password!);
-                    setCopiado(true);
-                  }}
-                >
-                  {copiado ? <Check className="size-4 text-clear" /> : <Copy className="size-4" />}
-                </Button>
-              </div>
-            )}
-            <DialogFooter>
-              <Button onClick={cerrarYLimpiar}>Listo</Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>Dar acceso a la app</DialogTitle>
-              <DialogDescription>
-                Se creará una cuenta de acceso para que pueda ver su propia capacitación, usando su RUT ya
-                registrado en esta matriz.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emailAcceso">Correo</Label>
-                <Input
-                  id="emailAcceso"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={pending}>
-                  {pending ? "Creando…" : "Dar acceso"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** El popup de Select no envuelve ni encoge su texto (fuerza whitespace-nowrap),
- * así que un nombre largo hay que acortarlo aquí - el título completo queda
- * disponible al pasar el mouse por encima. */
 function truncarTexto(texto: string, maxLargo = 46): string {
   return texto.length > maxLargo ? `${texto.slice(0, maxLargo - 1).trimEnd()}…` : texto;
 }

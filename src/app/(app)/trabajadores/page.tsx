@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSesion, centrosVisibles } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
+import { ROLES_ASIGNABLES } from "@/lib/roles";
+import type { RolNombre } from "@/lib/auth";
 import { TrabajadoresView } from "./trabajadores-view";
 
 const ROLES_DETALLE = [
@@ -76,12 +78,16 @@ export default async function TrabajadoresPage() {
     centroIds: s.subcontratos_centros.map((sc) => sc.centro_trabajo_id),
   }));
 
-  const [puedeGestionar, puedeDarAcceso, puedeInscribir, puedeVerDetalle] = await Promise.all([
+  const [puedeGestionar, puedeDarAcceso, puedeInscribir, puedeVerDetalle, puedeGestionarUsuarios] = await Promise.all([
     tienePermisoEnAlgunaOrg(sesion, "trabajadores.gestionar"),
     tienePermisoEnAlgunaOrg(sesion, "trabajadores.dar_acceso"),
     tienePermisoEnAlgunaOrg(sesion, "ediciones.inscribir"),
     tienePermisoEnAlgunaOrg(sesion, "trabajadores.ver_detalle"),
+    tienePermisoEnAlgunaOrg(sesion, "usuarios.gestionar"),
   ]);
+  // Mismo diálogo que "Nueva cuenta" en Usuarios y roles; quien sólo puede
+  // dar acceso a trabajadores ve únicamente ese rol.
+  const rolesCuenta: RolNombre[] = ["trabajador", ...(puedeGestionarUsuarios ? ROLES_ASIGNABLES : [])];
 
   return (
     <TrabajadoresView
@@ -94,6 +100,7 @@ export default async function TrabajadoresPage() {
       puedeDarAcceso={puedeDarAcceso}
       puedeInscribir={puedeInscribir}
       puedeVerDetalle={puedeVerDetalle}
+      rolesCuenta={rolesCuenta}
     />
   );
 }
