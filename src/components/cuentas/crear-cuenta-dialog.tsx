@@ -84,6 +84,9 @@ export function CrearCuentaDialog({
     .filter((r) => (r.rol === "super_admin" ? r.organizacionId === null : r.organizacionId === form.organizacionId))
     .map((r) => r.rol);
   const rolesNuevos = form.roles.filter((r) => !rolesActuales.includes(r));
+  // Igual que en la matriz: si ya está en esta organización, aquí no se hace
+  // nada más (los roles se gestionan desde su fila en Usuarios y roles).
+  const yaEnOrganizacion = cuentaExistente && rolesActuales.length > 0;
   const requiereOrganizacion = rolesNuevos.length === 0 || rolesNuevos.some((r) => r !== "super_admin");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
 
@@ -228,11 +231,20 @@ export function CrearCuentaDialog({
                   if (resultado?.email) setForm((f) => ({ ...f, email: f.email || resultado.email! }));
                 }}
               />
+              {yaEnOrganizacion && (
+                <p role="alert" className="border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-alert">
+                  Este usuario ya tiene una cuenta en esta organización. Para agregar o quitar roles, usa el lápiz
+                  en su fila de Usuarios y roles.
+                </p>
+              )}
+              <fieldset disabled={yaEnOrganizacion} className="flex min-w-0 flex-col gap-4 disabled:opacity-50">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="email">Correo</Label>
                 {cuentaExistente ? (
                   <p className="text-xs text-muted-foreground">
-                    Ya tiene cuenta: se le suman los roles marcados y mantiene su correo y contraseña actuales.
+                    {yaEnOrganizacion
+                      ? "Ya tiene cuenta; mantiene su correo y contraseña actuales."
+                      : "Ya tiene cuenta en otra organización: se le suman los roles marcados en esta y mantiene su correo y contraseña actuales."}
                   </p>
                 ) : (
                   <Input
@@ -253,14 +265,15 @@ export function CrearCuentaDialog({
                   onChange={(roles) => setForm((f) => ({ ...f, roles }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {rolesActuales.length > 0
-                    ? "Los roles en gris ya los tiene; marca los que quieras sumar. Para quitar uno, usa Roles de la cuenta en Usuarios y roles."
+                  {yaEnOrganizacion
+                    ? "Roles que ya tiene en esta organización."
                     : rolesDisponibles.length > 1
                       ? "Puedes marcar varios."
                       : "Es el único rol que puedes asignar."}
                   {rolesNuevos.includes("trabajador") && " Trabajador: debe estar en la matriz de vigencia de la organización."}
                 </p>
               </div>
+              </fieldset>
               {requiereOrganizacion && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Organización</Label>
@@ -290,7 +303,7 @@ export function CrearCuentaDialog({
                 />
               )}
               <DialogFooter>
-                <Button type="submit" disabled={pending || rolesNuevos.length === 0}>
+                <Button type="submit" disabled={pending || yaEnOrganizacion || rolesNuevos.length === 0}>
                   {pending ? "Guardando…" : cuentaExistente ? "Agregar roles" : "Crear cuenta"}
                 </Button>
               </DialogFooter>
