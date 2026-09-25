@@ -476,12 +476,16 @@ export const DEFINICIONES_HERRAMIENTAS: Groq.Chat.Completions.ChatCompletionTool
       parameters: {
         type: "object",
         properties: {
-          trabajador: { type: "string", description: "Opcional: nombre (o parte) o RUN de un trabajador específico." },
+          trabajador: {
+            type: ["string", "null"],
+            description: "Nombre (o parte) o RUN de un trabajador específico. null para todos.",
+          },
           centro: {
-            type: "string",
-            description: "Opcional: nombre (o parte) de un centro, para ver sólo los cambios desde o hacia ese centro.",
+            type: ["string", "null"],
+            description: "Nombre (o parte) de un centro, para ver sólo los cambios desde o hacia ese centro. null para todos.",
           },
         },
+        required: [],
       },
     },
   },

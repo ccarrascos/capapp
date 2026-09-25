@@ -23,6 +23,31 @@ export type MensajeChat = { role: "user" | "assistant"; content: string };
 const MAX_MENSAJES = 20;
 const MAX_VUELTAS_HERRAMIENTAS = 6;
 
+/**
+ * Groq valida los argumentos que genera el modelo contra el esquema de la
+ * herramienta y rechaza la respuesta entera (400 tool_use_failed) si no
+ * calzan. Es no determinístico, así que un reintento suele bastar.
+ */
+async function crearCompletion(mensajes: Groq.Chat.Completions.ChatCompletionMessageParam[]) {
+  const pedir = () =>
+    groq.chat.completions.create({
+      model: MODELO_IA,
+      messages: mensajes,
+      tools: DEFINICIONES_HERRAMIENTAS,
+      tool_choice: "auto",
+      temperature: 0.2,
+    });
+  try {
+    return await pedir();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("tool_use_failed")) {
+      console.warn("Groq tool_use_failed, reintentando:", error.message.slice(0, 300));
+      return await pedir();
+    }
+    throw error;
+  }
+}
+
 export async function enviarMensaje(
   historial: MensajeChat[],
 ): Promise<{ ok: true; respuesta: string } | { ok: false; mensaje: string }> {
@@ -48,13 +73,7 @@ export async function enviarMensaje(
 
   try {
     for (let vuelta = 0; vuelta < MAX_VUELTAS_HERRAMIENTAS; vuelta++) {
-      const respuesta = await groq.chat.completions.create({
-        model: MODELO_IA,
-        messages: mensajes,
-        tools: DEFINICIONES_HERRAMIENTAS,
-        tool_choice: "auto",
-        temperature: 0.2,
-      });
+      const respuesta = await crearCompletion(mensajes);
 
       const mensaje = respuesta.choices[0]?.message;
       if (!mensaje) return { ok: false, mensaje: "El asistente no respondió." };
