@@ -1114,6 +1114,7 @@ function NuevoTrabajadorDialog({
               apellidoPaterno: form.apellidoPaterno,
               apellidoMaterno: form.apellidoMaterno,
             }}
+            ocultarEstado={yaEnMatriz}
             onChange={(identidad) => setForm((f) => ({ ...f, ...identidad, dv: dvDe(identidad.run) }))}
             onEncontrada={(encontrada) => {
               setMatrizDe(encontrada?.enMatrizDe ?? []);

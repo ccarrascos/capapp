@@ -42,6 +42,7 @@ export function CamposIdentidad({
   onEncontrada,
   fija = false,
   buscar = true,
+  ocultarEstado = false,
 }: {
   valor: Identidad;
   onChange: (identidad: Identidad) => void;
@@ -49,6 +50,8 @@ export function CamposIdentidad({
   /** Identidad ya conocida (ej. desde la matriz): nada se edita. */
   fija?: boolean;
   buscar?: boolean;
+  /** Cuando el formulario ya muestra su propio aviso (ej. "ya está ingresado"). */
+  ocultarEstado?: boolean;
 }) {
   const [encontrada, setEncontrada] = useState<IdentidadEncontrada | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -112,7 +115,7 @@ export function CamposIdentidad({
           <Input id="identidad-dv" disabled value={dv} placeholder="-" className="font-mono text-center" />
         </div>
       </div>
-      {(buscando || estado) && (
+      {(buscando || (estado && !ocultarEstado)) && (
         <p className="text-xs text-muted-foreground -mt-2">{buscando ? "Buscando RUN…" : estado}</p>
       )}
 

@@ -225,6 +225,7 @@ export function CrearCuentaDialog({
               <CamposIdentidad
                 valor={form.identidad}
                 fija={identidadFija}
+                ocultarEstado={yaEnOrganizacion}
                 onChange={(identidad) => setForm((f) => ({ ...f, identidad }))}
                 onEncontrada={(resultado) => {
                   setEncontrada(resultado);
