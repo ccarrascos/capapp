@@ -47,21 +47,21 @@ export default async function ValidarCertificadoPage({
   return (
     <div className="min-h-dvh flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
-          <img src="/logo-full.png" alt="CapApp" className="h-24 w-auto" loading="lazy" />
-        </div>
-
         {certificado?.cursos?.organizaciones?.logo_url && (
-          <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center justify-center mb-5">
             {/* eslint-disable-next-line @next/next/no-img-element -- logo subido a Storage, no requiere optimización de next/image */}
             <img
               src={certificado.cursos.organizaciones.logo_url}
               alt={certificado.cursos.organizaciones.razon_social}
-              className="h-10 max-w-48 object-contain"
+              className="h-14 max-w-56 object-contain"
             />
           </div>
         )}
+
+        <div className="flex justify-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element -- logo estático, no requiere optimización de next/image */}
+          <img src="/logo-full.png" alt="CapApp" className="h-14 w-auto" loading="lazy" />
+        </div>
 
         {!certificado || !certificado.cursos || !certificado.personas ? (
           <div className="border border-alert/30 bg-alert/10 p-6 text-center">
