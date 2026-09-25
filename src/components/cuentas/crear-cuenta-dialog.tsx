@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { crearUsuario } from "@/app/(app)/usuarios/actions";
+import type { IdentidadEncontrada } from "@/app/(app)/personas/actions";
 import type { RolNombre } from "@/lib/auth";
 import { ROL_LABEL } from "@/lib/roles";
 import { esRutValido, formatearRut } from "@/lib/rut";
@@ -68,7 +69,8 @@ export function CrearCuentaDialog({
     { email: string; rut: string; emailEnviado: boolean; password?: string; expiraEn?: Date } | null
   >(null);
   const [copiado, setCopiado] = useState(false);
-  const [cuentaExistente, setCuentaExistente] = useState(false);
+  const [encontrada, setEncontrada] = useState<IdentidadEncontrada | null>(null);
+  const cuentaExistente = !!encontrada?.tieneCuenta;
   const formularioInicial = () => ({
     identidad: inicial?.identidad ?? IDENTIDAD_VACIA,
     email: inicial?.email ?? "",
@@ -77,7 +79,12 @@ export function CrearCuentaDialog({
     centrosTrabajoIds: [] as string[],
   });
   const [form, setForm] = useState(formularioInicial);
-  const requiereOrganizacion = form.roles.length === 0 || form.roles.some((r) => r !== "super_admin");
+  // Roles que la cuenta ya tiene: se muestran marcados y no se envían de nuevo.
+  const rolesActuales = (encontrada?.rolesCuenta ?? [])
+    .filter((r) => (r.rol === "super_admin" ? r.organizacionId === null : r.organizacionId === form.organizacionId))
+    .map((r) => r.rol);
+  const rolesNuevos = form.roles.filter((r) => !rolesActuales.includes(r));
+  const requiereOrganizacion = rolesNuevos.length === 0 || rolesNuevos.some((r) => r !== "super_admin");
   const centrosDeOrg = centros.filter((c) => c.organizacion_id === form.organizacionId);
 
   function onSubmit(e: React.FormEvent) {
@@ -98,9 +105,9 @@ export function CrearCuentaDialog({
         email: cuentaExistente ? "" : form.email.trim(),
         run: parsed.run,
         dv: parsed.dv,
-        roles: form.roles,
+        roles: rolesNuevos,
         organizacionId: requiereOrganizacion ? form.organizacionId : null,
-        centrosTrabajoIds: form.roles.includes("supervisor_centro") ? form.centrosTrabajoIds : [],
+        centrosTrabajoIds: rolesNuevos.includes("supervisor_centro") ? form.centrosTrabajoIds : [],
       });
 
       if (!resultado.ok) {
@@ -150,7 +157,7 @@ export function CrearCuentaDialog({
       onOpenChange={(v) => {
         if (v) {
           setForm(formularioInicial());
-          setCuentaExistente(false);
+          setEncontrada(null);
           setOpen(true);
         } else {
           cerrarYLimpiar();
@@ -216,9 +223,9 @@ export function CrearCuentaDialog({
                 valor={form.identidad}
                 fija={identidadFija}
                 onChange={(identidad) => setForm((f) => ({ ...f, identidad }))}
-                onEncontrada={(encontrada) => {
-                  setCuentaExistente(!!encontrada?.tieneCuenta);
-                  if (encontrada?.email) setForm((f) => ({ ...f, email: f.email || encontrada.email! }));
+                onEncontrada={(resultado) => {
+                  setEncontrada(resultado);
+                  if (resultado?.email) setForm((f) => ({ ...f, email: f.email || resultado.email! }));
                 }}
               />
               <div className="flex flex-col gap-1.5">
@@ -241,12 +248,17 @@ export function CrearCuentaDialog({
                 <Label>Roles</Label>
                 <SelectorRoles
                   disponibles={rolesDisponibles}
-                  seleccionados={form.roles}
+                  seleccionados={rolesNuevos}
+                  yaAsignados={rolesActuales}
                   onChange={(roles) => setForm((f) => ({ ...f, roles }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {rolesDisponibles.length > 1 ? "Puedes marcar varios." : "Es el único rol que puedes asignar."}
-                  {form.roles.includes("trabajador") && " Trabajador: debe estar en la matriz de vigencia de la organización."}
+                  {rolesActuales.length > 0
+                    ? "Los roles en gris ya los tiene; marca los que quieras sumar. Para quitar uno, usa Roles de la cuenta en Usuarios y roles."
+                    : rolesDisponibles.length > 1
+                      ? "Puedes marcar varios."
+                      : "Es el único rol que puedes asignar."}
+                  {rolesNuevos.includes("trabajador") && " Trabajador: debe estar en la matriz de vigencia de la organización."}
                 </p>
               </div>
               {requiereOrganizacion && (
@@ -270,7 +282,7 @@ export function CrearCuentaDialog({
                   </Select>
                 </div>
               )}
-              {form.roles.includes("supervisor_centro") && (
+              {rolesNuevos.includes("supervisor_centro") && (
                 <SelectorCentros
                   centros={centrosDeOrg}
                   seleccionados={form.centrosTrabajoIds}
@@ -278,8 +290,8 @@ export function CrearCuentaDialog({
                 />
               )}
               <DialogFooter>
-                <Button type="submit" disabled={pending || form.roles.length === 0}>
-                  {pending ? "Creando…" : "Crear cuenta"}
+                <Button type="submit" disabled={pending || rolesNuevos.length === 0}>
+                  {pending ? "Guardando…" : cuentaExistente ? "Agregar roles" : "Crear cuenta"}
                 </Button>
               </DialogFooter>
             </form>
@@ -295,28 +307,39 @@ export function SelectorRoles({
   seleccionados,
   onChange,
   disabled,
+  yaAsignados = [],
 }: {
   disponibles: RolNombre[];
   seleccionados: RolNombre[];
   onChange: (roles: RolNombre[]) => void;
   disabled?: boolean;
+  /** Roles que la cuenta ya tiene: aparecen marcados y no se pueden desmarcar aquí. */
+  yaAsignados?: RolNombre[];
 }) {
+  const visibles = [...disponibles, ...yaAsignados.filter((r) => !disponibles.includes(r))];
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-2 border border-border p-3">
-      {disponibles.map((r) => (
-        <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            disabled={disabled}
-            checked={seleccionados.includes(r)}
-            onChange={(e) =>
-              onChange(e.target.checked ? [...seleccionados, r] : seleccionados.filter((x) => x !== r))
-            }
-          />
-          {ROL_LABEL[r]}
-        </label>
-      ))}
+      {visibles.map((r) => {
+        const asignado = yaAsignados.includes(r);
+        return (
+          <label
+            key={r}
+            className={asignado ? "flex items-center gap-2 text-sm text-muted-foreground" : "flex items-center gap-2 text-sm cursor-pointer"}
+            title={asignado ? "Ya tiene este rol" : undefined}
+          >
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              disabled={disabled || asignado}
+              checked={asignado || seleccionados.includes(r)}
+              onChange={(e) =>
+                onChange(e.target.checked ? [...seleccionados, r] : seleccionados.filter((x) => x !== r))
+              }
+            />
+            {ROL_LABEL[r]}
+          </label>
+        );
+      })}
     </div>
   );
 }

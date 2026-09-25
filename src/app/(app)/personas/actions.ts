@@ -1,6 +1,6 @@
 "use server";
 
-import { getSesion } from "@/lib/auth";
+import { getSesion, type RolNombre } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tienePermisoEnAlgunaOrg } from "@/lib/permisos";
 import { ROL_LABEL } from "@/lib/roles";
@@ -17,8 +17,10 @@ export type IdentidadEncontrada = {
   fechaNacimiento: string | null;
   sexo: "masculino" | "femenino" | "otro" | null;
   tieneCuenta: boolean;
-  /** Roles de la cuenta en las organizaciones de quien consulta. */
+  /** Roles de la cuenta en las organizaciones de quien consulta (etiquetas). */
   roles: string[];
+  /** Los mismos roles, con su organización, para marcarlos en el formulario. */
+  rolesCuenta: { rol: RolNombre; organizacionId: string | null }[];
   /** Organizaciones de quien consulta donde ya está en la matriz. */
   enMatrizDe: string[];
   facilitador: { tituloProfesional: string | null; esExpertoPrevencion: boolean } | null;
@@ -110,6 +112,9 @@ export async function buscarIdentidadPorRun(run: string): Promise<IdentidadEncon
     sexo: compartida ? (persona?.sexo ?? null) : null,
     tieneCuenta: !!usuario,
     roles: [...new Set(rolesVisibles.map((r) => (r.roles ? ROL_LABEL[r.roles.nombre] : null)).filter((r): r is string => !!r))],
+    rolesCuenta: rolesVisibles
+      .filter((r) => r.roles)
+      .map((r) => ({ rol: r.roles!.nombre, organizacionId: r.organizacion_id })),
     enMatrizDe: vinculosVisibles.map((v) => v.organizacion_id),
     facilitador: facilitador
       ? { tituloProfesional: facilitador.titulo_profesional, esExpertoPrevencion: facilitador.es_experto_prevencion }
