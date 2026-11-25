@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash } from "node:crypto";
+import { headers } from "next/headers";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -8,6 +10,7 @@ import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/l
 import { esRutValido } from "@/lib/rut";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { captchaValido } from "@/lib/captcha";
 import type { RolNombre } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -24,96 +27,101 @@ const ROL_LABEL: Record<RolNombre, string> = {
 
 const MENSAJE_CREDENCIALES_INCORRECTAS = "RUT o contraseña incorrectos.";
 
-// Se registra por (run, dv) tal cual se recibe, exista o no la cuenta, y
-// el mensaje de vuelta es siempre el mismo genérico de arriba - nunca uno
-// distinto tipo "cuenta bloqueada", porque eso delataría que el RUT
-// existe. Así el bloqueo por fuerza bruta no abre un canal de enumeración
-// nuevo.
-async function estaBloqueado(admin: SupabaseClient<Database>, run: string, dv: string) {
-  const { data } = await admin.from("intentos_login").select("bloqueado_hasta").eq("run", run).eq("dv", dv).maybeSingle();
-  return !!data?.bloqueado_hasta && new Date(data.bloqueado_hasta).getTime() > Date.now();
+// Multiplicador del tope por IP respecto del tope por cuenta: una oficina
+// detrás de un mismo NAT no debe bloquearse por unos pocos fallos, pero una
+// sola IP tampoco puede probar claves contra muchos RUT distintos.
+const FACTOR_TOPE_IP = 10;
+
+async function huellaIp(): Promise<string> {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "desconocida";
+  return createHash("sha256").update(ip).digest("hex").slice(0, 24);
 }
 
-async function registrarIntentoFallido(admin: SupabaseClient<Database>, run: string, dv: string) {
-  const { login_max_intentos, login_bloqueo_minutos } = await obtenerConfiguracion();
-  const ventanaMs = login_bloqueo_minutos * 60 * 1000;
-  const ahora = Date.now();
-
-  // Retención mínima (Ley 21.719): los RUT de intentos fallidos sólo se
-  // guardan mientras sirven para el bloqueo.
-  await admin
-    .from("intentos_login")
-    .delete()
-    .lt("ultimo_intento", new Date(ahora - 24 * 60 * 60 * 1000).toISOString());
-
-  const { data: actual } = await admin
-    .from("intentos_login")
-    .select("intentos, ultimo_intento, bloqueado_hasta")
-    .eq("run", run)
-    .eq("dv", dv)
-    .maybeSingle();
-  // Fallos viejos o un bloqueo ya cumplido no deben seguir sumando.
-  const vigente =
-    actual &&
-    new Date(actual.ultimo_intento).getTime() > ahora - ventanaMs &&
-    !(actual.bloqueado_hasta && new Date(actual.bloqueado_hasta).getTime() <= ahora);
-  const intentos = (vigente ? actual.intentos : 0) + 1;
-  const bloqueadoHasta =
-    intentos >= login_max_intentos ? new Date(ahora + ventanaMs).toISOString() : null;
-
-  await admin
-    .from("intentos_login")
-    .upsert({ run, dv, intentos, ultimo_intento: new Date(ahora).toISOString(), bloqueado_hasta: bloqueadoHasta });
+// Contador atómico en BD (app_consumir_intento, migración 0034): se consume
+// el intento ANTES de verificar la clave, así una ráfaga paralela no puede
+// pasar el chequeo antes de que se grabe el bloqueo. El mensaje de vuelta es
+// siempre el genérico - nunca "cuenta bloqueada", que delataría que el RUT
+// existe.
+async function consumirIntento(
+  admin: SupabaseClient<Database>,
+  run: string,
+  dv: string,
+  max: number,
+  ventanaMin: number,
+) {
+  const { data, error } = await admin.rpc("app_consumir_intento", {
+    p_run: run,
+    p_dv: dv,
+    p_max: max,
+    p_ventana_min: ventanaMin,
+  });
+  // Si el contador falla, se rechaza (falla cerrado).
+  return !error && data === true;
 }
 
 async function limpiarIntentos(admin: SupabaseClient<Database>, run: string, dv: string) {
   await admin.from("intentos_login").delete().eq("run", run).eq("dv", dv);
 }
 
-export async function iniciarSesionConRut(input: { run: string; dv: string; password: string }) {
-  const admin = createAdminClient();
+export async function iniciarSesionConRut(input: { run: string; dv: string; password: string; captchaToken?: string }) {
+  const run = typeof input?.run === "string" ? input.run.trim() : "";
+  const dv = typeof input?.dv === "string" ? input.dv.trim().toUpperCase() : "";
+  const password = typeof input?.password === "string" ? input.password : "";
 
-  if (await estaBloqueado(admin, input.run, input.dv)) {
+  // Entrada basura: se rechaza sin tocar la base (evita llenar
+  // intentos_login con claves arbitrarias).
+  if (!esRutValido(run, dv) || password.length === 0 || password.length > 128) {
+    return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
+  }
+
+  if (!(await captchaValido(input.captchaToken))) {
+    return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
+  }
+
+  const admin = createAdminClient();
+  const { login_max_intentos, login_bloqueo_minutos } = await obtenerConfiguracion();
+
+  const ipOk = await consumirIntento(
+    admin,
+    "ip",
+    await huellaIp(),
+    login_max_intentos * FACTOR_TOPE_IP,
+    login_bloqueo_minutos,
+  );
+  const cuentaOk = await consumirIntento(admin, run, dv, login_max_intentos, login_bloqueo_minutos);
+  if (!ipOk || !cuentaOk) {
     return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
   }
 
   const { data: usuario } = await admin
     .from("usuarios")
     .select("id, email, activo, password_temporal_expira_en")
-    .eq("run", input.run)
-    .eq("dv", input.dv)
+    .eq("run", run)
+    .eq("dv", dv)
     .maybeSingle();
 
-  if (!usuario || !usuario.activo) {
-    await registrarIntentoFallido(admin, input.run, input.dv);
-    return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
-  }
-
+  // Cuenta inexistente, desactivada o con clave temporal caducada: misma
+  // respuesta que una clave incorrecta (sin canal de enumeración).
   const expirada =
+    !!usuario &&
     usuario.password_temporal_expira_en !== null &&
     new Date(usuario.password_temporal_expira_en).getTime() < Date.now();
-
-  if (expirada) {
-    await registrarIntentoFallido(admin, input.run, input.dv);
-    return {
-      ok: false as const,
-      expirada: true as const,
-      mensaje: "Tu contraseña temporal caducó. Solicita un nuevo acceso más abajo.",
-    };
+  if (!usuario || !usuario.activo || expirada) {
+    return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: usuario.email,
-    password: input.password,
+    password,
   });
 
   if (error) {
-    await registrarIntentoFallido(admin, input.run, input.dv);
     return { ok: false as const, mensaje: MENSAJE_CREDENCIALES_INCORRECTAS };
   }
 
-  await limpiarIntentos(admin, input.run, input.dv);
+  await limpiarIntentos(admin, run, dv);
 
   if (usuario.password_temporal_expira_en !== null) {
     await admin.from("usuarios").update({ password_temporal_expira_en: null }).eq("id", usuario.id);
@@ -124,20 +132,22 @@ export async function iniciarSesionConRut(input: { run: string; dv: string; pass
 
 const MENSAJE_RECUPERACION = "Si el RUT está registrado y activo, enviamos un nuevo acceso al correo asociado.";
 
-export async function solicitarNuevoAcceso(input: { run: string; dv: string }) {
-  const run = input.run.trim();
-  const dv = input.dv.trim().toUpperCase();
+export async function solicitarNuevoAcceso(input: { run: string; dv: string; captchaToken?: string }) {
+  const run = typeof input?.run === "string" ? input.run.trim() : "";
+  const dv = typeof input?.dv === "string" ? input.dv.trim().toUpperCase() : "";
 
   // El trabajo real (buscar la cuenta, resetear la clave, enviar el
   // correo) se agenda para después de responder - nunca se espera acá.
   // Si se esperara, el tiempo de respuesta sería en sí mismo una forma de
-  // distinguir un RUT que existe de uno que no (una solicitud a un RUT
-  // inexistente termina de inmediato; una real hace varias llamadas a la
-  // base y a Resend y tarda notoriamente más). Al responder siempre lo
+  // distinguir un RUT que existe de uno que no. Al responder siempre lo
   // mismo y de inmediato, no queda ningún canal - ni el contenido de la
   // respuesta ni cuánto demora - para comprobar qué RUT tiene cuenta.
-  if (esRutValido(run, dv)) {
-    after(() => procesarSolicitudNuevoAcceso(run, dv));
+  if (esRutValido(run, dv) && (await captchaValido(input?.captchaToken))) {
+    // Tope por IP (no depende del RUT, por lo que no filtra nada): 5 por ventana.
+    const admin = createAdminClient();
+    const { recuperacion_throttle_minutos } = await obtenerConfiguracion();
+    const ipOk = await consumirIntento(admin, "rec-ip", await huellaIp(), 5, recuperacion_throttle_minutos);
+    if (ipOk) after(() => procesarSolicitudNuevoAcceso(run, dv));
   }
 
   return { ok: true as const, mensaje: MENSAJE_RECUPERACION };
@@ -157,11 +167,11 @@ async function procesarSolicitudNuevoAcceso(run: string, dv: string) {
 
   const config = await obtenerConfiguracion();
 
-  if (usuario.password_temporal_expira_en) {
-    const duracionActualMs = config.password_temporal_horas * 60 * 60 * 1000;
-    const emitidaEn = new Date(usuario.password_temporal_expira_en).getTime() - duracionActualMs;
-    if (Date.now() - emitidaEn < config.recuperacion_throttle_minutos * 60 * 1000) return;
-  }
+  // Tope persistente por RUT, independiente de si la clave actual es temporal:
+  // una solicitud por ventana (sin esto, quien conozca un RUT podría
+  // invalidar la clave de esa persona una y otra vez).
+  const permitido = await consumirIntento(admin, `rec:${run}`, dv, 1, config.recuperacion_throttle_minutos);
+  if (!permitido) return;
 
   const { data: rolFila } = await admin
     .from("usuario_roles")

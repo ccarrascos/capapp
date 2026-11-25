@@ -1,10 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { esFechaIso } from "@/lib/validar";
+import { obtenerConfiguracion } from "@/lib/configuracion";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSesion } from "@/lib/auth";
 import { tienePermiso } from "@/lib/permisos";
+import { mensajeDeError } from "@/lib/errores";
 
 /**
  * Gestionar una edición (inscribir, tomar asistencia, evaluar, certificar) requiere
@@ -154,7 +158,7 @@ export async function inscribirTrabajadores(edicionId: string, personaRuns: stri
             : "Uno o más de los trabajadores seleccionados ya están inscritos en esta edición.",
       };
     }
-    return { ok: false as const, mensaje: error.message };
+    return { ok: false as const, mensaje: mensajeDeError(error, "ediciones.actions#1") };
   }
 
   // Quien tiene portal propio se entera de que lo inscribieron en un curso.
@@ -230,7 +234,7 @@ export async function registrarAsistenciaModulo(input: {
       { onConflict: "inscripcion_id,modulo_id" },
     );
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "ediciones.actions#2") };
 
   const { error: errorEstado } = await supabase
     .from("inscripciones")
@@ -305,7 +309,7 @@ export async function registrarEvaluacionFinal(input: {
     aprobado: input.aprobado,
   });
 
-  if (errorEval) return { ok: false as const, mensaje: errorEval.message };
+  if (errorEval) return { ok: false as const, mensaje: mensajeDeError(errorEval, "ediciones.actions#3") };
 
   const { error: errorInscripcion } = await supabase
     .from("inscripciones")
@@ -315,7 +319,7 @@ export async function registrarEvaluacionFinal(input: {
     })
     .eq("id", input.inscripcionId);
 
-  if (errorInscripcion) return { ok: false as const, mensaje: errorInscripcion.message };
+  if (errorInscripcion) return { ok: false as const, mensaje: mensajeDeError(errorInscripcion, "ediciones.actions#4") };
 
   // Igual que al inscribir: quien tiene portal propio se entera de que fue
   // aprobado. Cliente admin porque la notificación es para el trabajador,
@@ -369,7 +373,7 @@ export async function marcarManualEntregado(input: {
     })
     .eq("id", input.inscripcionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "ediciones.actions#5") };
 
   revalidatePath(`/ediciones/${input.edicionId}`);
   return { ok: true as const };
@@ -403,14 +407,31 @@ export async function emitirCertificado(input: {
   // un trabajador o un curso distinto al que efectivamente aprobó.
   const { data: inscripcion } = await supabase
     .from("inscripciones")
-    .select("persona_run")
+    .select("persona_run, estado")
     .eq("id", input.inscripcionId)
     .eq("edicion_id", input.edicionId)
     .maybeSingle();
 
   if (!inscripcion) return { ok: false as const, mensaje: "La inscripción no corresponde a esta edición." };
 
-  const numeroCertificado = `DS44-${inscripcion.persona_run}-${Date.now().toString(36).toUpperCase()}`;
+  // Sólo se certifica a quien aprobó, con una vigencia futura y dentro del
+  // tope configurado: ni el estado ni la fecha pueden venir del cliente sin
+  // verificarse.
+  if (inscripcion.estado !== "aprobado") {
+    return { ok: false as const, mensaje: "Sólo se puede emitir certificado a una inscripción aprobada." };
+  }
+  const { certificado_vigencia_anios } = await obtenerConfiguracion();
+  const hoy = new Date();
+  const tope = new Date(Date.UTC(hoy.getUTCFullYear() + certificado_vigencia_anios, hoy.getUTCMonth(), hoy.getUTCDate() + 1));
+  if (
+    !esFechaIso(input.vigenciaHasta) ||
+    new Date(`${input.vigenciaHasta}T00:00:00Z`) <= hoy ||
+    new Date(`${input.vigenciaHasta}T00:00:00Z`) > tope
+  ) {
+    return { ok: false as const, mensaje: "La fecha de vigencia no es válida." };
+  }
+
+  const numeroCertificado = `DS44-${inscripcion.persona_run}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
   const facilitador = edicion.facilitadores;
   const entidadEmisoraTipo = facilitador?.tipo_proveedor === "oal" || facilitador?.tipo_proveedor === "otec"
@@ -428,7 +449,7 @@ export async function emitirCertificado(input: {
     entidad_emisora_id: entidadEmisoraId,
   });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "ediciones.actions#6") };
 
   // Le avisamos al trabajador que su certificado ya está disponible -
   // aparte del aviso de aprobación, porque la emisión suele pasar más tarde.

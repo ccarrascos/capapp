@@ -22,7 +22,7 @@ export function parsearRut(input: string): { run: string; dv: string } | null {
 }
 
 export function esRutValido(run: string, dv: string): boolean {
-  if (!/^\d+$/.test(run)) return false;
+  if (!/^[1-9]\d{0,7}$/.test(run)) return false;
   return calcularDV(run) === dv.toUpperCase();
 }
 

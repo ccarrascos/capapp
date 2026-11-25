@@ -7,6 +7,7 @@ import { obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { tienePermiso } from "@/lib/permisos";
 import type { AccionPermiso } from "@/lib/permisos-catalogo";
 import type { Database } from "@/lib/database.types";
+import { mensajeDeError } from "@/lib/errores";
 
 type TemaModulo = Database["public"]["Enums"]["tema_modulo"];
 type ModalidadEjecucion = Database["public"]["Enums"]["modalidad_ejecucion"];
@@ -75,7 +76,7 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
   if (errorCurso || !curso) {
     const mensaje = errorCurso?.message.includes("duplicate key")
       ? `Ya existe un curso llamado "${nombre}" en esta organización.`
-      : (errorCurso?.message ?? "No se pudo crear el curso.");
+      : mensajeDeError(errorCurso ?? {}, "cursos.actions#3", "No se pudo crear el curso.");
     return { ok: false as const, mensaje };
   }
 
@@ -92,7 +93,7 @@ export async function crearCursoDS44(input: { organizacionId: string; nombre: st
 
   if (errorModulos) {
     await supabase.from("cursos").delete().eq("id", curso.id);
-    return { ok: false as const, mensaje: errorModulos.message };
+    return { ok: false as const, mensaje: mensajeDeError(errorModulos, "cursos.actions#1") };
   }
 
   revalidatePath("/cursos");
@@ -138,7 +139,7 @@ export async function crearEdicion(input: {
     estado: "planificada",
   });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "cursos.actions#2") };
 
   revalidatePath(`/cursos/${input.cursoId}`);
   return { ok: true as const };

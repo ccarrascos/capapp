@@ -310,7 +310,8 @@ async function consultarTabla(tabla: string, filtros: { columna: string; valor: 
   }
 
   const { data, error } = await query;
-  if (error) return { error: error.message };
+  if (error) console.error("[ia.herramientas]", error.code, error.message);
+    return { error: "No se pudo consultar la información." };
 
   return { tabla, cantidad: data?.length ?? 0, limite: LIMITE_TABLA, filas: data ?? [] };
 }

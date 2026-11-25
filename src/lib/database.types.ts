@@ -810,6 +810,7 @@ export type Database = {
       intentos_login: {
         Row: {
           bloqueado_hasta: string | null
+          bloqueos: number
           dv: string
           intentos: number
           run: string
@@ -817,6 +818,7 @@ export type Database = {
         }
         Insert: {
           bloqueado_hasta?: string | null
+          bloqueos?: number
           dv: string
           intentos?: number
           run: string
@@ -824,6 +826,7 @@ export type Database = {
         }
         Update: {
           bloqueado_hasta?: string | null
+          bloqueos?: number
           dv?: string
           intentos?: number
           run?: string
@@ -1548,6 +1551,10 @@ export type Database = {
       }
     }
     Functions: {
+      app_consumir_intento: {
+        Args: { p_dv: string; p_max: number; p_run: string; p_ventana_min: number }
+        Returns: boolean
+      }
       app_es_super_admin: { Args: never; Returns: boolean }
       app_organizaciones_usuario: { Args: never; Returns: string[] }
       app_persona_run_actual: { Args: never; Returns: string }

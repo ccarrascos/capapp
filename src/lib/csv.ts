@@ -1,3 +1,5 @@
+import { neutralizarFormula } from "@/lib/validar";
+
 /**
  * CSV separado por ";" (punto y coma) - así lo abre Excel en configuración
  * regional latinoamericana sin pedir "convertir texto en columnas". Mismo
@@ -5,7 +7,7 @@
  */
 
 function csvEscapar(valor: string): string {
-  return `"${valor.replace(/"/g, '""')}"`;
+  return `"${neutralizarFormula(valor).replace(/"/g, '""')}"`;
 }
 
 export function generarCsv(filas: string[][], delimitador = ";"): string {

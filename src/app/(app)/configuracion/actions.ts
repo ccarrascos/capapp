@@ -18,6 +18,7 @@ import {
 import { invalidarCachePermisos, tienePermiso } from "@/lib/permisos";
 import { CATALOGO_PERMISOS, rolPuedeTenerPermiso, type AccionPermiso } from "@/lib/permisos-catalogo";
 import type { RolNombre } from "@/lib/auth";
+import { mensajeDeError } from "@/lib/errores";
 
 export async function actualizarConfiguracion(input: { clave: string; valor: number }) {
   const sesion = await getSesion();
@@ -50,7 +51,7 @@ export async function actualizarConfiguracion(input: { clave: string; valor: num
     actualizado_por: sesion.usuarioId,
   });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "configuracion.actions#1") };
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,
@@ -85,7 +86,7 @@ export async function actualizarPermiso(input: { rol: RolNombre; accion: string;
         .from("permisos_revocados")
         .upsert({ rol: input.rol, accion, revocado_por: sesion.usuarioId, revocado_en: new Date().toISOString() });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "configuracion.actions#2") };
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,
@@ -132,7 +133,7 @@ export async function actualizarConfiguracionOrganizacion(input: {
   cambios[campo.clave] = input.valor;
   const { error } = await supabase.from("organizaciones").update(cambios).eq("id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "configuracion.actions#3") };
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,

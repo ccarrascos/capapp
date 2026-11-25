@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createClienteEfimero } from "@supabase/supabase-js";
 import { obtenerConfiguracion } from "@/lib/configuracion";
+import { mensajeDeError } from "@/lib/errores";
+import { tipoImagenReal, EXTENSION_IMAGEN } from "@/lib/imagen";
 
 const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
 
@@ -29,15 +32,17 @@ export async function subirAvatar(formData: FormData) {
     return { ok: false as const, mensaje: `La imagen no puede superar los ${max_mb_avatar_usuario} MB.` };
   }
 
-  const extension = archivo.type === "image/png" ? "png" : archivo.type === "image/webp" ? "webp" : "jpg";
-  const ruta = `${user.id}/avatar.${extension}`;
+  const tipoReal = tipoImagenReal(new Uint8Array(await archivo.arrayBuffer()));
+  if (!tipoReal) return { ok: false as const, mensaje: "El archivo no es una imagen válida." };
+
+  const ruta = `${user.id}/avatar.${EXTENSION_IMAGEN[tipoReal]}`;
 
   const { error: errorSubida } = await supabase.storage.from("avatars").upload(ruta, archivo, {
     upsert: true,
-    contentType: archivo.type,
+    contentType: tipoReal,
   });
 
-  if (errorSubida) return { ok: false as const, mensaje: errorSubida.message };
+  if (errorSubida) return { ok: false as const, mensaje: mensajeDeError(errorSubida, "subirAvatar") };
 
   const {
     data: { publicUrl },
@@ -47,7 +52,7 @@ export async function subirAvatar(formData: FormData) {
 
   const { error: errorPerfil } = await supabase.from("usuarios").update({ avatar_url: avatarUrl }).eq("id", user.id);
 
-  if (errorPerfil) return { ok: false as const, mensaje: errorPerfil.message };
+  if (errorPerfil) return { ok: false as const, mensaje: mensajeDeError(errorPerfil, "subirAvatar.perfil") };
 
   revalidatePath("/", "layout");
   return { ok: true as const, avatarUrl };
@@ -66,7 +71,7 @@ export async function actualizarPerfil(input: { nombres: string; apellidos: stri
     .update({ nombres: input.nombres, apellidos: input.apellidos, telefono: input.telefono })
     .eq("id", user.id);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "perfil.actions#1") };
 
   revalidatePath("/perfil");
   return { ok: true as const };
@@ -150,11 +155,70 @@ export async function solicitarBajaCuenta() {
 
   if (!user) return { ok: false as const, mensaje: "No autenticado." };
 
-  const { error } = await supabase.from("usuarios").update({ activo: false }).eq("id", user.id);
+  // Cliente admin: el trigger de la migración 0034 impide que el dueño
+  // cambie `activo` por API directa (para que no pueda reactivarse). Darse
+  // de baja sí es un derecho, así que se hace desde el servidor, siempre
+  // sobre la cuenta de la sesión.
+  const { error } = await createAdminClient().from("usuarios").update({ activo: false }).eq("id", user.id);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "perfil.actions#2") };
 
   await supabase.auth.signOut();
+
+  return { ok: true as const };
+}
+
+const PASSWORD_MIN = 12;
+const PASSWORD_MAX = 72; // bcrypt ignora lo que pase de 72 bytes
+
+export async function cambiarPassword(input: { actual: string; nueva: string }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false as const, mensaje: "No autenticado." };
+
+  const actual = typeof input?.actual === "string" ? input.actual : "";
+  const nueva = typeof input?.nueva === "string" ? input.nueva : "";
+  if (nueva.length < PASSWORD_MIN || nueva.length > PASSWORD_MAX) {
+    return { ok: false as const, mensaje: `La contraseña debe tener entre ${PASSWORD_MIN} y ${PASSWORD_MAX} caracteres.` };
+  }
+  if (nueva === actual) {
+    return { ok: false as const, mensaje: "La nueva contraseña debe ser distinta de la actual." };
+  }
+
+  const admin = createAdminClient();
+  const { login_max_intentos, login_bloqueo_minutos } = await obtenerConfiguracion();
+  const { data: permitido } = await admin.rpc("app_consumir_intento", {
+    p_run: "pw",
+    p_dv: user.id,
+    p_max: login_max_intentos,
+    p_ventana_min: login_bloqueo_minutos,
+  });
+  if (permitido !== true) {
+    return { ok: false as const, mensaje: "Demasiados intentos. Inténtalo más tarde." };
+  }
+
+  // Reautenticación con un cliente efímero: no toca las cookies de la sesión.
+  const efimero = createClienteEfimero(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { error: errorActual } = await efimero.auth.signInWithPassword({ email: user.email, password: actual });
+  if (errorActual) return { ok: false as const, mensaje: "La contraseña actual no es correcta." };
+
+  const { error } = await admin.auth.admin.updateUserById(user.id, { password: nueva });
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "cambiarPassword") };
+
+  await admin.from("usuarios").update({ password_temporal_expira_en: null }).eq("id", user.id);
+  await admin.from("intentos_login").delete().eq("run", "pw").eq("dv", user.id);
+
+  // Cierra las demás sesiones (otros dispositivos) conservando la actual.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session?.access_token) await admin.auth.admin.signOut(session.access_token, "others");
 
   return { ok: true as const };
 }

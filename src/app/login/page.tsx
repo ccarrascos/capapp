@@ -38,13 +38,12 @@ function LoginForm() {
       const resultado = await iniciarSesionConRut({ run: parsed.run, dv: parsed.dv, password });
       if (!resultado.ok) {
         setError(resultado.mensaje);
-        if ("expirada" in resultado && resultado.expirada) {
-          setMostrarRecuperar(true);
-          setRunRecuperar(rut);
-        }
         return;
       }
-      const next = searchParams.get("next") || "/dashboard";
+      // Sólo rutas relativas internas: "//evil.tld" o "https://…" caerían en
+      // un sitio de phishing tras un login legítimo.
+      const nextParam = searchParams.get("next");
+      const next = nextParam && /^\/(?![/\\])/.test(nextParam) ? nextParam : "/dashboard";
       router.replace(next);
       router.refresh();
     });

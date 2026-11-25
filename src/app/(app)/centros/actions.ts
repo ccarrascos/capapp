@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSesion, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { tienePermiso } from "@/lib/permisos";
+import { mensajeDeError } from "@/lib/errores";
 
 function autorizado(sesion: Sesion, organizacionId: string) {
   return tienePermiso(sesion, "centros.gestionar", organizacionId);
@@ -32,7 +33,7 @@ export async function crearCentroTrabajo(input: {
     region: input.region,
   });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "centros.actions#1") };
 
   revalidatePath("/centros");
   return { ok: true as const };
@@ -65,7 +66,7 @@ export async function actualizarCentroTrabajo(input: {
     .eq("id", input.centroId)
     .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "centros.actions#2") };
 
   revalidatePath("/centros");
   revalidatePath("/trabajadores");
@@ -91,7 +92,7 @@ export async function actualizarActivoCentroTrabajo(input: {
     .eq("id", input.centroId)
     .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "centros.actions#3") };
 
   revalidatePath("/centros");
   revalidatePath("/trabajadores");

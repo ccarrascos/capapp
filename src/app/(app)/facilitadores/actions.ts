@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { esRutValido } from "@/lib/rut";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mensajeDeError } from "@/lib/errores";
 
 type TipoProveedor = Database["public"]["Enums"]["tipo_proveedor"];
 
@@ -39,7 +40,7 @@ async function resolverEntidadExterna(
   if (error || !creado) {
     return {
       ok: false,
-      mensaje: error?.message ?? `No se pudo registrar ${tipoProveedor === "oal" ? "el organismo administrador" : "la OTEC"}.`,
+      mensaje: mensajeDeError(error ?? {}, "facilitadores.actions#1", `No se pudo registrar ${tipoProveedor === "oal" ? "el organismo administrador" : "la OTEC"}.`),
     };
   }
 
@@ -146,7 +147,7 @@ export async function crearFacilitador(input: {
     es_experto_prevencion: input.esExpertoPrevencion,
   });
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "facilitadores.actions#2") };
 
   // Si la persona ya tiene cuenta con rol facilitador en esta organización,
   // se vincula la ficha para que vea y gestione sus ediciones (RLS usa
@@ -210,9 +211,10 @@ export async function actualizarFacilitador(input: {
       titulo_profesional: input.tituloProfesional,
       es_experto_prevencion: input.esExpertoPrevencion,
     })
-    .eq("id", input.facilitadorId);
+    .eq("id", input.facilitadorId)
+    .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "facilitadores.actions#3") };
 
   revalidatePath("/facilitadores");
   return { ok: true as const };
@@ -237,9 +239,10 @@ export async function actualizarEstadoFacilitador(input: {
   const { error } = await supabase
     .from("facilitadores")
     .update({ activo: input.activo })
-    .eq("id", input.facilitadorId);
+    .eq("id", input.facilitadorId)
+    .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "facilitadores.actions#4") };
 
   revalidatePath("/facilitadores");
   return { ok: true as const };

@@ -12,13 +12,14 @@ import { obtenerUrlFirmada } from "@/app/(app)/cursos/[cursoId]/materiales-actio
  * la ruta mediante un Server Action. La subida ocurre directo desde el
  * navegador con la sesión del usuario, respetando el RLS de storage.objects.
  */
-const TIPOS_PERMITIDOS = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.ms-powerpoint",
-];
+const EXTENSION_POR_TIPO: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/vnd.ms-powerpoint": "ppt",
+};
+const TIPOS_PERMITIDOS = Object.keys(EXTENSION_POR_TIPO);
 export function FileField({
   label,
   path,
@@ -58,7 +59,7 @@ export function FileField({
     }
 
     startTransition(async () => {
-      const ext = file.name.split(".").pop() ?? "bin";
+      const ext = EXTENSION_POR_TIPO[file.type];
       const destino = `${storagePathPrefix}/${fileName}.${ext}`;
       const supabase = createClient();
 

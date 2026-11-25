@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
  * Supabase pausa el proyecto tras ~7 días sin actividad; una consulta al día
  * basta para que no lo considere inactivo. No devuelve datos.
  *
- * Si CRON_SECRET está definido en Vercel, el cron lo envía como
- * "Authorization: Bearer <CRON_SECRET>" y aquí se exige.
+ * Falla cerrado: sin CRON_SECRET definido en Vercel el endpoint rechaza todo.
+ * El cron lo envía como "Authorization: Bearer <CRON_SECRET>".
  */
 export async function GET(request: Request) {
   const secreto = process.env.CRON_SECRET;
-  if (secreto && request.headers.get("authorization") !== `Bearer ${secreto}`) {
+  if (!secreto || request.headers.get("authorization") !== `Bearer ${secreto}`) {
     return new Response("No autorizado", { status: 401 });
   }
 

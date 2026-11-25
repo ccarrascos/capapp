@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
-import { actualizarPerfil, subirAvatar, quitarAvatar, exportarMisDatos, solicitarBajaCuenta } from "./actions";
+import { actualizarPerfil, subirAvatar, quitarAvatar, exportarMisDatos, solicitarBajaCuenta, cambiarPassword } from "./actions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -55,7 +54,7 @@ export function PerfilView({
         </div>
       </div>
 
-      <CambiarContrasena email={email} />
+      <CambiarContrasena />
 
       <MisDatos />
     </div>
@@ -223,7 +222,7 @@ function DatosPersonales({
   );
 }
 
-function CambiarContrasena({ email }: { email: string }) {
+function CambiarContrasena() {
   const [pending, startTransition] = useTransition();
   const [actual, setActual] = useState("");
   const [password, setPassword] = useState("");
@@ -235,8 +234,8 @@ function CambiarContrasena({ email }: { email: string }) {
       toast.error("Ingresa tu contraseña actual.");
       return;
     }
-    if (password.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres.");
+    if (password.length < 12) {
+      toast.error("La contraseña debe tener al menos 12 caracteres.");
       return;
     }
     if (password !== confirmacion) {
@@ -244,15 +243,9 @@ function CambiarContrasena({ email }: { email: string }) {
       return;
     }
     startTransition(async () => {
-      const supabase = createClient();
-      const { error: errorActual } = await supabase.auth.signInWithPassword({ email, password: actual });
-      if (errorActual) {
-        toast.error("La contraseña actual no es correcta.");
-        return;
-      }
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
-        toast.error(error.message);
+      const resultado = await cambiarPassword({ actual, nueva: password });
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
         return;
       }
       toast.success("Contraseña actualizada.");

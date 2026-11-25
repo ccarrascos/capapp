@@ -12,6 +12,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { estadoVigenciaDeCurso } from "@/lib/vigencia";
 import { obtenerConfiguracion, obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
 import { tienePermiso } from "@/lib/permisos";
+import { esEmail, esRunNumerico, esTexto, esUuid } from "@/lib/validar";
+import { mensajeDeError } from "@/lib/errores";
 import type { Database } from "@/lib/database.types";
 
 type ModalidadContractual = Database["public"]["Enums"]["modalidad_contractual"];
@@ -84,6 +86,23 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     };
   }
 
+  if (
+    !esUuid(input.organizacionId) ||
+    !esTexto(input.nombres, 100) ||
+    !esTexto(input.apellidoPaterno, 100) ||
+    (input.apellidoMaterno != null && !esTexto(input.apellidoMaterno, 100)) ||
+    (input.unidad != null && !esTexto(input.unidad, 100, 0)) ||
+    (input.email != null && input.email !== "" && !esEmail(normalizarEmail(input.email)))
+  ) {
+    return { ok: false as const, mensaje: "Revisa los datos ingresados." };
+  }
+
+  const errorRefs = await validarReferenciasOrganizacion(createAdminClient(), input.organizacionId, {
+    cargoId: input.cargoId,
+    centroTrabajoId: input.centroTrabajoId,
+  });
+  if (errorRefs) return { ok: false as const, mensaje: errorRefs };
+
   const supabase = await createClient();
 
   const errorSubcontrato = await validarSubcontrato(
@@ -130,7 +149,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
     });
 
     if (errorPersona) {
-      return { ok: false as const, mensaje: errorPersona.message };
+      return { ok: false as const, mensaje: mensajeDeError(errorPersona, "trabajadores.actions#1") };
     }
   }
 
@@ -148,7 +167,7 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
   if (errorVinculo) {
     const mensaje = errorVinculo.message.includes("duplicate key")
       ? "Esta persona ya está registrada en esta organización."
-      : errorVinculo.message;
+      : mensajeDeError(errorVinculo, "trabajadores.actions#3");
     return { ok: false as const, mensaje };
   }
 
@@ -161,6 +180,24 @@ export async function crearTrabajador(input: CrearTrabajadorInput) {
         nombreExistente: `${personaExistente.nombres} ${personaExistente.apellido_paterno}${personaExistente.apellido_materno ? ` ${personaExistente.apellido_materno}` : ""}`,
       }
     : { ok: true as const, personaYaExistia: false as const };
+}
+
+async function validarReferenciasOrganizacion(
+  admin: ReturnType<typeof createAdminClient>,
+  organizacionId: string,
+  refs: { cargoId: string | null; centroTrabajoId: string | null },
+) {
+  if (refs.cargoId) {
+    if (!esUuid(refs.cargoId)) return "El cargo no es válido.";
+    const { data } = await admin.from("cargos").select("id").eq("id", refs.cargoId).eq("organizacion_id", organizacionId).maybeSingle();
+    if (!data) return "El cargo no pertenece a tu organización.";
+  }
+  if (refs.centroTrabajoId) {
+    if (!esUuid(refs.centroTrabajoId)) return "El centro de trabajo no es válido.";
+    const { data } = await admin.from("centros_trabajo").select("id").eq("id", refs.centroTrabajoId).eq("organizacion_id", organizacionId).maybeSingle();
+    if (!data) return "El centro de trabajo no pertenece a tu organización.";
+  }
+  return null;
 }
 
 export async function actualizarTrabajador(input: {
@@ -199,7 +236,38 @@ export async function actualizarTrabajador(input: {
     };
   }
 
+  if (
+    !esRunNumerico(input.personaRun) ||
+    !esUuid(input.organizacionId) ||
+    !esTexto(input.nombres, 100) ||
+    !esTexto(input.apellidoPaterno, 100) ||
+    (input.apellidoMaterno !== null && !esTexto(input.apellidoMaterno, 100)) ||
+    (input.unidad !== null && !esTexto(input.unidad, 100, 0))
+  ) {
+    return { ok: false as const, mensaje: "Revisa los datos ingresados." };
+  }
+
   const supabase = await createClient();
+  const admin = createAdminClient();
+
+  // Anti-IDOR: la persona debe tener vínculo en ESTA organización. Sin esto,
+  // un admin de otra organización podría editar la identidad (y el correo de
+  // acceso) de cualquier RUN de la plataforma.
+  const { data: vinculoEnOrg } = await admin
+    .from("vinculos_laborales")
+    .select("id")
+    .eq("persona_run", input.personaRun)
+    .eq("organizacion_id", input.organizacionId)
+    .maybeSingle();
+  if (!vinculoEnOrg) {
+    return { ok: false as const, mensaje: "Esa persona no pertenece a tu organización." };
+  }
+
+  const errorRefs = await validarReferenciasOrganizacion(admin, input.organizacionId, {
+    cargoId: input.cargoId,
+    centroTrabajoId: input.centroTrabajoId,
+  });
+  if (errorRefs) return { ok: false as const, mensaje: errorRefs };
 
   const errorSubcontrato = await validarSubcontrato(
     supabase,
@@ -227,8 +295,28 @@ export async function actualizarTrabajador(input: {
     };
   }
 
+  if (nuevoEmail && !esEmail(nuevoEmail)) {
+    return { ok: false as const, mensaje: "El correo no es válido." };
+  }
+
   if (personaActual?.usuario_id && nuevoEmail && nuevoEmail !== personaActual.email) {
-    const admin = createAdminClient();
+    // El correo de acceso es el canal de recuperación de la cuenta: sólo se
+    // cambia desde aquí si todos los accesos de esa cuenta son de esta
+    // organización (si no, quien administra otra organización podría
+    // quedarse con una cuenta ajena).
+    const { data: rolesCuenta } = await admin
+      .from("usuario_roles")
+      .select("organizacion_id, roles(nombre)")
+      .eq("usuario_id", personaActual.usuario_id);
+    const cuentaCompartida = (rolesCuenta ?? []).some(
+      (r) => r.roles?.nombre === "super_admin" || r.organizacion_id !== input.organizacionId,
+    );
+    if (cuentaCompartida) {
+      return {
+        ok: false as const,
+        mensaje: "Esta cuenta tiene accesos en otras organizaciones; el correo de acceso no se puede cambiar desde aquí.",
+      };
+    }
 
     // Supabase Auth responde "Error updating user" genérico (sin código
     // distintivo) tanto para un correo duplicado como para casi cualquier
@@ -250,14 +338,14 @@ export async function actualizarTrabajador(input: {
       email_confirm: true,
     });
     if (errorAuthEmail) {
-      return { ok: false as const, mensaje: `No se pudo actualizar el correo de acceso: ${errorAuthEmail.message}` };
+      return { ok: false as const, mensaje: mensajeDeError(errorAuthEmail, "actualizarTrabajador.authEmail", "No se pudo actualizar el correo de acceso.") };
     }
     const { error: errorUsuarioEmail } = await admin
       .from("usuarios")
       .update({ email: nuevoEmail })
       .eq("id", personaActual.usuario_id);
     if (errorUsuarioEmail) {
-      return { ok: false as const, mensaje: errorUsuarioEmail.message };
+      return { ok: false as const, mensaje: mensajeDeError(errorUsuarioEmail, "actualizarTrabajador.usuarioEmail") };
     }
     await registrarAuditoria(admin, {
       usuarioId: sesion.usuarioId,
@@ -281,7 +369,7 @@ export async function actualizarTrabajador(input: {
     })
     .eq("run", input.personaRun);
 
-  if (errorPersona) return { ok: false as const, mensaje: errorPersona.message };
+  if (errorPersona) return { ok: false as const, mensaje: mensajeDeError(errorPersona, "actualizarTrabajador.persona") };
 
   const { data: vinculoActual } = await supabase
     .from("vinculos_laborales")
@@ -303,7 +391,7 @@ export async function actualizarTrabajador(input: {
     .eq("persona_run", input.personaRun)
     .eq("organizacion_id", input.organizacionId);
 
-  if (errorVinculo) return { ok: false as const, mensaje: errorVinculo.message };
+  if (errorVinculo) return { ok: false as const, mensaje: mensajeDeError(errorVinculo, "actualizarTrabajador.vinculo") };
 
   if (vinculoActual && vinculoActual.centro_trabajo_id !== input.centroTrabajoId) {
     await supabase.from("historial_centro_trabajo").insert({
@@ -615,7 +703,7 @@ export async function cargarTrabajadoresMasivo(input: {
         sexo,
       });
       if (errorPersona) {
-        resultados.push({ fila: numeroFila, ok: false, mensaje: errorPersona.message });
+        resultados.push({ fila: numeroFila, ok: false, mensaje: mensajeDeError(errorPersona, "trabajadores.actions#2") });
         continue;
       }
     }
@@ -634,7 +722,7 @@ export async function cargarTrabajadoresMasivo(input: {
     if (errorVinculo) {
       const mensaje = errorVinculo.message.includes("duplicate key")
         ? "Esta persona ya está registrada en esta organización."
-        : errorVinculo.message;
+        : mensajeDeError(errorVinculo, "trabajadores.actions#4");
       resultados.push({ fila: numeroFila, ok: false, mensaje });
       continue;
     }

@@ -10,6 +10,7 @@ import { esRutValido } from "@/lib/rut";
 import { generarPasswordTemporal, calcularExpiracionPasswordTemporal } from "@/lib/password";
 import { normalizarEmail } from "@/lib/normalizar-email";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { mensajeDeError } from "@/lib/errores";
 
 const ROL_LABEL: Record<RolNombre, string> = {
   super_admin: "Super administrador",
@@ -189,7 +190,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
   });
 
   if (errorAuth || !creado.user) {
-    return { ok: false as const, mensaje: errorAuth?.message ?? "No se pudo crear la cuenta." };
+    return { ok: false as const, mensaje: mensajeDeError(errorAuth ?? {}, "usuarios.actions#1", "No se pudo crear la cuenta.") };
   }
 
   const supabase = await createClient();
@@ -206,7 +207,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   if (errorPerfil) {
     await admin.auth.admin.deleteUser(creado.user.id);
-    return { ok: false as const, mensaje: errorPerfil.message };
+    return { ok: false as const, mensaje: mensajeDeError(errorPerfil, "usuarios.actions#3") };
   }
 
   const { data: rolRows } = await supabase.from("roles").select("id, nombre").in("nombre", roles);
@@ -229,7 +230,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
 
   if (errorRol) {
     await admin.auth.admin.deleteUser(creado.user.id);
-    return { ok: false as const, mensaje: errorRol.message };
+    return { ok: false as const, mensaje: mensajeDeError(errorRol, "usuarios.actions#4") };
   }
 
   await vincularPersona(admin, creado.user.id, run, email);
@@ -387,7 +388,7 @@ export async function agregarRolUsuario(input: {
     .select("id")
     .single();
 
-  if (error || !creado) return { ok: false as const, mensaje: error?.message ?? "No se pudo asignar el rol." };
+  if (error || !creado) return { ok: false as const, mensaje: mensajeDeError(error ?? {}, "usuarios.actions#2", "No se pudo asignar el rol.") };
 
   if (runPersona) await vincularPersona(admin, input.usuarioId, runPersona, null);
 
@@ -456,7 +457,7 @@ export async function quitarRolUsuario(input: { usuarioRolId: string; usuarioId:
 
   const supabase = await createClient();
   const { error } = await supabase.from("usuario_roles").delete().eq("id", input.usuarioRolId);
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "usuarios.actions#5") };
 
   if (rol === "facilitador" && asignacion.organizacion_id) {
     // Sin esto seguiría viendo y gestionando ediciones vía RLS
@@ -520,9 +521,29 @@ export async function actualizarEstadoUsuario(input: {
     }
   }
 
+  // Una cuenta con rol de super_admin, o con roles en organizaciones que el
+  // llamante no administra, no la desactiva un admin de organización: el
+  // cambio es global (usuarios.activo), no por organización.
+  if (!sesion.esSuperAdmin) {
+    const { data: rolesObjetivo } = await admin
+      .from("usuario_roles")
+      .select("organizacion_id, roles(nombre)")
+      .eq("usuario_id", input.usuarioId);
+    const ajeno = (rolesObjetivo ?? []).some(
+      (r) => r.roles?.nombre === "super_admin" || r.organizacion_id !== input.organizacionId,
+    );
+    if (ajeno) {
+      return { ok: false as const, mensaje: "Esa cuenta tiene accesos fuera de tu organización; solo un super administrador puede modificarla." };
+    }
+  }
+
   const { error } = await admin.from("usuarios").update({ activo: input.activo }).eq("id", input.usuarioId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "actualizarEstadoUsuario") };
+
+  // Desactivar también bloquea la cuenta en Auth (sesiones y refresh tokens
+  // vivos, y login directo contra la API de Supabase); reactivar la libera.
+  await admin.auth.admin.updateUserById(input.usuarioId, { ban_duration: input.activo ? "none" : "876000h" });
 
   await registrarAuditoria(admin, {
     usuarioId: sesion.usuarioId,

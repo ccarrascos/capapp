@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sincronizarNotificaciones } from "@/lib/notificaciones";
+import { mensajeDeError } from "@/lib/errores";
 
 export async function obtenerNotificaciones() {
   const sesion = await getSesion();
@@ -33,7 +34,7 @@ export async function marcarNotificacionLeida(id: string) {
     .eq("id", id)
     .eq("usuario_id", sesion.usuarioId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "notificaciones.actions#1") };
 
   revalidatePath("/", "layout");
   return { ok: true as const };
@@ -50,7 +51,7 @@ export async function marcarTodasLeidas() {
     .eq("usuario_id", sesion.usuarioId)
     .eq("leido", false);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "notificaciones.actions#2") };
 
   revalidatePath("/", "layout");
   return { ok: true as const };

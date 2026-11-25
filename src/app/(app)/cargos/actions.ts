@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSesion, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { tienePermiso } from "@/lib/permisos";
+import { mensajeDeError } from "@/lib/errores";
 
 function autorizado(sesion: Sesion, organizacionId: string) {
   return tienePermiso(sesion, "cargos.gestionar", organizacionId);
@@ -26,7 +27,7 @@ export async function crearCargo(input: { organizacionId: string; nombre: string
   if (error) {
     const mensaje = error.message.includes("duplicate key")
       ? "Ya existe un cargo con ese nombre en esta organización."
-      : error.message;
+      : mensajeDeError(error, "cargos.actions#2");
     return { ok: false as const, mensaje };
   }
 
@@ -53,7 +54,7 @@ export async function actualizarCargo(input: { cargoId: string; organizacionId: 
   if (error) {
     const mensaje = error.message.includes("duplicate key")
       ? "Ya existe otro cargo con ese nombre en esta organización."
-      : error.message;
+      : mensajeDeError(error, "cargos.actions#3");
     return { ok: false as const, mensaje };
   }
 
@@ -77,7 +78,7 @@ export async function actualizarActivoCargo(input: { cargoId: string; organizaci
     .eq("id", input.cargoId)
     .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "cargos.actions#1") };
 
   revalidatePath("/cargos");
   revalidatePath("/trabajadores");

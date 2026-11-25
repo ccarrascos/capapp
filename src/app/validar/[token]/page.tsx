@@ -1,11 +1,15 @@
 import { CircleCheck, CircleX } from "lucide-react";
+import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { esUuid } from "@/lib/validar";
 
 const ENTIDAD_EMISORA_LABEL: Record<string, string> = {
   empleador: "Empleador",
   oal: "Organismo Administrador de la Ley",
   otec: "OTEC",
 };
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function ValidarCertificadoPage({
   params,
@@ -15,7 +19,9 @@ export default async function ValidarCertificadoPage({
   const { token } = await params;
   const admin = createAdminClient();
 
-  const { data: certificado } = await admin
+  const { data: certificado } = !esUuid(token)
+    ? { data: null }
+    : await admin
     .from("certificados")
     .select(
       "numero_certificado, fecha_emision, fecha_vigencia_hasta, entidad_emisora_tipo, entidad_emisora_id, cursos(nombre, horas_totales, organizaciones(razon_social, logo_url)), personas(nombres, apellido_paterno, apellido_materno, run, dv)",

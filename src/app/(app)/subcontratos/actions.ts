@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSesion, type Sesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { tienePermiso } from "@/lib/permisos";
+import { mensajeDeError } from "@/lib/errores";
 
 function autorizado(sesion: Sesion, organizacionId: string) {
   return tienePermiso(sesion, "subcontratos.gestionar", organizacionId);
@@ -32,7 +33,7 @@ export async function crearSubcontrato(input: {
   if (error) {
     const mensaje = error.message.includes("duplicate key")
       ? "Ya existe un subcontrato con ese nombre en esta organización - asígnalo a otro centro en vez de crearlo de nuevo."
-      : error.message;
+      : mensajeDeError(error, "subcontratos.actions#5");
     return { ok: false as const, mensaje };
   }
 
@@ -42,7 +43,7 @@ export async function crearSubcontrato(input: {
 
   if (errorAsignacion) {
     await supabase.from("subcontratos").delete().eq("id", subcontrato.id);
-    return { ok: false as const, mensaje: errorAsignacion.message };
+    return { ok: false as const, mensaje: mensajeDeError(errorAsignacion, "subcontratos.actions#1") };
   }
 
   revalidatePath("/subcontratos");
@@ -77,7 +78,7 @@ export async function actualizarSubcontrato(input: {
   if (error) {
     const mensaje = error.message.includes("duplicate key")
       ? "Ya existe otro subcontrato con ese nombre en esta organización."
-      : error.message;
+      : mensajeDeError(error, "subcontratos.actions#6");
     return { ok: false as const, mensaje };
   }
 
@@ -96,7 +97,7 @@ export async function actualizarSubcontrato(input: {
     const { error: errorAgregar } = await supabase
       .from("subcontratos_centros")
       .insert(aAgregar.map((centroTrabajoId) => ({ subcontrato_id: input.subcontratoId, centro_trabajo_id: centroTrabajoId })));
-    if (errorAgregar) return { ok: false as const, mensaje: errorAgregar.message };
+    if (errorAgregar) return { ok: false as const, mensaje: mensajeDeError(errorAgregar, "subcontratos.actions#2") };
   }
 
   if (aQuitar.length > 0) {
@@ -105,7 +106,7 @@ export async function actualizarSubcontrato(input: {
       .delete()
       .eq("subcontrato_id", input.subcontratoId)
       .in("centro_trabajo_id", aQuitar);
-    if (errorQuitar) return { ok: false as const, mensaje: errorQuitar.message };
+    if (errorQuitar) return { ok: false as const, mensaje: mensajeDeError(errorQuitar, "subcontratos.actions#3") };
   }
 
   revalidatePath("/subcontratos");
@@ -132,7 +133,7 @@ export async function actualizarActivoSubcontrato(input: {
     .eq("id", input.subcontratoId)
     .eq("organizacion_id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "subcontratos.actions#4") };
 
   revalidatePath("/subcontratos");
   revalidatePath("/trabajadores");

@@ -45,11 +45,14 @@ export async function getSesion(): Promise<Sesion | null> {
 
   if (!usuario) return null;
 
+  // Una cuenta desactivada no conserva ningún rol aunque su sesión/refresh
+  // token siga vivo (cae en la pantalla de cuenta suspendida).
   // Una organización desactivada (ej. por falta de pago) le retira el
   // acceso a todos sus roles - no sólo visualmente, acá mismo, para que
   // toda verificación de rol/organización en cualquier página deje de
   // encontrar ese rol automáticamente, sin tener que tocar cada página.
   const roles: AsignacionRol[] = (asignaciones ?? [])
+    .filter(() => usuario.activo !== false)
     .filter((a) => a.roles)
     .filter((a) => a.organizacion_id === null || a.organizaciones?.activo !== false)
     .map((a) => ({

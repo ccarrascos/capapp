@@ -1,8 +1,13 @@
 import { CircleX, UserX } from "lucide-react";
+import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { esUuid } from "@/lib/validar";
 import { SignBadge, type EstadoVigencia } from "@/components/status/sign-badge";
 import { estadoVigenciaDeCurso, peorEstadoVigencia, ultimoAprobadoPorCurso } from "@/lib/vigencia";
 import { obtenerConfiguracionOrganizacion } from "@/lib/configuracion";
+
+// Credenciales con datos personales: fuera de los buscadores.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function CredencialPage({
   params,
@@ -12,12 +17,15 @@ export default async function CredencialPage({
   const { qrToken } = await params;
   const admin = createAdminClient();
 
-  const { data: vinculo } = await admin
+  const { data: vinculo } = !esUuid(qrToken)
+    ? { data: null }
+    : await admin
     .from("vinculos_laborales")
     .select(
       "persona_run, organizacion_id, tipo_vinculo, personas(nombres, apellido_paterno, apellido_materno, run, dv, usuarios(activo, avatar_url)), cargos(nombre), centros_trabajo(nombre), subcontratos(nombre), organizaciones(razon_social, logo_url)",
     )
     .eq("qr_token", qrToken)
+    .eq("activo", true)
     .maybeSingle();
 
   let cursos: { nombre: string; vigenciaHasta: string | null; estado: EstadoVigencia }[] = [];

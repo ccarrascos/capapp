@@ -1,5 +1,7 @@
 "use server";
 
+import { tipoImagenReal, EXTENSION_IMAGEN } from "@/lib/imagen";
+import { mensajeDeError } from "@/lib/errores";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSesion } from "@/lib/auth";
@@ -41,13 +43,13 @@ export async function crearOrganizacion(input: CrearOrganizacionInput) {
     .select("id")
     .single();
 
-  if (error || !data) return { ok: false as const, mensaje: error?.message ?? "No se pudo crear la organización." };
+  if (error || !data) return { ok: false as const, mensaje: mensajeDeError(error ?? {}, "organizaciones.actions#1", "No se pudo crear la organización.") };
 
   revalidatePath("/organizaciones");
   return { ok: true as const, organizacionId: data.id };
 }
 
-const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
 
 export async function subirLogoOrganizacion(organizacionId: string, formData: FormData) {
   const sesion = await getSesion();
@@ -64,7 +66,7 @@ export async function subirLogoOrganizacion(organizacionId: string, formData: Fo
   }
 
   if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
-    return { ok: false as const, mensaje: "Formato no permitido. Usa JPG, PNG, WEBP o SVG." };
+    return { ok: false as const, mensaje: "Formato no permitido. Usa JPG, PNG o WEBP." };
   }
 
   const { max_mb_logo_organizacion } = await obtenerConfiguracion();
@@ -72,22 +74,17 @@ export async function subirLogoOrganizacion(organizacionId: string, formData: Fo
     return { ok: false as const, mensaje: `La imagen no puede superar los ${max_mb_logo_organizacion} MB.` };
   }
 
-  const extension =
-    archivo.type === "image/png"
-      ? "png"
-      : archivo.type === "image/webp"
-        ? "webp"
-        : archivo.type === "image/svg+xml"
-          ? "svg"
-          : "jpg";
-  const ruta = `${organizacionId}/logo.${extension}`;
+  const tipoReal = tipoImagenReal(new Uint8Array(await archivo.arrayBuffer()));
+  if (!tipoReal) return { ok: false as const, mensaje: "El archivo no es una imagen válida." };
+
+  const ruta = `${organizacionId}/logo.${EXTENSION_IMAGEN[tipoReal]}`;
 
   const { error: errorSubida } = await supabase.storage.from("logos").upload(ruta, archivo, {
     upsert: true,
-    contentType: archivo.type,
+    contentType: tipoReal,
   });
 
-  if (errorSubida) return { ok: false as const, mensaje: errorSubida.message };
+  if (errorSubida) return { ok: false as const, mensaje: mensajeDeError(errorSubida, "subirLogoOrganizacion") };
 
   const {
     data: { publicUrl },
@@ -97,7 +94,7 @@ export async function subirLogoOrganizacion(organizacionId: string, formData: Fo
 
   const { error: errorOrg } = await supabase.from("organizaciones").update({ logo_url: logoUrl }).eq("id", organizacionId);
 
-  if (errorOrg) return { ok: false as const, mensaje: errorOrg.message };
+  if (errorOrg) return { ok: false as const, mensaje: mensajeDeError(errorOrg, "subirLogoOrganizacion.org") };
 
   revalidatePath("/", "layout");
   return { ok: true as const, logoUrl };
@@ -115,7 +112,7 @@ export async function actualizarActivoOrganizacion(input: { organizacionId: stri
     .update({ activo: input.activo })
     .eq("id", input.organizacionId);
 
-  if (error) return { ok: false as const, mensaje: error.message };
+  if (error) return { ok: false as const, mensaje: mensajeDeError(error, "organizaciones.actions#2") };
 
   await registrarAuditoria(supabase, {
     usuarioId: sesion.usuarioId,

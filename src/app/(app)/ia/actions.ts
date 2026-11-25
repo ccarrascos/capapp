@@ -48,6 +48,8 @@ async function crearCompletion(mensajes: Groq.Chat.Completions.ChatCompletionMes
   }
 }
 
+const MAX_LARGO_MENSAJE = 2000;
+
 export async function enviarMensaje(
   historial: MensajeChat[],
 ): Promise<{ ok: true; respuesta: string } | { ok: false; mensaje: string }> {
@@ -59,6 +61,21 @@ export async function enviarMensaje(
     return { ok: false, mensaje: "No tienes permiso para usar el asistente." };
   }
 
+  // El historial lo arma el cliente: se aceptan sólo turnos user/assistant de
+  // texto con tope de largo (un "system"/"tool" falso permitiría inyectar
+  // instrucciones o resultados de herramientas inventados).
+  if (
+    !Array.isArray(historial) ||
+    historial.some(
+      (m) =>
+        (m?.role !== "user" && m?.role !== "assistant") ||
+        typeof m.content !== "string" ||
+        m.content.length > MAX_LARGO_MENSAJE,
+    )
+  ) {
+    return { ok: false, mensaje: "La conversación no es válida." };
+  }
+
   if (historial.length === 0 || historial[historial.length - 1].role !== "user") {
     return { ok: false, mensaje: "Falta el mensaje del usuario." };
   }
@@ -68,7 +85,7 @@ export async function enviarMensaje(
 
   const mensajes: Groq.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: MENSAJE_SISTEMA },
-    ...historial,
+    ...historial.map((m) => ({ role: m.role, content: m.content })),
   ];
 
   try {
