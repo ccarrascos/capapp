@@ -17,7 +17,7 @@ export default function PoliticaPrivacidadPage() {
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight mt-1">
             Política de privacidad
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">Última actualización: septiembre de 2026.</p>
+          <p className="text-sm text-muted-foreground mt-2">Última actualización: noviembre de 2026.</p>
         </div>
 
         <section className="flex flex-col gap-3">
@@ -71,7 +71,46 @@ export default function PoliticaPrivacidadPage() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">5. Con quién se comparten</h2>
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+            5. Retiro del consentimiento
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Los datos de identificación, contacto, laborales y de capacitación son necesarios para cumplir la
+            obligación legal descrita en el punto 4, por lo que su tratamiento no depende de tu consentimiento. La
+            foto de perfil, en cambio, la subes voluntariamente: puedes retirar ese consentimiento en cualquier
+            momento desde <span className="font-medium text-foreground">Mi perfil → Quitar foto</span>. La foto se
+            borra y deja de mostrarse en la plataforma y en tu credencial. El retiro no afecta la licitud del
+            tratamiento realizado antes de ese momento.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+            6. Decisiones automatizadas y elaboración de perfiles
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Capapp calcula automáticamente el estado de vigencia de tu capacitación (vigente, por vencer, vencida o
+            sin capacitación) con una regla fija de fechas: tu capacitación vence al cumplirse el plazo de vigencia
+            del certificado, contado desde la fecha en que la aprobaste, y se marca &quot;por vencer&quot; cuando
+            faltan pocos días para esa fecha (tu organización define cuántos). La aprobación de un curso no es
+            automática: la registra el facilitador o quien administra la capacitación.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Tu empleador usa ese estado para autorizarte a realizar trabajos que exigen esta capacitación. Por eso,
+            si tu capacitación aparece vencida o sin registro, es posible que no se te autorice a realizar esas
+            tareas hasta regularizarla. Esa autorización la decide tu empleador, no la plataforma. Si crees que tu
+            estado es incorrecto (por ejemplo, porque falta registrar un curso que aprobaste), puedes pedir que una
+            persona lo revise y lo corrija por los canales de tu empresa, según se indica en el punto 9.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            No elaboramos perfiles sobre ti. Los reportes por rango etario y sexo son agregados y no se usan para
+            evaluarte individualmente. El asistente de inteligencia artificial sólo responde consultas de quienes
+            administran la capacitación y no toma decisiones sobre ti.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">7. Con quién se comparten</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Con tu empleador y quienes administran la capacitación dentro de tu organización. Quien escanee el código
             QR de tu credencial o de tu certificado ve tu nombre, RUT y estado de capacitación (y, en la credencial,
@@ -89,7 +128,7 @@ export default function PoliticaPrivacidadPage() {
 
         <section className="flex flex-col gap-3">
           <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
-            6. Cuánto tiempo conservamos tus datos
+            8. Cuánto tiempo conservamos tus datos
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Mientras dure tu relación laboral con la organización y, respecto de los registros de capacitación y
@@ -99,20 +138,21 @@ export default function PoliticaPrivacidadPage() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">7. Tus derechos</h2>
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">9. Tus derechos</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Tienes derecho de acceso, rectificación, supresión, oposición, portabilidad y bloqueo de tus datos
             personales. Desde <span className="font-medium text-foreground">Mi perfil → Mis datos</span> puedes
             descargar una copia completa de tus datos y solicitar la baja de tu cuenta. Ten en cuenta que, mientras
             exista la obligación legal de conservar registros de capacitación (DS 44), esa solicitud no elimina
-            dichos registros, aunque sí desactiva tu acceso a la plataforma. Para cualquier otra solicitud, contacta
-            a quien administra Capapp en tu organización, que es el responsable de responderte. Si no recibes
-            respuesta o no estás conforme, puedes reclamar ante la Agencia de Protección de Datos Personales.
+            dichos registros, aunque sí desactiva tu acceso a la plataforma. Para cualquier otra solicitud, incluida
+            la revisión de tu estado de capacitación, usa los canales habituales de tu empresa (tu supervisor,
+            recursos humanos u otro que tu empleador defina): tu empleador es el responsable de responderte. Si no
+            recibes respuesta o no estás conforme, puedes reclamar ante la Agencia de Protección de Datos Personales.
           </p>
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">8. Seguridad</h2>
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wide">10. Seguridad</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Tus datos se almacenan cifrados en reposo y se transmiten siempre mediante conexiones cifradas (HTTPS). El
             acceso a la información está restringido por rol y por organización.

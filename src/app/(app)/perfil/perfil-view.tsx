@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { actualizarPerfil, subirAvatar, exportarMisDatos, solicitarBajaCuenta } from "./actions";
+import { actualizarPerfil, subirAvatar, quitarAvatar, exportarMisDatos, solicitarBajaCuenta } from "./actions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -98,6 +98,19 @@ function AvatarUploader({
     e.target.value = "";
   }
 
+  function onQuitar() {
+    if (!confirm("¿Quitar tu foto de perfil? Dejará de mostrarse en la app y en tu credencial.")) return;
+    startTransition(async () => {
+      const resultado = await quitarAvatar();
+      if (!resultado.ok) {
+        toast.error(resultado.mensaje);
+        return;
+      }
+      setUrlActual(null);
+      toast.success("Foto de perfil eliminada.");
+    });
+  }
+
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
@@ -125,6 +138,16 @@ function AvatarUploader({
       <div>
         <p className="text-sm font-medium">Foto de perfil</p>
         <p className="text-xs text-muted-foreground">JPG, PNG o WEBP. Máximo {maxMb} MB.</p>
+        {urlActual && (
+          <button
+            type="button"
+            onClick={onQuitar}
+            disabled={pending}
+            className="mt-1 text-xs text-destructive underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            Quitar foto
+          </button>
+        )}
       </div>
     </div>
   );

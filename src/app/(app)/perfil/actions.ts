@@ -158,3 +158,34 @@ export async function solicitarBajaCuenta() {
 
   return { ok: true as const };
 }
+
+/**
+ * Retiro del consentimiento para la foto de perfil (política de privacidad,
+ * sección 5): borra el archivo del bucket y deja de mostrarla en la app y en
+ * la credencial QR. Con el cliente del usuario: la política del bucket sólo
+ * le permite borrar su propia carpeta.
+ */
+export async function quitarAvatar() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false as const, mensaje: "No autenticado." };
+
+  const { data: archivos, error: errorLista } = await supabase.storage.from("avatars").list(user.id);
+  if (errorLista) return { ok: false as const, mensaje: "No se pudo quitar la foto. Intenta de nuevo." };
+
+  if (archivos && archivos.length > 0) {
+    const { error: errorBorrado } = await supabase.storage
+      .from("avatars")
+      .remove(archivos.map((a) => `${user.id}/${a.name}`));
+    if (errorBorrado) return { ok: false as const, mensaje: "No se pudo quitar la foto. Intenta de nuevo." };
+  }
+
+  const { error } = await supabase.from("usuarios").update({ avatar_url: null }).eq("id", user.id);
+  if (error) return { ok: false as const, mensaje: "No se pudo quitar la foto. Intenta de nuevo." };
+
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
